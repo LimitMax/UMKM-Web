@@ -398,80 +398,61 @@ export default function CustomerOrderPage() {
         </div>
 
         {/* Right Side: Desktop Checkout sidebar (visible on desktop) */}
-        <div className="hidden md:block w-96 bg-slate-900 border border-slate-800 rounded-2xl p-6 h-fit sticky top-24">
-          <h2 className="font-bold text-base text-white flex items-center gap-2 mb-4">
+        <div className="hidden md:flex w-96 bg-slate-900 border border-slate-800 rounded-2xl p-5 h-[calc(100vh-130px)] sticky top-24 flex-col min-h-0">
+          <h2 className="font-bold text-base text-white flex items-center gap-2 mb-3 flex-shrink-0">
             <ShoppingBag className="w-5 h-5 text-emerald-400" />
             <span>Keranjang Belanja</span>
           </h2>
 
           {cart.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 text-xs">
+            <div className="flex-1 flex items-center justify-center text-center py-8 text-slate-500 text-xs">
               Keranjang masih kosong. Pilih menu di sebelah kiri.
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              {/* Cart List */}
-              <div className="max-h-60 overflow-y-auto pr-1 flex flex-col gap-3">
-                {cart.map((item) => (
-                  <div key={item.product.id} className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800/50">
-                    <div className="flex-1 pr-2">
-                      <p className="text-xs font-semibold text-white line-clamp-1">{item.product.name}</p>
-                      <p className="text-[10px] text-emerald-400 font-bold mt-0.5">{formatRupiah(item.product.price)}</p>
-                    </div>
-                    
-                    {/* Controls */}
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => updateQuantity(item.product.id, -1)}
-                        className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="text-xs font-bold text-white w-4 text-center">{item.quantity}</span>
-                      <button 
-                        onClick={() => updateQuantity(item.product.id, 1)}
-                        className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+            <form onSubmit={handleCheckout} className="flex-1 flex flex-col min-h-0">
+              {/* Scrollable middle container (Cart list and inputs) */}
+              <div className="flex-1 overflow-y-auto pr-1 pb-3 flex flex-col gap-4 min-h-0 scrollbar-thin">
+                {/* Cart List */}
+                <div className="flex flex-col gap-2.5">
+                  {cart.map((item) => (
+                    <div key={item.product.id} className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800/50">
+                      <div className="flex-1 pr-2">
+                        <p className="text-xs font-semibold text-white line-clamp-1">{item.product.name}</p>
+                        <p className="text-[10px] text-emerald-400 font-bold mt-0.5">{formatRupiah(item.product.price)}</p>
+                      </div>
                       
-                      <button 
-                        onClick={() => removeFromCart(item.product.id)}
-                        className="p-1 ml-1 text-slate-500 hover:text-rose-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Controls */}
+                      <div className="flex items-center gap-2">
+                        <button 
+                          type="button"
+                          onClick={() => updateQuantity(item.product.id, -1)}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="text-xs font-bold text-white w-4 text-center">{item.quantity}</span>
+                        <button 
+                          type="button"
+                          onClick={() => updateQuantity(item.product.id, 1)}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                        
+                        <button 
+                          type="button"
+                          onClick={() => removeFromCart(item.product.id)}
+                          className="p-1 ml-1 text-slate-500 hover:text-rose-400"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-t border-slate-800 pt-3">
-                <div className="flex flex-col gap-2 mb-4">
-                  <div className="flex justify-between text-xs text-slate-400">
-                    <span>Subtotal:</span>
-                    <span className="text-slate-300">{formatRupiah(subtotal)}</span>
-                  </div>
-                  {businessProfile?.serviceChargeEnabled && (
-                    <div className="flex justify-between text-xs text-slate-400">
-                      <span>Biaya Layanan ({businessProfile.serviceChargePercentage}%):</span>
-                      <span className="text-slate-300">{formatRupiah(serviceCharge)}</span>
-                    </div>
-                  )}
-                  {businessProfile?.taxEnabled && (
-                    <div className="flex justify-between text-xs text-slate-400">
-                      <span>Pajak ({businessProfile.taxPercentage}%):</span>
-                      <span className="text-slate-300">{formatRupiah(tax)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-bold text-sm text-white border-t border-slate-850 pt-2 mt-1">
-                    <span>Total Bayar:</span>
-                    <span className="text-emerald-400 text-base">{formatRupiah(totalAmount)}</span>
-                  </div>
+                  ))}
                 </div>
-                
-                {/* Checkout form */}
-                <form onSubmit={handleCheckout} className="flex flex-col gap-3">
+
+                {/* Checkout Fields */}
+                <div className="flex flex-col gap-3.5 border-t border-slate-850 pt-3.5 mt-1">
                   <div>
                     <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Nama Lengkap *</label>
                     <input
@@ -538,24 +519,50 @@ export default function CustomerOrderPage() {
                       {paymentMethod === 'Bank Transfer' && '💡 Transfer: Konfirmasi pembayaran ke kasir'}
                     </p>
                   </div>
+                </div>
+              </div>
 
-                  {errorMsg && (
-                    <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-1.5 mt-2">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      <span>{errorMsg}</span>
+              {/* Sticky bottom totals and checkout trigger inside form */}
+              <div className="border-t border-slate-800 pt-3 mt-auto bg-slate-900 flex-shrink-0">
+                <div className="flex flex-col gap-1.5 mb-3">
+                  <div className="flex justify-between text-xs text-slate-450">
+                    <span>Subtotal:</span>
+                    <span className="text-slate-300">{formatRupiah(subtotal)}</span>
+                  </div>
+                  {businessProfile?.serviceChargeEnabled && (
+                    <div className="flex justify-between text-xs text-slate-450">
+                      <span>Biaya Layanan ({businessProfile.serviceChargePercentage}%):</span>
+                      <span className="text-slate-300">{formatRupiah(serviceCharge)}</span>
                     </div>
                   )}
+                  {businessProfile?.taxEnabled && (
+                    <div className="flex justify-between text-xs text-slate-450">
+                      <span>Pajak ({businessProfile.taxPercentage}%):</span>
+                      <span className="text-slate-300">{formatRupiah(tax)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-sm text-white border-t border-slate-850 pt-2 mt-1">
+                    <span>Total Bayar:</span>
+                    <span className="text-emerald-400 text-base">{formatRupiah(totalAmount)}</span>
+                  </div>
+                </div>
 
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-500 text-slate-950 font-bold rounded-xl transition-all shadow-lg hover:shadow-emerald-500/20 text-sm mt-3"
-                  >
-                    {isLoading ? 'Memproses...' : 'Konfirmasi & Bayar'}
-                  </button>
-                </form>
+                {errorMsg && (
+                  <div className="p-2 mb-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-450 text-[10px] flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-500 text-slate-950 font-black rounded-xl transition-all shadow-lg hover:shadow-emerald-500/20 text-xs uppercase tracking-wider"
+                >
+                  {isLoading ? 'Memproses...' : 'Konfirmasi & Bayar'}
+                </button>
               </div>
-            </div>
+            </form>
           )}
         </div>
       </main>
@@ -611,14 +618,16 @@ export default function CustomerOrderPage() {
             </div>
 
             {/* List and checkout inputs */}
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
-              {cart.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">
-                  Keranjang belanja masih kosong.
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-3">
+            {cart.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-center py-12 text-slate-500 text-xs">
+                Keranjang belanja masih kosong.
+              </div>
+            ) : (
+              <form onSubmit={handleCheckout} className="flex-1 flex flex-col min-h-0">
+                {/* Scrollable middle container */}
+                <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 min-h-0 scrollbar-thin">
+                  {/* Cart List */}
+                  <div className="flex flex-col gap-2.5">
                     {cart.map((item) => (
                       <div key={item.product.id} className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800/50">
                         <div className="flex-1 pr-2">
@@ -628,6 +637,7 @@ export default function CustomerOrderPage() {
                         
                         <div className="flex items-center gap-2">
                           <button 
+                            type="button"
                             onClick={() => updateQuantity(item.product.id, -1)}
                             className="p-1 rounded bg-slate-800 text-slate-300"
                           >
@@ -635,6 +645,7 @@ export default function CustomerOrderPage() {
                           </button>
                           <span className="text-xs font-bold text-white w-4 text-center">{item.quantity}</span>
                           <button 
+                            type="button"
                             onClick={() => updateQuantity(item.product.id, 1)}
                             className="p-1 rounded bg-slate-800 text-slate-300"
                           >
@@ -642,6 +653,7 @@ export default function CustomerOrderPage() {
                           </button>
                           
                           <button 
+                            type="button"
                             onClick={() => removeFromCart(item.product.id)}
                             className="p-1 text-slate-500"
                           >
@@ -652,118 +664,120 @@ export default function CustomerOrderPage() {
                     ))}
                   </div>
 
-                  <div className="border-t border-slate-800 pt-4 flex flex-col gap-4">
-                    <div className="flex flex-col gap-3">
-                      <div className="flex justify-between text-xs text-slate-400">
-                        <span>Subtotal:</span>
-                        <span className="text-slate-300">{formatRupiah(subtotal)}</span>
-                      </div>
-                      {businessProfile?.serviceChargeEnabled && (
-                        <div className="flex justify-between text-xs text-slate-400">
-                          <span>Biaya Layanan ({businessProfile.serviceChargePercentage}%):</span>
-                          <span className="text-slate-300">{formatRupiah(serviceCharge)}</span>
-                        </div>
-                      )}
-                      {businessProfile?.taxEnabled && (
-                        <div className="flex justify-between text-xs text-slate-400">
-                          <span>Pajak ({businessProfile.taxPercentage}%):</span>
-                          <span className="text-slate-300">{formatRupiah(tax)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between font-bold text-sm text-white border-t border-slate-850 pt-2 mt-1">
-                        <span>Total Bayar:</span>
-                        <span className="text-emerald-400 text-base">{formatRupiah(totalAmount)}</span>
-                      </div>
+                  {/* Form fields */}
+                  <div className="flex flex-col gap-3.5 border-t border-slate-850 pt-3.5 mt-1">
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Nama Lengkap *</label>
+                      <input
+                        type="text"
+                        required
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="Budi Santoso"
+                        className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">No. WhatsApp (Opsional)</label>
+                      <input
+                        type="tel"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        placeholder="08123456789"
+                        className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Catatan</label>
+                      <textarea
+                        value={orderNotes}
+                        onChange={(e) => setOrderNotes(e.target.value)}
+                        placeholder="Rasa pedas sedang, es teh manis jumbo"
+                        rows={2}
+                        className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 resize-none"
+                      />
                     </div>
 
-                    <form onSubmit={handleCheckout} className="flex flex-col gap-4">
-                      <div>
-                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Nama Lengkap *</label>
-                        <input
-                          type="text"
-                          required
-                          value={customerName}
-                          onChange={(e) => setCustomerName(e.target.value)}
-                          placeholder="Budi Santoso"
-                          className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
-                        />
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-2">Metode Pembayaran *</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: 'Cash', label: 'Tunai', icon: DollarSign },
+                          { id: 'QRIS', label: 'QRIS', icon: Wallet },
+                          { id: 'Bank Transfer', label: 'Transfer', icon: CreditCard },
+                        ].map((method) => {
+                          const Icon = method.icon;
+                          const isSelected = paymentMethod === method.id;
+                          return (
+                            <button
+                              key={method.id}
+                              type="button"
+                              onClick={() => setPaymentMethod(method.id as PaymentMethod)}
+                              className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all ${
+                                isSelected
+                                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              <Icon className="w-4 h-4 mb-1" />
+                              <span className="text-[10px]">{method.label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
-                      
-                      <div>
-                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">No. WhatsApp (Opsional)</label>
-                        <input
-                          type="tel"
-                          value={customerPhone}
-                          onChange={(e) => setCustomerPhone(e.target.value)}
-                          placeholder="08123456789"
-                          className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Catatan</label>
-                        <textarea
-                          value={orderNotes}
-                          onChange={(e) => setOrderNotes(e.target.value)}
-                          placeholder="Rasa pedas sedang, es teh manis jumbo"
-                          rows={2}
-                          className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 resize-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-2">Metode Pembayaran *</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { id: 'Cash', label: 'Tunai', icon: DollarSign },
-                            { id: 'QRIS', label: 'QRIS', icon: Wallet },
-                            { id: 'Bank Transfer', label: 'Transfer', icon: CreditCard },
-                          ].map((method) => {
-                            const Icon = method.icon;
-                            const isSelected = paymentMethod === method.id;
-                            return (
-                              <button
-                                key={method.id}
-                                type="button"
-                                onClick={() => setPaymentMethod(method.id as PaymentMethod)}
-                                className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all ${
-                                  isSelected
-                                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
-                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                                }`}
-                              >
-                                <Icon className="w-4 h-4 mb-1" />
-                                <span className="text-[10px]">{method.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <p className="text-[10px] text-slate-450 font-sans mt-2.5 italic leading-relaxed">
-                          {paymentMethod === 'Cash' && '💡 Tunai: Bayar di kasir saat pesanan diambil'}
-                          {paymentMethod === 'QRIS' && '💡 QRIS: Scan QRIS di kasir setelah checkout'}
-                          {paymentMethod === 'Bank Transfer' && '💡 Transfer: Konfirmasi pembayaran ke kasir'}
-                        </p>
-                      </div>
-
-                      {errorMsg && (
-                        <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-1.5">
-                          <AlertCircle className="w-4 h-4" />
-                          <span>{errorMsg}</span>
-                        </div>
-                      )}
-
-                      <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-550 text-slate-950 font-bold rounded-xl transition-all shadow-lg text-xs uppercase tracking-wider mt-2"
-                      >
-                        {isLoading ? 'Memproses...' : 'Konfirmasi & Bayar'}
-                      </button>
-                    </form>
+                      <p className="text-[10px] text-slate-450 font-sans mt-2.5 italic leading-relaxed">
+                        {paymentMethod === 'Cash' && '💡 Tunai: Bayar di kasir saat pesanan diambil'}
+                        {paymentMethod === 'QRIS' && '💡 QRIS: Scan QRIS di kasir setelah checkout'}
+                        {paymentMethod === 'Bank Transfer' && '💡 Transfer: Konfirmasi pembayaran ke kasir'}
+                      </p>
+                    </div>
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+
+                {/* Sticky Bottom Footer for totals and pay CTA inside form */}
+                <div className="p-4 bg-slate-950 border-t border-slate-850 flex-shrink-0">
+                  <div className="flex flex-col gap-1.5 mb-3">
+                    <div className="flex justify-between text-xs text-slate-450">
+                      <span>Subtotal:</span>
+                      <span className="text-slate-300">{formatRupiah(subtotal)}</span>
+                    </div>
+                    {businessProfile?.serviceChargeEnabled && (
+                      <div className="flex justify-between text-xs text-slate-450">
+                        <span>Biaya Layanan ({businessProfile.serviceChargePercentage}%):</span>
+                        <span className="text-slate-300">{formatRupiah(serviceCharge)}</span>
+                      </div>
+                    )}
+                    {businessProfile?.taxEnabled && (
+                      <div className="flex justify-between text-xs text-slate-450">
+                        <span>Pajak ({businessProfile.taxPercentage}%):</span>
+                        <span className="text-slate-300">{formatRupiah(tax)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold text-sm text-white border-t border-slate-850 pt-2 mt-1">
+                      <span>Total Bayar:</span>
+                      <span className="text-emerald-400 text-base">{formatRupiah(totalAmount)}</span>
+                    </div>
+                  </div>
+
+                  {errorMsg && (
+                    <div className="p-2 mb-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-450 text-[10px] flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-550 text-slate-950 font-bold rounded-xl transition-all shadow-lg text-xs uppercase tracking-wider"
+                  >
+                    {isLoading ? 'Memproses...' : 'Konfirmasi & Bayar'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

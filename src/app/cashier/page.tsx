@@ -398,11 +398,11 @@ export default function CashierDashboard() {
         </div>
 
         {/* Right Section: Detailed Order Drawer/Panel */}
-        <div className="w-full lg:w-96 bg-slate-900 border border-slate-850 rounded-2xl p-6 h-fit lg:sticky lg:top-24 flex flex-col gap-6">
+        <div className="w-full lg:w-96 bg-slate-900 border border-slate-850 rounded-2xl p-5 h-[calc(100vh-130px)] lg:sticky lg:top-24 flex flex-col min-h-0">
           {selectedOrder ? (
-            <>
-              {/* Header Details */}
-              <div className="border-b border-slate-800 pb-4">
+            <div className="flex flex-col flex-1 min-h-0">
+              {/* Header Details (fixed) */}
+              <div className="border-b border-slate-800 pb-3 flex-shrink-0">
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">Rincian Antrean</span>
@@ -414,14 +414,14 @@ export default function CashierDashboard() {
                 </div>
                 
                 {/* Customer Meta */}
-                <div className="flex flex-col gap-1.5 mt-4 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                <div className="flex flex-col gap-1.5 mt-3 p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-xs">
                   <div className="flex items-center gap-2 text-slate-400">
                     <User className="w-3.5 h-3.5 text-slate-500" />
                     <span>Nama: <strong className="text-white">{selectedOrder.customerName}</strong></span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-400">
                     <Phone className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Telepon: <strong className="text-white">{selectedOrder.customerPhone}</strong></span>
+                    <span>Telepon: <strong className="text-white">{selectedOrder.customerPhone || '-'}</strong></span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
                     <CreditCard className="w-3.5 h-3.5 text-slate-500" />
@@ -435,10 +435,10 @@ export default function CashierDashboard() {
                 </div>
               </div>
 
-              {/* Items List */}
-              <div className="max-h-48 overflow-y-auto pr-1">
-                <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-3">Pesanan Pelanggan</h4>
-                <div className="flex flex-col gap-3">
+              {/* Scrollable Middle Content (Items List) */}
+              <div className="flex-1 overflow-y-auto py-3 pr-1 min-h-0 scrollbar-thin">
+                <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2.5">Pesanan Pelanggan</h4>
+                <div className="flex flex-col gap-2.5">
                   {selectedOrder.items.map((item) => (
                     <div key={item.productId} className="flex justify-between items-center text-xs text-slate-350">
                       <div>
@@ -451,132 +451,129 @@ export default function CashierDashboard() {
                 </div>
               </div>
 
-              {/* Bill Details */}
-              <div className="border-t border-slate-850 pt-4 bg-slate-950/20 p-3 rounded-xl flex flex-col gap-1.5">
-                {selectedOrder.subtotal !== undefined && selectedOrder.subtotal !== selectedOrder.totalAmount && (
-                  <>
-                    <div className="flex justify-between text-xs text-slate-400">
-                      <span>Subtotal:</span>
-                      <span className="text-slate-300">{formatRupiah(selectedOrder.subtotal)}</span>
-                    </div>
-                    {selectedOrder.serviceChargeAmount !== undefined && selectedOrder.serviceChargeAmount > 0 && (
-                      <div className="flex justify-between text-xs text-slate-400">
-                        <span>Biaya Layanan:</span>
-                        <span className="text-slate-300">{formatRupiah(selectedOrder.serviceChargeAmount)}</span>
+              {/* Sticky bottom footer for totals and workflow buttons */}
+              <div className="border-t border-slate-800 pt-3 mt-auto flex-shrink-0 bg-slate-900 flex flex-col gap-3">
+                {/* Bill details */}
+                <div className="bg-slate-950/45 p-2.5 rounded-xl border border-slate-850/50 flex flex-col gap-1.5">
+                  {selectedOrder.subtotal !== undefined && selectedOrder.subtotal !== selectedOrder.totalAmount && (
+                    <>
+                      <div className="flex justify-between text-[11px] text-slate-455">
+                        <span>Subtotal:</span>
+                        <span className="text-slate-305">{formatRupiah(selectedOrder.subtotal)}</span>
                       </div>
-                    )}
-                    {selectedOrder.taxAmount !== undefined && selectedOrder.taxAmount > 0 && (
-                      <div className="flex justify-between text-xs text-slate-400">
-                        <span>Pajak:</span>
-                        <span className="text-slate-300">{formatRupiah(selectedOrder.taxAmount)}</span>
-                      </div>
-                    )}
-                  </>
-                )}
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>Pembayaran:</span>
-                  <span className={`font-bold ${selectedOrder.paymentStatus === 'Paid' ? 'text-emerald-400' : 'text-amber-500'}`}>
-                    {selectedOrder.paymentStatus === 'Paid' ? 'LUNAS' : 'Belum Bayar'}
-                  </span>
+                      {selectedOrder.serviceChargeAmount !== undefined && selectedOrder.serviceChargeAmount > 0 && (
+                        <div className="flex justify-between text-[11px] text-slate-455">
+                          <span>Biaya Layanan:</span>
+                          <span className="text-slate-305">{formatRupiah(selectedOrder.serviceChargeAmount)}</span>
+                        </div>
+                      )}
+                      {selectedOrder.taxAmount !== undefined && selectedOrder.taxAmount > 0 && (
+                        <div className="flex justify-between text-[11px] text-slate-455">
+                          <span>Pajak:</span>
+                          <span className="text-slate-305">{formatRupiah(selectedOrder.taxAmount)}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div className="flex justify-between text-[11px] text-slate-455">
+                    <span>Status Bayar:</span>
+                    <span className={`font-bold ${selectedOrder.paymentStatus === 'Paid' ? 'text-emerald-400' : 'text-amber-500'}`}>
+                      {selectedOrder.paymentStatus === 'Paid' ? 'LUNAS' : 'Belum Bayar'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-bold text-xs text-white border-t border-slate-800 pt-1.5 mt-0.5">
+                    <span>Total Tagihan:</span>
+                    <span className="text-emerald-400 text-sm">{formatRupiah(selectedOrder.totalAmount)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between font-bold text-sm text-white border-t border-slate-800 pt-1.5 mt-0.5">
-                  <span>Total Tagihan:</span>
-                  <span className="text-emerald-400">{formatRupiah(selectedOrder.totalAmount)}</span>
-                </div>
-              </div>
 
-              {/* Workflow Actions */}
-              <div className="flex flex-col gap-2 pt-2 border-t border-slate-800">
-                <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">Perbarui Status</h4>
-                
                 {/* State-Machine buttons */}
-                {selectedOrder.status === 'Waiting for Payment' && (
-                  <>
+                <div className="flex flex-col gap-2">
+                  {selectedOrder.status === 'Waiting for Payment' && (
+                    <div className="flex flex-col gap-1.5">
+                      <button
+                        onClick={() => handleUpdateStatus(selectedOrder.id, 'Paid')}
+                        className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
+                      >
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                        <span>Konfirmasi Pembayaran Lunas</span>
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStatus(selectedOrder.id, 'Cancelled')}
+                        className="w-full py-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 hover:text-rose-450 text-slate-400 border border-slate-750 hover:border-rose-500/20 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        <span>Batalkan Pesanan</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedOrder.status === 'Paid' && (
                     <button
-                      onClick={() => handleUpdateStatus(selectedOrder.id, 'Paid')}
-                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs"
+                      onClick={() => handleUpdateStatus(selectedOrder.id, 'Processing')}
+                      className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-500/10 cursor-pointer"
                     >
-                      <Check className="w-4 h-4 stroke-[2.5]" />
-                      <span>Konfirmasi Pembayaran Lunas</span>
+                      <Play className="w-4 h-4" />
+                      <span>Mulai Proses / Kirim Dapur</span>
                     </button>
+                  )}
+
+                  {selectedOrder.status === 'Processing' && (
                     <button
-                      onClick={() => handleUpdateStatus(selectedOrder.id, 'Cancelled')}
-                      className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-rose-950/50 hover:text-rose-400 text-slate-400 border border-slate-700 hover:border-rose-500/20 font-bold transition-all flex items-center justify-center gap-2 text-xs"
+                      onClick={() => handleUpdateStatus(selectedOrder.id, 'Ready')}
+                      className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-blue-500/10 cursor-pointer"
                     >
+                      <CheckSquare className="w-4 h-4" />
+                      <span>Tandai Siap Saji</span>
+                    </button>
+                  )}
+
+                  {selectedOrder.status === 'Ready' && (
+                    <button
+                      onClick={() => handleUpdateStatus(selectedOrder.id, 'Completed')}
+                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/10 cursor-pointer"
+                    >
+                      <CheckSquare className="w-4 h-4 stroke-[2.5]" />
+                      <span>Selesaikan / Ambil</span>
+                    </button>
+                  )}
+
+                  {selectedOrder.status === 'Completed' && (
+                    <div className="p-2.5 bg-emerald-950/20 text-center rounded-xl border border-emerald-500/15 text-[11px] text-emerald-400 flex items-center justify-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Pesanan ini telah Selesai dan Lunas.</span>
+                    </div>
+                  )}
+
+                  {selectedOrder.status === 'Cancelled' && (
+                    <div className="p-2.5 bg-rose-950/20 text-center rounded-xl border border-rose-500/15 text-[11px] text-rose-450 flex items-center justify-center gap-1.5">
                       <XCircle className="w-4 h-4" />
-                      <span>Batalkan Pesanan</span>
-                    </button>
-                  </>
-                )}
+                      <span>Pesanan Dibatalkan. Stok dikembalikan.</span>
+                    </div>
+                  )}
+                </div>
 
-                {selectedOrder.status === 'Paid' && (
-                  <button
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'Processing')}
-                    className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-500/10"
-                  >
-                    <Play className="w-4 h-4" />
-                    <span>Mulai Proses / Kirim Dapur</span>
-                  </button>
-                )}
-
-                {selectedOrder.status === 'Processing' && (
-                  <button
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'Ready')}
-                    className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-blue-500/10"
-                  >
-                    <CheckSquare className="w-4 h-4" />
-                    <span>Tandai Siap Saji</span>
-                  </button>
-                )}
-
-                {selectedOrder.status === 'Ready' && (
-                  <button
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'Completed')}
-                    className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/10"
-                  >
-                    <CheckSquare className="w-4 h-4 stroke-[2.5]" />
-                    <span>Selesaikan / Ambil</span>
-                  </button>
-                )}
-
-                {selectedOrder.status === 'Completed' && (
-                  <div className="p-3 bg-slate-950 text-center rounded-xl border border-slate-800 text-xs text-slate-400 flex items-center justify-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    <span>Pesanan ini telah Selesai dan Lunas.</span>
-                  </div>
-                )}
-
-                {selectedOrder.status === 'Cancelled' && (
-                  <div className="p-3 bg-rose-500/10 text-center rounded-xl border border-rose-500/20 text-xs text-rose-400 flex items-center justify-center gap-2">
-                    <XCircle className="w-5 h-5" />
-                    <span>Pesanan Dibatalkan. Stok dikembalikan.</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Receipt Actions */}
-              <div className="flex flex-col gap-2 pt-3 border-t border-slate-800">
-                <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-1">Struk Transaksi</h4>
-                <div className="flex gap-2">
+                {/* Receipt links */}
+                <div className="flex gap-2 border-t border-slate-800 pt-2.5">
                   <button
                     onClick={() => window.open(`/receipt/${selectedOrder.id}`, '_blank')}
-                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-750 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-750 text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     <span>Lihat Struk</span>
                   </button>
                   <button
                     onClick={() => window.open(`/receipt/${selectedOrder.id}?print=true`, '_blank')}
-                    className="flex-1 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     <span>Cetak Struk</span>
                   </button>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
-            <div className="text-center py-20 text-slate-500 text-xs flex flex-col items-center justify-center gap-3">
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-20 text-slate-500 text-xs gap-3">
               <FileText className="w-8 h-8 text-slate-700" />
               <p>Pilih salah satu pesanan untuk melihat detail dan mengupdate status.</p>
             </div>

@@ -181,8 +181,8 @@ export default function AdminProductsPage() {
       </div>
 
       {/* Filter and Search actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="relative md:col-span-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md w-full">
           <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
             <Search className="w-4.5 h-4.5" />
           </span>
@@ -195,15 +195,15 @@ export default function AdminProductsPage() {
           />
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none flex-shrink-0">
           {['Semua', 'Makanan', 'Minuman', 'Snack', 'Paket Promo'].map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat
                   ? 'bg-slate-800 text-emerald-400 border border-emerald-500/25'
-                  : 'bg-slate-900/50 text-slate-400 border border-slate-850 hover:text-white'
+                  : 'bg-slate-900/50 text-slate-450 border border-slate-850 hover:text-white'
               }`}
             >
               {cat}
@@ -213,9 +213,17 @@ export default function AdminProductsPage() {
       </div>
 
       {/* Products Table/Grid list */}
-      {filteredProducts.length === 0 ? (
-        <div className="text-center py-20 border border-dashed border-slate-850 rounded-2xl">
-          <p className="text-slate-500 text-xs">Belum ada produk yang ditambahkan.</p>
+      {products.length === 0 ? (
+        <div className="text-center py-16 border border-dashed border-slate-850 rounded-2xl flex flex-col items-center justify-center gap-3">
+          <AlertCircle className="w-8 h-8 text-slate-700" />
+          <p className="text-slate-500 text-xs font-semibold">Belum ada produk dalam katalog.</p>
+          <p className="text-[11px] text-slate-600 max-w-sm">Silakan klik tombol &ldquo;Tambah Produk&rdquo; di atas untuk memasukkan menu makanan atau minuman pertama Anda.</p>
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="text-center py-16 border border-dashed border-slate-850 rounded-2xl flex flex-col items-center justify-center gap-3">
+          <Search className="w-8 h-8 text-slate-700" />
+          <p className="text-slate-500 text-xs font-semibold">Hasil Pencarian Tidak Ditemukan</p>
+          <p className="text-[11px] text-slate-650 max-w-sm">Tidak ada produk yang cocok dengan kata kunci &ldquo;{searchQuery}&rdquo; atau filter kategori &ldquo;{selectedCategory}&rdquo;.</p>
         </div>
       ) : (
         <div className="bg-slate-900 border border-slate-850 rounded-2xl overflow-hidden">
@@ -238,14 +246,26 @@ export default function AdminProductsPage() {
                     {/* Image & Info */}
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <img 
-                          src={prod.imageUrl} 
-                          alt={prod.name} 
-                          className="w-10 h-10 object-cover rounded-lg bg-slate-950 border border-slate-800" 
-                        />
+                        <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0">
+                          {prod.imageUrl ? (
+                            <img 
+                              src={prod.imageUrl} 
+                              alt={prod.name} 
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.opacity = '0';
+                              }}
+                              className="w-full h-full object-cover transition-opacity duration-300" 
+                            />
+                          ) : null}
+                          <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex items-center justify-center text-slate-550 font-bold text-xs uppercase pointer-events-none -z-10">
+                            {prod.name.substring(0, 2).toUpperCase()}
+                          </div>
+                        </div>
                         <div>
-                          <p className="font-bold text-white text-xs">{prod.name}</p>
-                          <p className="text-[10px] text-slate-500 mt-0.5">ID: {prod.id.slice(5, 12)}</p>
+                          <p className="font-bold text-white text-xs max-w-[180px] md:max-w-[220px] truncate" title={prod.name}>
+                            {prod.name}
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-0.5 font-mono">ID: {prod.id.slice(5, 12)}</p>
                         </div>
                       </div>
                     </td>

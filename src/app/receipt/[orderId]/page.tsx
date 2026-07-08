@@ -103,7 +103,7 @@ export default function ReceiptPage() {
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-start p-4 sm:p-8 relative">
       
       {/* Print CSS Injection */}
-      <style jsx global>{`
+      <style>{`
         @media print {
           body {
             background: white !important;
