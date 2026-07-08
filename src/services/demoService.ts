@@ -8,6 +8,7 @@
 
 import { Order, Product, PaymentMethod, OrderStatus, PaymentStatus } from '../types';
 import { getStorageItem, setStorageItem, STORAGE_KEYS, SEED_PRODUCTS } from './db';
+import { businessService } from './businessService';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -252,10 +253,19 @@ export const demoService = {
         now.getTime() - blueprint.hoursAgo * 3_600_000,
       ).toISOString();
 
-      const totalAmount = blueprint.items.reduce(
+      const subtotal = blueprint.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
       );
+
+      const profile = businessService.getProfile();
+      const serviceChargeAmount = profile.serviceChargeEnabled
+        ? Math.round(subtotal * (profile.serviceChargePercentage / 100))
+        : 0;
+      const taxAmount = profile.taxEnabled
+        ? Math.round(subtotal * (profile.taxPercentage / 100))
+        : 0;
+      const totalAmount = subtotal + serviceChargeAmount + taxAmount;
 
       return {
         id: `demo-order-${index + 1}-${now.getTime()}`,
@@ -264,6 +274,9 @@ export const demoService = {
         customerPhone: blueprint.customerPhone,
         notes: blueprint.notes,
         items: blueprint.items,
+        subtotal,
+        serviceChargeAmount,
+        taxAmount,
         totalAmount,
         paymentMethod: blueprint.paymentMethod,
         paymentStatus: blueprint.paymentStatus,

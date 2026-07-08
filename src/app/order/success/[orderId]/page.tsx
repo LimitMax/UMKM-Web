@@ -247,6 +247,28 @@ export default function OrderSuccessPage() {
               </div>
             ))}
 
+            {/* Breakdown Rows */}
+            {order.subtotal !== undefined && order.subtotal !== order.totalAmount && (
+              <div className="border-t border-slate-900 pt-3 mt-2 flex flex-col gap-1.5 text-xs text-slate-400">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span className="text-slate-350">{formatRupiah(order.subtotal)}</span>
+                </div>
+                {order.serviceChargeAmount !== undefined && order.serviceChargeAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span>Biaya Layanan</span>
+                    <span className="text-slate-350">{formatRupiah(order.serviceChargeAmount)}</span>
+                  </div>
+                )}
+                {order.taxAmount !== undefined && order.taxAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span>Pajak</span>
+                    <span className="text-slate-350">{formatRupiah(order.taxAmount)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Total Row */}
             <div className="border-t border-slate-800 pt-3 mt-2 flex justify-between items-center font-bold text-sm text-white">
               <span>Total Keseluruhan</span>

@@ -446,14 +446,34 @@ export default function CashierDashboard() {
               </div>
 
               {/* Bill Details */}
-              <div className="border-t border-slate-850 pt-4 bg-slate-950/20 p-3 rounded-xl">
-                <div className="flex justify-between text-xs text-slate-400 mb-1">
+              <div className="border-t border-slate-850 pt-4 bg-slate-950/20 p-3 rounded-xl flex flex-col gap-1.5">
+                {selectedOrder.subtotal !== undefined && selectedOrder.subtotal !== selectedOrder.totalAmount && (
+                  <>
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Subtotal:</span>
+                      <span className="text-slate-300">{formatRupiah(selectedOrder.subtotal)}</span>
+                    </div>
+                    {selectedOrder.serviceChargeAmount !== undefined && selectedOrder.serviceChargeAmount > 0 && (
+                      <div className="flex justify-between text-xs text-slate-400">
+                        <span>Biaya Layanan:</span>
+                        <span className="text-slate-300">{formatRupiah(selectedOrder.serviceChargeAmount)}</span>
+                      </div>
+                    )}
+                    {selectedOrder.taxAmount !== undefined && selectedOrder.taxAmount > 0 && (
+                      <div className="flex justify-between text-xs text-slate-400">
+                        <span>Pajak:</span>
+                        <span className="text-slate-300">{formatRupiah(selectedOrder.taxAmount)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="flex justify-between text-xs text-slate-400">
                   <span>Pembayaran:</span>
                   <span className={`font-bold ${selectedOrder.paymentStatus === 'Paid' ? 'text-emerald-400' : 'text-amber-500'}`}>
                     {selectedOrder.paymentStatus === 'Paid' ? 'LUNAS' : 'Belum Bayar'}
                   </span>
                 </div>
-                <div className="flex justify-between font-bold text-sm text-white">
+                <div className="flex justify-between font-bold text-sm text-white border-t border-slate-800 pt-1.5 mt-0.5">
                   <span>Total Tagihan:</span>
                   <span className="text-emerald-400">{formatRupiah(selectedOrder.totalAmount)}</span>
                 </div>

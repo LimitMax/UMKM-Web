@@ -230,9 +230,31 @@ export default function AdminTransactionsPage() {
               </div>
 
               {/* Receipt Total */}
-              <div className="border-t border-slate-850 pt-4 bg-slate-950/20 p-3 rounded-xl flex justify-between items-center font-bold text-sm text-white">
-                <span>Total Diterima:</span>
-                <span className="text-emerald-400 text-base">{formatRupiah(selectedTx.totalAmount)}</span>
+              <div className="border-t border-slate-850 pt-4 bg-slate-950/20 p-3 rounded-xl flex flex-col gap-1.5">
+                {selectedTx.subtotal !== undefined && selectedTx.subtotal !== selectedTx.totalAmount && (
+                  <>
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Subtotal:</span>
+                      <span className="text-slate-300">{formatRupiah(selectedTx.subtotal)}</span>
+                    </div>
+                    {selectedTx.serviceChargeAmount !== undefined && selectedTx.serviceChargeAmount > 0 && (
+                      <div className="flex justify-between text-xs text-slate-400">
+                        <span>Biaya Layanan:</span>
+                        <span className="text-slate-300">{formatRupiah(selectedTx.serviceChargeAmount)}</span>
+                      </div>
+                    )}
+                    {selectedTx.taxAmount !== undefined && selectedTx.taxAmount > 0 && (
+                      <div className="flex justify-between text-xs text-slate-400">
+                        <span>Pajak:</span>
+                        <span className="text-slate-300">{formatRupiah(selectedTx.taxAmount)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="flex justify-between font-bold text-sm text-white border-t border-slate-800 pt-1.5 mt-0.5">
+                  <span>Total Diterima:</span>
+                  <span className="text-emerald-400 text-base">{formatRupiah(selectedTx.totalAmount)}</span>
+                </div>
               </div>
             </>
           ) : (

@@ -36,11 +36,30 @@ export interface Order {
   customerPhone: string;
   notes?: string;
   items: OrderItem[];
+  subtotal?: number;
+  taxAmount?: number;
+  serviceChargeAmount?: number;
   totalAmount: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   status: OrderStatus;
   createdAt: string;
+}
+
+export interface BusinessProfile {
+  businessName: string;
+  businessType: string;
+  description: string;
+  logoUrl: string;
+  address: string;
+  whatsappNumber: string;
+  openingHours: string;
+  orderLink: string;
+  currency: string;
+  taxEnabled: boolean;
+  taxPercentage: number;
+  serviceChargeEnabled: boolean;
+  serviceChargePercentage: number;
 }
 
 export interface SalesSummary {

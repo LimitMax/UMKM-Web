@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  FlaskConical,
+  Settings as SettingsIcon,
+  QrCode,
+  Copy,
+  Download,
+  Save,
   RotateCcw,
   Trash2,
   PackageOpen,
@@ -17,15 +21,12 @@ import {
   DollarSign,
   ListOrdered,
   ChevronRight,
-  ShieldAlert,
   Sparkles,
 } from 'lucide-react';
+import QRCode from 'react-qr-code';
 import { demoService, DemoStats, GenerateResult } from '../../../services/demoService';
+import { businessService } from '../../../services/businessService';
 import { formatRupiah } from '../../../utils/format';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface ConfirmConfig {
   title: string;
@@ -41,25 +42,84 @@ interface Toast {
   message: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Page Component
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function AdminSettingsPage() {
-  const [stats, setStats] = useState<DemoStats | null>(null);
+  // Tab state: 'profile' | 'demo'
+  const [activeTab, setActiveTab] = useState<'profile' | 'demo'>('profile');
+
+  // Business Profile states
+  const [businessName, setBusinessName] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return businessService.getProfile().businessName;
+  });
+  const [businessType, setBusinessType] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return businessService.getProfile().businessType;
+  });
+  const [description, setDescription] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return businessService.getProfile().description;
+  });
+  const [logoUrl, setLogoUrl] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return businessService.getProfile().logoUrl;
+  });
+  const [address, setAddress] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return businessService.getProfile().address;
+  });
+  const [whatsappNumber, setWhatsappNumber] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return businessService.getProfile().whatsappNumber;
+  });
+  const [openingHours, setOpeningHours] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return businessService.getProfile().openingHours;
+  });
+  const [taxEnabled, setTaxEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return businessService.getProfile().taxEnabled;
+  });
+  const [taxPercentage, setTaxPercentage] = useState(() => {
+    if (typeof window === 'undefined') return 10;
+    return businessService.getProfile().taxPercentage;
+  });
+  const [serviceChargeEnabled, setServiceChargeEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return businessService.getProfile().serviceChargeEnabled;
+  });
+  const [serviceChargePercentage, setServiceChargePercentage] = useState(() => {
+    if (typeof window === 'undefined') return 5;
+    return businessService.getProfile().serviceChargePercentage;
+  });
+
+  // Dynamic order link state
+  const [orderLink, setOrderLink] = useState('');
+
+  // Demo stats states
+  const [stats, setStats] = useState<DemoStats | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return demoService.getStats();
+  });
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Load business profile and stats
   const loadStats = useCallback(() => {
     const s = demoService.getStats();
     setStats(s);
   }, []);
 
   useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+    // Calculate dynamic order link
+    if (typeof window !== 'undefined') {
+      const timer = setTimeout(() => {
+        setOrderLink(`${window.location.origin}/order`);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -86,7 +146,148 @@ export default function AdminSettingsPage() {
     }
   };
 
-  // ── Action Handlers ──────────────────────────────────────────────────────
+  // ── Business Settings Actions ────────────────────────────────────────────
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!businessName.trim()) {
+      showToast('error', 'Nama bisnis wajib diisi.');
+      return;
+    }
+    if (!whatsappNumber.trim()) {
+      showToast('error', 'Nomor WhatsApp wajib diisi.');
+      return;
+    }
+
+    setIsActionLoading(true);
+    try {
+      businessService.updateProfile({
+        businessName,
+        businessType,
+        description,
+        logoUrl,
+        address,
+        whatsappNumber,
+        openingHours,
+        taxEnabled,
+        taxPercentage: Number(taxPercentage),
+        serviceChargeEnabled,
+        serviceChargePercentage: Number(serviceChargePercentage),
+      });
+
+      // Sync user session businessName
+      const sessionKey = 'umkm_pilot_user_session';
+      if (typeof window !== 'undefined') {
+        const sessionStr = window.localStorage.getItem(sessionKey);
+        if (sessionStr) {
+          try {
+            const session = JSON.parse(sessionStr);
+            session.businessName = businessName;
+            window.localStorage.setItem(sessionKey, JSON.stringify(session));
+          } catch (err) {
+            console.error('Session sync error:', err);
+          }
+        }
+      }
+
+      showToast('success', 'Pengaturan bisnis berhasil disimpan! Memuat ulang halaman...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch {
+      showToast('error', 'Gagal menyimpan pengaturan bisnis.');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleResetProfile = () => {
+    setConfirm({
+      title: 'Reset Pengaturan Bisnis',
+      description: 'Apakah Anda yakin ingin mengembalikan pengaturan bisnis ke kondisi default? Seluruh konfigurasi profil, alamat, pajak, dan biaya layanan Anda saat ini akan direset.',
+      consequences: [
+        'Nama bisnis kembali menjadi "Warung Kopi Nusantara"',
+        'Biaya pajak (10%) & layanan (5%) akan dinonaktifkan',
+        'Deskripsi dan logo default akan diterapkan kembali',
+        'Halaman akan dimuat ulang untuk memperbarui sistem'
+      ],
+      confirmLabel: 'Ya, Reset Pengaturan',
+      variant: 'warning',
+      onConfirm: () => {
+        setIsActionLoading(true);
+        setConfirm(null);
+        try {
+          const defaults = businessService.resetProfile();
+          setBusinessName(defaults.businessName);
+          setBusinessType(defaults.businessType);
+          setDescription(defaults.description);
+          setLogoUrl(defaults.logoUrl);
+          setAddress(defaults.address);
+          setWhatsappNumber(defaults.whatsappNumber);
+          setOpeningHours(defaults.openingHours);
+          setTaxEnabled(defaults.taxEnabled);
+          setTaxPercentage(defaults.taxPercentage);
+          setServiceChargeEnabled(defaults.serviceChargeEnabled);
+          setServiceChargePercentage(defaults.serviceChargePercentage);
+
+          // Reset user session businessName
+          const sessionKey = 'umkm_pilot_user_session';
+          if (typeof window !== 'undefined') {
+            const sessionStr = window.localStorage.getItem(sessionKey);
+            if (sessionStr) {
+              const session = JSON.parse(sessionStr);
+              session.businessName = defaults.businessName;
+              window.localStorage.setItem(sessionKey, JSON.stringify(session));
+            }
+          }
+
+          showToast('success', 'Pengaturan bisnis berhasil direset! Memuat ulang...');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } catch {
+          showToast('error', 'Gagal mereset pengaturan bisnis.');
+          setIsActionLoading(false);
+        }
+      }
+    });
+  };
+
+  // ── QR Code Utilities ───────────────────────────────────────────────────
+
+  const handleCopyLink = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(orderLink);
+      showToast('success', 'Link QR Menu berhasil disalin ke clipboard!');
+    } else {
+      showToast('error', 'Browser Anda tidak mendukung penyalinan otomatis.');
+    }
+  };
+
+  const handleDownloadQR = () => {
+    const svg = document.getElementById('qr-code-svg');
+    if (!svg) {
+      showToast('error', 'QR Code SVG tidak ditemukan.');
+      return;
+    }
+    try {
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = svgUrl;
+      downloadLink.download = `qr-menu-${businessName.replace(/\s+/g, '-').toLowerCase()}.svg`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(svgUrl);
+      showToast('success', 'QR Code berhasil diunduh sebagai file SVG!');
+    } catch {
+      showToast('error', 'Gagal mengunduh QR Code.');
+    }
+  };
+
+  // ── Demo Action Handlers ────────────────────────────────────────────────
 
   const handleResetAll = () => {
     setConfirm({
@@ -94,7 +295,7 @@ export default function AdminSettingsPage() {
       description:
         'Anda akan menghapus SELURUH pesanan dan mengembalikan katalog produk ke kondisi awal (7 produk seed). Tindakan ini TIDAK DAPAT dibatalkan.',
       consequences: [
-        'Seluruh riwayat pesanan dihapus permanen',
+        'Seluruh riwayat pesanan dihapus secara permanen',
         'Semua statistik dashboard kembali ke nol',
         'Katalog produk dikembalikan ke 7 produk seed',
         'Stok semua produk dikembalikan ke nilai awal',
@@ -154,11 +355,10 @@ export default function AdminSettingsPage() {
       description:
         'Akan dibuat 8 pesanan demo dengan berbagai status (selesai, aktif, menunggu, batal). Semua data saat ini AKAN DITIMPA untuk memastikan konsistensi.',
       consequences: [
-        '8 pesanan baru dibuat untuk hari ini',
+        '8 pesanan baru dibuat untuk hari ini dengan perhitungan pajak & layanan aktif (jika diaktifkan)',
         'Katalog produk dikembalikan ke 7 produk seed',
         'Stok produk dikurangi sesuai pesanan aktif',
-        'Omzet demo hari ini: ≈ Rp 207.000',
-        'Antrean kasir aktif: 4 pesanan (Paid, Diproses, Siap, Menunggu)',
+        'Dashboard, kasir, dan transaksi terisi data contoh yang sinkron',
       ],
       confirmLabel: 'Ya, Generate Pesanan Demo',
       variant: 'success',
@@ -253,346 +453,644 @@ export default function AdminSettingsPage() {
       {/* ── Page Header ────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-black text-white flex items-center gap-2">
-            <FlaskConical className="w-6 h-6 text-emerald-400" />
-            <span>Alat Demo &amp; Pengembangan</span>
+          <h1 className="text-2xl font-black text-white flex items-center gap-2.5">
+            <SettingsIcon className="w-6 h-6 text-emerald-400" />
+            <span>Pengaturan Bisnis</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Kelola data demo untuk keperluan pengujian, presentasi, dan demonstrasi fitur aplikasi.
+            Konfigurasi profil UMKM, buat menu digital berbasis QR, dan atur pembiayaan daerah.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <ShieldAlert className="w-3.5 h-3.5" />
-            Mode Demo Aktif
-          </span>
-        </div>
-      </div>
-
-      {/* ── Live Data Stats ────────────────────────────────────────────────── */}
-      <div className="bg-slate-900 border border-slate-850 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">
-            Status Data Saat Ini
-          </span>
-          <button
-            onClick={handleRefreshStats}
-            className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-emerald-400 transition-all"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>Perbarui</span>
-          </button>
-        </div>
-
-        {stats ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {/* Products */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
-                  <Package className="w-3.5 h-3.5 text-slate-400" />
-                </div>
-                <span className="text-[10px] text-slate-500 font-mono">Produk</span>
-              </div>
-              <span className="text-xl font-black text-white">{stats.totalProducts}</span>
-              <div className="flex flex-wrap gap-1 mt-1">
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 font-bold">
-                  {stats.activeProducts} aktif
-                </span>
-                {stats.lowStockCount > 0 && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/15 font-bold">
-                    {stats.lowStockCount} menipis
-                  </span>
-                )}
-                {stats.outOfStockCount > 0 && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/15 font-bold">
-                    {stats.outOfStockCount} habis
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Orders */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
-                  <ShoppingCart className="w-3.5 h-3.5 text-slate-400" />
-                </div>
-                <span className="text-[10px] text-slate-500 font-mono">Total Pesanan</span>
-              </div>
-              <span className="text-xl font-black text-white">{stats.totalOrders}</span>
-              <div className="flex flex-wrap gap-1 mt-1">
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-bold">
-                  {stats.todayOrdersCount} hari ini
-                </span>
-              </div>
-            </div>
-
-            {/* Active Queue */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
-                  <ListOrdered className="w-3.5 h-3.5 text-slate-400" />
-                </div>
-                <span className="text-[10px] text-slate-500 font-mono">Antrean Aktif</span>
-              </div>
-              <span className="text-xl font-black text-white">{stats.activeOrdersCount}</span>
-              <div className="flex flex-wrap gap-1 mt-1">
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 font-bold">
-                  {stats.completedOrdersCount} selesai
-                </span>
-                {stats.cancelledOrdersCount > 0 && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 border border-slate-700 font-bold">
-                    {stats.cancelledOrdersCount} batal
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Revenue */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                </div>
-                <span className="text-[10px] text-slate-500 font-mono">Omzet Hari Ini</span>
-              </div>
-              <span className="text-xl font-black text-emerald-400">
-                {stats.todayRevenue > 0 ? formatRupiah(stats.todayRevenue) : '—'}
-              </span>
-              <span className="text-[9px] text-slate-600 mt-1">pesanan lunas + selesai</span>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-16 rounded-xl bg-slate-800 animate-pulse" />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── ZONE: Aksi Berbahaya ───────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <div className="h-px flex-1 bg-slate-850" />
-          <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest px-3">
-            Aksi Berbahaya
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <Sparkles className="w-3.5 h-3.5" />
+            UMKM Digital
           </span>
-          <div className="h-px flex-1 bg-slate-850" />
-        </div>
-        <p className="text-[11px] text-slate-500 text-center">
-          Tindakan di bawah bersifat permanen dan tidak dapat dibatalkan.
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Reset All */}
-          <div className="bg-rose-950/20 border border-rose-500/20 rounded-2xl p-5 flex flex-col gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center flex-shrink-0">
-                <RotateCcw className="w-4.5 h-4.5 text-rose-400" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Reset Semua Data</h3>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Hapus seluruh pesanan dan kembalikan 7 produk seed ke kondisi awal. Cocok untuk memulai demo dari awal.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleResetAll}
-              disabled={isActionLoading}
-              className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all flex items-center justify-center gap-2"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Reset Semua Data
-            </button>
-          </div>
-
-          {/* Clear Orders */}
-          <div className="bg-amber-950/10 border border-amber-500/20 rounded-2xl p-5 flex flex-col gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                <Trash2 className="w-4.5 h-4.5 text-amber-400" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Bersihkan Semua Pesanan</h3>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Hapus seluruh riwayat pesanan dan antrean kasir. Katalog produk dan stok tidak terpengaruh.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleClearOrders}
-              disabled={isActionLoading}
-              className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-2"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Bersihkan Pesanan
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* ── ZONE: Generate Demo Data ───────────────────────────────────────── */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <div className="h-px flex-1 bg-slate-850" />
-          <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest px-3">
-            Generate Data Demo
-          </span>
-          <div className="h-px flex-1 bg-slate-850" />
-        </div>
-        <p className="text-[11px] text-slate-500 text-center">
-          Isi database dengan data contoh yang realistis untuk demonstrasi dan pengujian.
-        </p>
+      {/* ── Tabs Navigation ────────────────────────────────────────────────── */}
+      <div className="flex border-b border-slate-850 gap-2">
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all relative ${
+            activeTab === 'profile'
+              ? 'text-emerald-400 border-b-2 border-emerald-500'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <QrCode className="w-4.5 h-4.5" />
+          <span>Profil Toko &amp; QR Menu</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('demo')}
+          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all relative ${
+            activeTab === 'demo'
+              ? 'text-emerald-400 border-b-2 border-emerald-500'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Zap className="w-4.5 h-4.5" />
+          <span>Alat Demo &amp; Developer</span>
+        </button>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Generate Sample Orders */}
-          <div className="bg-emerald-950/20 border border-emerald-500/20 rounded-2xl p-5 flex flex-col gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                <Zap className="w-4.5 h-4.5 text-emerald-400" />
+      {/* ── Tab Content: PROFILE & QR MENU ──────────────────────────────────── */}
+      {activeTab === 'profile' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Left Block: Business Form (Colspan-2) */}
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            <form onSubmit={handleSaveProfile} className="bg-slate-900 border border-slate-850 rounded-2xl p-6 flex flex-col gap-6">
+              
+              <div className="border-b border-slate-800 pb-3">
+                <h3 className="text-sm font-bold text-white">Identitas UMKM</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Informasi utama bisnis yang akan ditampilkan pada halaman menu pelanggan.</p>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Buat Pesanan Contoh</h3>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Generate 8 pesanan demo dengan berbagai status untuk hari ini. Akan mengisi dashboard, kasir, transaksi, dan insight dengan data yang realistis.
-                </p>
-              </div>
-            </div>
 
-            {/* What you get preview */}
-            <div className="bg-slate-950/40 rounded-xl border border-slate-900 p-3 flex flex-col gap-1.5">
-              <span className="text-[9px] font-mono text-emerald-400/80 uppercase font-bold tracking-widest mb-1">
-                Yang akan dibuat:
-              </span>
-              {[
-                { label: '3 pesanan Selesai', sub: 'Omzet +Rp 132.000', color: 'text-emerald-400' },
-                { label: '3 pesanan Aktif (Bayar/Proses/Siap)', sub: 'Antrean kasir', color: 'text-blue-400' },
-                { label: '1 pesanan Menunggu Pembayaran', sub: 'Queue baru', color: 'text-amber-400' },
-                { label: '1 pesanan Dibatalkan', sub: 'Stok dikembalikan', color: 'text-slate-500' },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <ChevronRight className={`w-3 h-3 flex-shrink-0 ${item.color}`} />
-                  <span className="text-[10px] text-slate-300 font-semibold">{item.label}</span>
-                  <span className="text-[9px] text-slate-600">{item.sub}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Business Name */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Nama Bisnis *</label>
+                  <input
+                    type="text"
+                    required
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    placeholder="Contoh: Warung Kopi Nusantara"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
                 </div>
-              ))}
-            </div>
 
-            <button
-              onClick={handleGenerateSampleOrders}
-              disabled={isActionLoading}
-              className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all shadow-lg hover:shadow-emerald-500/20 flex items-center justify-center gap-2"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              Generate Pesanan Demo
-            </button>
-          </div>
+                {/* Business Type */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Kategori / Tipe Bisnis</label>
+                  <input
+                    type="text"
+                    value={businessType}
+                    onChange={(e) => setBusinessType(e.target.value)}
+                    placeholder="Contoh: Kedai Kopi & Makanan"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
 
-          {/* Low Stock Simulation */}
-          <div className="bg-amber-950/10 border border-amber-500/20 rounded-2xl p-5 flex flex-col gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-4.5 h-4.5 text-amber-400" />
+                {/* Logo URL */}
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">URL Logo Bisnis (Gambar Online)</label>
+                  <input
+                    type="url"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="Masukkan tautan gambar URL logomu..."
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Slogan / Deskripsi Singkat</label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Contoh: Pesan menu favorit kamu langsung dari meja."
+                    rows={2}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all resize-none"
+                  />
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Simulasi Stok Kritis</h3>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Set beberapa produk ke stok sangat sedikit (2–4 unit) untuk menguji tampilan peringatan stok di dashboard dan halaman stok.
-                </p>
-              </div>
-            </div>
 
-            {/* Affected products preview */}
-            <div className="bg-slate-950/40 rounded-xl border border-slate-900 p-3 flex flex-col gap-1.5">
-              <span className="text-[9px] font-mono text-amber-400/80 uppercase font-bold tracking-widest mb-1">
-                Produk yang diubah:
-              </span>
-              {[
-                { name: 'Es Kopi Susu Gula Aren', stock: '4 unit' },
-                { name: 'Roti Bakar Cokelat Keju', stock: '3 unit' },
-                { name: 'Paket Kenyang A', stock: '2 unit' },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                    <span className="text-[10px] text-slate-300">{item.name}</span>
+              <div className="border-b border-slate-800 pb-3 pt-2">
+                <h3 className="text-sm font-bold text-white">Operasional &amp; Kontak</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Kontak WhatsApp dan alamat untuk mempermudah pelanggan menghubungi Anda.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* WA Number */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Nomor WhatsApp *</label>
+                  <input
+                    type="text"
+                    required
+                    value={whatsappNumber}
+                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    placeholder="Contoh: 081234567890"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
+
+                {/* Opening Hours */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Jam Operasional</label>
+                  <input
+                    type="text"
+                    value={openingHours}
+                    onChange={(e) => setOpeningHours(e.target.value)}
+                    placeholder="Contoh: 08.00 - 22.00"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Alamat Toko</label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Contoh: Jl. Nusantara No. 88, Jakarta"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="border-b border-slate-800 pb-3 pt-2">
+                <h3 className="text-sm font-bold text-white">Pajak &amp; Biaya Layanan</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Konfigurasi tambahan biaya transaksi lokal yang akan dikenakan di kasir dan menu.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-950/40 p-4 rounded-xl border border-slate-850">
+                {/* Tax Switch */}
+                <div className="flex flex-col justify-between gap-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-200">Biaya Pajak Daerah (PPN/PB1)</h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Tambahkan nilai pajak ke subtotal pembelanjaan.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={taxEnabled}
+                        onChange={(e) => setTaxEnabled(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
+                    </label>
                   </div>
-                  <span className="text-[10px] font-mono font-bold text-amber-400">{item.stock}</span>
+
+                  {taxEnabled && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={taxPercentage}
+                        onChange={(e) => setTaxPercentage(Number(e.target.value))}
+                        className="w-20 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white text-center focus:outline-none focus:border-emerald-500"
+                      />
+                      <span className="text-xs text-slate-400">%</span>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
 
-            <button
-              onClick={handleSetLowStock}
-              disabled={isActionLoading}
-              className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-2"
-            >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              Simulasikan Stok Kritis
-            </button>
+                {/* Service Charge Switch */}
+                <div className="flex flex-col justify-between gap-3 border-t md:border-t-0 md:border-l border-slate-850 pt-4 md:pt-0 md:pl-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-200">Biaya Layanan (Service Charge)</h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Tambahkan biaya pelayanan (staff/dapur) ke struk.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={serviceChargeEnabled}
+                        onChange={(e) => setServiceChargeEnabled(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
+                    </label>
+                  </div>
+
+                  {serviceChargeEnabled && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={serviceChargePercentage}
+                        onChange={(e) => setServiceChargePercentage(Number(e.target.value))}
+                        className="w-20 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white text-center focus:outline-none focus:border-emerald-500"
+                      />
+                      <span className="text-xs text-slate-400">%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Form Action Buttons */}
+              <div className="flex gap-3 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={handleResetProfile}
+                  disabled={isActionLoading}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-2"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Default</span>
+                </button>
+                <button
+                  type="submit"
+                  disabled={isActionLoading}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all shadow-md hover:shadow-emerald-500/10 flex items-center justify-center gap-2"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isActionLoading ? 'Menyimpan...' : 'Simpan Pengaturan'}</span>
+                </button>
+              </div>
+            </form>
           </div>
-        </div>
-      </div>
 
-      {/* ── ZONE: Pemulihan Data ───────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <div className="h-px flex-1 bg-slate-850" />
-          <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest px-3">
-            Pemulihan Data
-          </span>
-          <div className="h-px flex-1 bg-slate-850" />
-        </div>
+          {/* Right Block: QR Menu Preview Generator */}
+          <div className="flex flex-col gap-6">
+            <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 flex flex-col gap-5">
+              
+              <div className="border-b border-slate-800 pb-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <QrCode className="w-4 h-4 text-emerald-400" />
+                  <span>QR Menu &amp; Order</span>
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Tautan digital menu pelanggan mandiri.</p>
+              </div>
 
-        <div className="bg-blue-950/10 border border-blue-500/20 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5">
-          <div className="flex items-start gap-3 flex-1">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-              <PackageOpen className="w-4.5 h-4.5 text-blue-400" />
+              {/* QR Preview Wrapper */}
+              <div className="flex flex-col items-center justify-center p-6 bg-slate-950 rounded-xl border border-slate-850">
+                <div className="p-4 bg-white rounded-2xl shadow-xl flex items-center justify-center aspect-square">
+                  {orderLink ? (
+                    <QRCode
+                      id="qr-code-svg"
+                      value={orderLink}
+                      size={180}
+                      level="H"
+                      className="w-full h-full"
+                    />
+                  ) : (
+                    <div className="w-40 h-40 bg-slate-900 animate-pulse rounded-lg" />
+                  )}
+                </div>
+                <div className="text-center mt-4">
+                  <h4 className="text-xs font-black text-white">{businessName}</h4>
+                  <p className="text-[9px] text-slate-500 font-mono mt-0.5 truncate max-w-xs">{orderLink}</p>
+                </div>
+              </div>
+
+              {/* Copy / Download Buttons */}
+              <div className="flex flex-col gap-2.5">
+                <button
+                  onClick={handleCopyLink}
+                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Salin Link Order</span>
+                </button>
+                <button
+                  onClick={handleDownloadQR}
+                  className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh QR (Vector SVG)</span>
+                </button>
+              </div>
+
+              {/* Instructions text */}
+              <div className="p-3 bg-slate-950/50 rounded-xl border border-slate-850 text-[10px] text-slate-500 leading-relaxed">
+                <strong className="text-slate-400">Petunjuk Penggunaan:</strong>
+                <p className="mt-1">
+                  Cetak file QR code ini dan letakkan di meja kasir atau meja pelanggan. Pelanggan cukup memindai (scan) QR ini menggunakan kamera HP untuk langsung memesan menu mandiri.
+                </p>
+              </div>
+
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">Pulihkan Katalog Produk</h3>
-              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                Kembalikan 7 produk seed ke kondisi awal beserta stok semula. Riwayat pesanan tidak akan terhapus.
-              </p>
-              <div className="flex flex-wrap gap-1 mt-2">
-                {['Es Kopi Susu', 'Nasi Geprek', 'Mie Goreng', 'Roti Bakar', 'Es Teh', 'Kopi Hitam', 'Paket Kenyang'].map(
-                  (name) => (
-                    <span
-                      key={name}
-                      className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700"
-                    >
-                      {name}
+          </div>
+
+        </div>
+      )}
+
+      {/* ── Tab Content: DEVELOPER DEMO TOOLS ────────────────────────────────── */}
+      {activeTab === 'demo' && (
+        <div className="flex flex-col gap-6 animate-in fade-in duration-100">
+          
+          {/* Stats Summary */}
+          <div className="bg-slate-900 border border-slate-850 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">
+                Status Data Saat Ini
+              </span>
+              <button
+                onClick={handleRefreshStats}
+                className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-emerald-400 transition-all"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span>Perbarui</span>
+              </button>
+            </div>
+
+            {stats ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {/* Products */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
+                      <Package className="w-3.5 h-3.5 text-slate-400" />
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">Produk</span>
+                  </div>
+                  <span className="text-xl font-black text-white">{stats.totalProducts}</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 font-bold">
+                      {stats.activeProducts} aktif
                     </span>
-                  ),
-                )}
+                    {stats.lowStockCount > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/15 font-bold">
+                        {stats.lowStockCount} menipis
+                      </span>
+                    )}
+                    {stats.outOfStockCount > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/15 font-bold">
+                        {stats.outOfStockCount} habis
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Orders */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
+                      <ShoppingCart className="w-3.5 h-3.5 text-slate-400" />
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">Total Pesanan</span>
+                  </div>
+                  <span className="text-xl font-black text-white">{stats.totalOrders}</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-bold">
+                      {stats.todayOrdersCount} hari ini
+                    </span>
+                  </div>
+                </div>
+
+                {/* Active Queue */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
+                      <ListOrdered className="w-3.5 h-3.5 text-slate-400" />
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">Antrean Aktif</span>
+                  </div>
+                  <span className="text-xl font-black text-white">{stats.activeOrdersCount}</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 font-bold">
+                      {stats.completedOrdersCount} selesai
+                    </span>
+                    {stats.cancelledOrdersCount > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 border border-slate-700 font-bold">
+                        {stats.cancelledOrdersCount} batal
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Revenue */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">Omzet Hari Ini</span>
+                  </div>
+                  <span className="text-xl font-black text-emerald-400">
+                    {stats.todayRevenue > 0 ? formatRupiah(stats.todayRevenue) : '—'}
+                  </span>
+                  <span className="text-[9px] text-slate-655 mt-1">pesanan lunas + selesai</span>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-16 rounded-xl bg-slate-800 animate-pulse" />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Action Zone: Danger */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-slate-850" />
+              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest px-3">
+                Aksi Berbahaya
+              </span>
+              <div className="h-px flex-1 bg-slate-850" />
+            </div>
+            <p className="text-[11px] text-slate-500 text-center">
+              Tindakan di bawah bersifat permanen dan tidak dapat dibatalkan.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Reset All */}
+              <div className="bg-rose-950/20 border border-rose-500/20 rounded-2xl p-5 flex flex-col gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center flex-shrink-0">
+                    <RotateCcw className="w-4.5 h-4.5 text-rose-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Reset Semua Data</h3>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                      Hapus seluruh pesanan dan kembalikan 7 produk seed ke kondisi awal. Cocok untuk memulai demo dari awal.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleResetAll}
+                  disabled={isActionLoading}
+                  className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all flex items-center justify-center gap-2"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Reset Semua Data
+                </button>
+              </div>
+
+              {/* Clear Orders */}
+              <div className="bg-amber-950/10 border border-amber-500/20 rounded-2xl p-5 flex flex-col gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                    <Trash2 className="w-4.5 h-4.5 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Bersihkan Semua Pesanan</h3>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                      Hapus seluruh riwayat pesanan dan antrean kasir. Katalog produk dan stok tidak terpengaruh.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleClearOrders}
+                  disabled={isActionLoading}
+                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Bersihkan Pesanan</span>
+                </button>
               </div>
             </div>
           </div>
-          <button
-            onClick={handleRestoreProducts}
-            disabled={isActionLoading}
-            className="flex-shrink-0 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all flex items-center gap-2 w-full sm:w-auto"
-          >
-            <PackageOpen className="w-3.5 h-3.5" />
-            Pulihkan Produk
-          </button>
-        </div>
-      </div>
 
-      {/* ── Info Footer ───────────────────────────────────────────────────── */}
-      <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-850 text-[11px] text-slate-500 leading-relaxed">
-        <strong className="text-slate-400">Catatan:</strong> Semua perubahan memengaruhi localStorage browser secara langsung. Segarkan halaman Admin Dashboard, Kasir, Transaksi, dan AI Insights setelah melakukan aksi di atas untuk melihat perubahan.
-      </div>
+          {/* Action Zone: Generate */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-slate-850" />
+              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest px-3">
+                Generate Data Demo
+              </span>
+              <div className="h-px flex-1 bg-slate-850" />
+            </div>
+            <p className="text-[11px] text-slate-500 text-center">
+              Isi database lokal dengan data contoh yang realistis untuk pengujian sistem.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Generate Orders */}
+              <div className="bg-emerald-950/20 border border-emerald-500/20 rounded-2xl p-5 flex flex-col gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-4.5 h-4.5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Buat Pesanan Contoh</h3>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                      Buat 8 pesanan hari ini dengan rincian biaya pajak & layanan (jika aktif). Mengisi kasir, dashboard, transaksi, dan insights.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/40 rounded-xl border border-slate-900 p-3 flex flex-col gap-1.5">
+                  <span className="text-[9px] font-mono text-emerald-400/80 uppercase font-bold tracking-widest mb-1">
+                    Rincian data:
+                  </span>
+                  {[
+                    { label: '3 pesanan Selesai', sub: 'Pendapatan langsung', color: 'text-emerald-400' },
+                    { label: '3 pesanan Aktif', sub: 'Dapur & kasir', color: 'text-blue-400' },
+                    { label: '1 pesanan Menunggu', sub: 'Antrean kasir', color: 'text-amber-400' },
+                    { label: '1 pesanan Batal', sub: 'Stok dipulihkan', color: 'text-slate-500' },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <ChevronRight className={`w-3 h-3 flex-shrink-0 ${item.color}`} />
+                      <span className="text-[10px] text-slate-350 font-semibold">{item.label}</span>
+                      <span className="text-[9px] text-slate-600">{item.sub}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleGenerateSampleOrders}
+                  disabled={isActionLoading}
+                  className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all shadow-lg hover:shadow-emerald-500/20 flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Generate Pesanan Demo
+                </button>
+              </div>
+
+              {/* Low Stock Demo */}
+              <div className="bg-amber-950/10 border border-amber-500/20 rounded-2xl p-5 flex flex-col gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-4.5 h-4.5 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Simulasi Stok Kritis</h3>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                      Set 3 produk ke stok menipis (2-4 unit) untuk memicu peringatan sistem di dashboard dan halaman inventaris.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/40 rounded-xl border border-slate-900 p-3 flex flex-col gap-1.5">
+                  <span className="text-[9px] font-mono text-amber-400/80 uppercase font-bold tracking-widest mb-1">
+                    Produk target:
+                  </span>
+                  {[
+                    { name: 'Es Kopi Susu Gula Aren', stock: '4 unit' },
+                    { name: 'Roti Bakar Cokelat Keju', stock: '3 unit' },
+                    { name: 'Paket Kenyang A', stock: '2 unit' },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                        <span className="text-[10px] text-slate-350">{item.name}</span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-amber-400">{item.stock}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleSetLowStock}
+                  disabled={isActionLoading}
+                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-2"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Simulasikan Stok Kritis
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Zone: Recovery */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-slate-850" />
+              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest px-3">
+                Pemulihan Data
+              </span>
+              <div className="h-px flex-1 bg-slate-850" />
+            </div>
+
+            <div className="bg-blue-950/10 border border-blue-500/20 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <div className="flex items-start gap-3 flex-1">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                  <PackageOpen className="w-4.5 h-4.5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Pulihkan Katalog Produk</h3>
+                  <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                    Kembalikan 7 produk seed ke kondisi awal beserta stok semula. Riwayat pesanan tidak terpengaruh.
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {['Es Kopi Susu', 'Nasi Geprek', 'Mie Goreng', 'Roti Bakar', 'Es Teh', 'Kopi Hitam', 'Paket Kenyang'].map(
+                      (name) => (
+                        <span
+                          key={name}
+                          className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700"
+                        >
+                          {name}
+                        </span>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleRestoreProducts}
+                disabled={isActionLoading}
+                className="flex-shrink-0 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all flex items-center gap-2 w-full sm:w-auto"
+              >
+                <PackageOpen className="w-3.5 h-3.5" />
+                Pulihkan Produk
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-850 text-[11px] text-slate-500 leading-relaxed">
+            <strong className="text-slate-400">Catatan Pengembang:</strong> Semua perubahan di tab ini memengaruhi database localStorage lokal browser secara langsung. Refresh tab lainnya untuk memvalidasi perubahan Anda.
+          </div>
+        </div>
+      )}
 
       {/* ── Confirmation Modal ────────────────────────────────────────────── */}
       {confirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl flex flex-col gap-5 animate-in fade-in zoom-in-95 duration-150">
 
-            {/* Modal header */}
+            {/* Modal Header */}
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div
@@ -631,7 +1129,7 @@ export default function AdminSettingsPage() {
               </div>
             )}
 
-            {/* Modal action buttons */}
+            {/* Modal Action Buttons */}
             <div className="flex gap-3 pt-1">
               <button
                 onClick={() => setConfirm(null)}

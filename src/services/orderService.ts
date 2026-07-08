@@ -3,6 +3,7 @@ import { getStorageItem, setStorageItem, STORAGE_KEYS } from './db';
 import { productService } from './productService';
 import { USE_SUPABASE } from '../config/dbConfig';
 import { supabase } from '../lib/supabase';
+import { businessService } from './businessService';
 
 export const orderService = {
   async getOrders(): Promise<Order[]> {
@@ -95,11 +96,19 @@ export const orderService = {
       }
     }
 
-    // 3. Calculate total amount
-    const totalAmount = orderData.items.reduce(
+    // 3. Calculate subtotal, tax, service charge, and total amount
+    const profile = businessService.getProfile();
+    const subtotal = orderData.items.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0
     );
+    const serviceChargeAmount = profile.serviceChargeEnabled
+      ? Math.round(subtotal * (profile.serviceChargePercentage / 100))
+      : 0;
+    const taxAmount = profile.taxEnabled
+      ? Math.round(subtotal * (profile.taxPercentage / 100))
+      : 0;
+    const totalAmount = subtotal + serviceChargeAmount + taxAmount;
 
     // 4. Generate queue number and order ID
     const queueNumber = await this.generateQueueNumber();
@@ -174,6 +183,9 @@ export const orderService = {
       customerPhone: orderData.customerPhone,
       notes: orderData.notes,
       items: orderData.items,
+      subtotal,
+      serviceChargeAmount,
+      taxAmount,
       totalAmount,
       paymentMethod: orderData.paymentMethod,
       paymentStatus: 'Waiting for Payment',

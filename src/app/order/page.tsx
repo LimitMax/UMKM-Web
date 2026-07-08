@@ -16,11 +16,15 @@ import {
   CheckCircle,
   CreditCard,
   Wallet,
-  DollarSign
+  DollarSign,
+  MapPin,
+  Phone,
+  Clock
 } from 'lucide-react';
 import { productService } from '../../services/productService';
 import { orderService } from '../../services/orderService';
-import { Product, ProductCategory, OrderItem, PaymentMethod } from '../../types';
+import { businessService } from '../../services/businessService';
+import { Product, ProductCategory, OrderItem, PaymentMethod, BusinessProfile } from '../../types';
 import { formatRupiah } from '../../utils/format';
 
 export default function CustomerOrderPage() {
@@ -44,12 +48,19 @@ export default function CustomerOrderPage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Load products on mount
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
+
   useEffect(() => {
     const loadProducts = async () => {
       const activeProds = await productService.getActiveProducts();
       setProducts(activeProds);
     };
+    const loadProfile = () => {
+      const profile = businessService.getProfile();
+      setBusinessProfile(profile);
+    };
     loadProducts();
+    loadProfile();
   }, []);
 
   // Filter categories
@@ -109,7 +120,14 @@ export default function CustomerOrderPage() {
     setCart((prevCart) => prevCart.filter((item) => item.product.id !== productId));
   };
 
-  const totalAmount = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const serviceCharge = businessProfile?.serviceChargeEnabled
+    ? Math.round(subtotal * (businessProfile.serviceChargePercentage / 100))
+    : 0;
+  const tax = businessProfile?.taxEnabled
+    ? Math.round(subtotal * (businessProfile.taxPercentage / 100))
+    : 0;
+  const totalAmount = subtotal + serviceCharge + tax;
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   // Handle Checkout submission
@@ -174,7 +192,9 @@ export default function CustomerOrderPage() {
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="font-bold text-lg text-white">Menu Pesanan</h1>
+              <h1 className="font-bold text-lg text-white">
+                {businessProfile ? businessProfile.businessName : 'Menu Pesanan'}
+              </h1>
               <p className="text-xs text-emerald-400 font-mono">Pesan Mandiri & Cepat</p>
             </div>
           </div>
@@ -198,6 +218,71 @@ export default function CustomerOrderPage() {
         
         {/* Left Side: Product catalog */}
         <div className="flex-1 flex flex-col gap-6">
+
+          {/* Business Profile Hero Banner */}
+          {businessProfile && (
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 flex flex-col sm:flex-row items-center sm:items-start gap-4 md:gap-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+              
+              {/* Logo */}
+              {businessProfile.logoUrl ? (
+                <img 
+                  src={businessProfile.logoUrl} 
+                  alt={businessProfile.businessName} 
+                  className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl object-cover bg-slate-950 border border-slate-850 flex-shrink-0"
+                />
+              ) : (
+                <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-tr from-emerald-400 to-teal-500 flex items-center justify-center text-slate-950 font-black text-xl sm:text-2xl flex-shrink-0">
+                  {businessProfile.businessName.substring(0, 2).toUpperCase()}
+                </div>
+              )}
+
+              {/* Info details */}
+              <div className="flex-1 text-center sm:text-left flex flex-col gap-2">
+                <div>
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                    <h2 className="text-lg md:text-xl font-black text-white leading-tight">{businessProfile.businessName}</h2>
+                    {businessProfile.businessType && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {businessProfile.businessType}
+                      </span>
+                    )}
+                  </div>
+                  {businessProfile.description && (
+                    <p className="text-xs text-slate-400 leading-relaxed max-w-xl">
+                      {businessProfile.description}
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1.5 mt-1 border-t border-slate-850 pt-2.5 text-[11px] text-slate-500">
+                  {businessProfile.openingHours && (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Buka: <strong className="text-slate-350">{businessProfile.openingHours}</strong></span>
+                    </span>
+                  )}
+                  {businessProfile.whatsappNumber && (
+                    <a 
+                      href={`https://wa.me/${businessProfile.whatsappNumber.replace(/\D/g, '')}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Hubungi: <strong className="text-slate-350">{businessProfile.whatsappNumber}</strong></span>
+                    </a>
+                  )}
+                  {businessProfile.address && (
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Alamat: <strong className="text-slate-355">{businessProfile.address}</strong></span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           {/* Search and Filters */}
           <div className="flex flex-col gap-4">
             <div className="relative">
@@ -345,9 +430,27 @@ export default function CustomerOrderPage() {
               </div>
 
               <div className="border-t border-slate-800 pt-3">
-                <div className="flex justify-between font-bold text-sm text-white mb-4">
-                  <span>Total Bayar:</span>
-                  <span className="text-emerald-400">{formatRupiah(totalAmount)}</span>
+                <div className="flex flex-col gap-2 mb-4">
+                  <div className="flex justify-between text-xs text-slate-400">
+                    <span>Subtotal:</span>
+                    <span className="text-slate-300">{formatRupiah(subtotal)}</span>
+                  </div>
+                  {businessProfile?.serviceChargeEnabled && (
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Biaya Layanan ({businessProfile.serviceChargePercentage}%):</span>
+                      <span className="text-slate-300">{formatRupiah(serviceCharge)}</span>
+                    </div>
+                  )}
+                  {businessProfile?.taxEnabled && (
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Pajak ({businessProfile.taxPercentage}%):</span>
+                      <span className="text-slate-300">{formatRupiah(tax)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-sm text-white border-t border-slate-850 pt-2 mt-1">
+                    <span>Total Bayar:</span>
+                    <span className="text-emerald-400 text-base">{formatRupiah(totalAmount)}</span>
+                  </div>
                 </div>
                 
                 {/* Checkout form */}
@@ -520,9 +623,27 @@ export default function CustomerOrderPage() {
                   </div>
 
                   <div className="border-t border-slate-800 pt-4 flex flex-col gap-4">
-                    <div className="flex justify-between font-bold text-sm text-white">
-                      <span>Total Bayar:</span>
-                      <span className="text-emerald-400">{formatRupiah(totalAmount)}</span>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex justify-between text-xs text-slate-400">
+                        <span>Subtotal:</span>
+                        <span className="text-slate-300">{formatRupiah(subtotal)}</span>
+                      </div>
+                      {businessProfile?.serviceChargeEnabled && (
+                        <div className="flex justify-between text-xs text-slate-400">
+                          <span>Biaya Layanan ({businessProfile.serviceChargePercentage}%):</span>
+                          <span className="text-slate-300">{formatRupiah(serviceCharge)}</span>
+                        </div>
+                      )}
+                      {businessProfile?.taxEnabled && (
+                        <div className="flex justify-between text-xs text-slate-400">
+                          <span>Pajak ({businessProfile.taxPercentage}%):</span>
+                          <span className="text-slate-300">{formatRupiah(tax)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold text-sm text-white border-t border-slate-850 pt-2 mt-1">
+                        <span>Total Bayar:</span>
+                        <span className="text-emerald-400 text-base">{formatRupiah(totalAmount)}</span>
+                      </div>
                     </div>
 
                     <form onSubmit={handleCheckout} className="flex flex-col gap-4">
