@@ -12,27 +12,29 @@ import {
   CreditCard, 
   AlertCircle,
   FileText,
-  Home,
-  Printer
+  Home
 } from 'lucide-react';
 import { orderService } from '@/services/orderService';
+import { businessService } from '@/services/businessService';
 import { Order } from '@/types';
-import { formatRupiah, formatDate } from '@/utils/format';
+import { formatRupiah, formatDate, formatOrderStatus, formatPaymentStatus } from '@/utils/format';
 
 // Timeline steps mapping
 const TIMELINE_STEPS = [
   { key: 'Waiting for Payment', label: 'Menunggu Pembayaran' },
-  { key: 'Paid', label: 'Sudah Bayar' },
+  { key: 'Paid', label: 'Sudah Dibayar' },
   { key: 'Processing', label: 'Sedang Diproses' },
-  { key: 'Ready', label: 'Siap Disajikan' },
+  { key: 'Ready', label: 'Siap Diambil' },
   { key: 'Completed', label: 'Selesai' }
 ];
 
 export default function OrderSuccessPage() {
   const { orderId } = useParams() as { orderId: string };
   const [order, setOrder] = useState<Order | null>(null);
-
   const [isLoading, setIsLoading] = useState(true);
+  const [whatsappNumber] = useState<string>(() => {
+    return businessService.getProfile()?.whatsappNumber || '';
+  });
 
   // Poll localStorage to get live cashier status updates
   useEffect(() => {
@@ -130,27 +132,35 @@ export default function OrderSuccessPage() {
             </span>
           </div>
 
-          {/* Alert for Payment instruction */}
-          {order.status === 'Waiting for Payment' && (
-            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-left text-xs text-amber-400 flex items-start gap-3">
-              <Clock className="w-5 h-5 flex-shrink-0 text-amber-500 mt-0.5" />
-              <div>
-                <p className="font-bold">Menunggu Pembayaran ({order.paymentMethod})</p>
-                <p className="text-slate-400 mt-0.5">
-                  {order.paymentMethod === 'Cash' 
-                    ? 'Silakan menuju ke meja kasir untuk melakukan pembayaran tunai.' 
-                    : `Silakan lakukan pembayaran sebesar ${formatRupiah(order.totalAmount)} lewat ${order.paymentMethod}. Pesanan Anda akan diproses setelah kasir memvalidasi pembayaran.`}
-                </p>
-              </div>
+          {/* Alert for Next Step Guide */}
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-left text-xs flex flex-col gap-2.5 mt-4">
+            <div className="flex items-center gap-2 text-emerald-400 font-bold border-b border-slate-850 pb-2">
+              <Clock className="w-4 h-4 text-emerald-400" />
+              <span>Instruksi Langkah Berikutnya</span>
             </div>
-          )}
-
-          {isCancelled && (
-            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center text-xs text-rose-400 flex items-center justify-center gap-2">
-              <AlertCircle className="w-5 h-5" />
-              <strong>Pesanan Dibatalkan oleh Kasir/Admin.</strong>
-            </div>
-          )}
+            
+            <p className="text-slate-350 leading-relaxed font-sans">
+              {order.status === 'Waiting for Payment' && (
+                order.paymentMethod === 'Cash' 
+                  ? '💡 Lakukan pembayaran tunai ke kasir dengan menunjukkan nomor antrean ini.' 
+                  : order.paymentMethod === 'QRIS'
+                    ? `💡 Silakan bayar tagihan sebesar ${formatRupiah(order.totalAmount)} dengan memindai kode QRIS toko di meja kasir.`
+                    : `💡 Silakan transfer sebesar ${formatRupiah(order.totalAmount)} ke rekening bank toko dan tunjukkan tanda buktinya ke kasir.`
+              )}
+              {(order.status === 'Paid' || order.status === 'Processing') && (
+                '💡 Pesanan Anda telah divalidasi dan sedang dipersiapkan di dapur. Mohon menunggu nomor antrean Anda dipanggil.'
+              )}
+              {order.status === 'Ready' && (
+                '🎉 Pesanan Anda sudah siap! Silakan ambil hidangan Anda di konter servis dengan menunjukkan nomor antrean ini.'
+              )}
+              {order.status === 'Completed' && (
+                '✅ Pesanan telah selesai diambil. Terima kasih atas pesanan Anda, selamat menikmati!'
+              )}
+              {isCancelled && (
+                '❌ Pesanan ini telah dibatalkan. Silakan lakukan pemesanan ulang atau hubungi admin.'
+              )}
+            </p>
+          </div>
         </div>
 
         {/* Card: Real-time Status Timeline (Only show if not cancelled) */}
@@ -225,7 +235,11 @@ export default function OrderSuccessPage() {
             </div>
             <div className="col-span-2 flex items-center gap-1.5 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
               <CreditCard className="w-3.5 h-3.5 text-slate-500" />
-              <span>Metode: <strong className="text-slate-200">{order.paymentMethod} ({order.paymentStatus === 'Paid' ? 'LUNAS' : 'BELUM BAYAR'})</strong></span>
+              <span>Pembayaran: <strong className="text-slate-200">{order.paymentMethod} ({formatPaymentStatus(order.paymentStatus)})</strong></span>
+            </div>
+            <div className="col-span-2 flex items-center gap-1.5 text-slate-400 border-t border-slate-900 pt-1.5">
+              <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <span>Status Pesanan: <strong className="text-slate-200">{formatOrderStatus(order.status)}</strong></span>
             </div>
             {order.notes && (
               <div className="col-span-2 text-[11px] text-amber-400/80 italic mt-0.5 pt-1.5 border-t border-slate-900">
@@ -282,22 +296,39 @@ export default function OrderSuccessPage() {
           </div>
         </div>
 
-        {/* Receipt Actions Card */}
-        <div className="glass rounded-3xl p-5 border border-slate-800/80 flex flex-col sm:flex-row gap-3">
+        {/* Actions Grid */}
+        <div className="flex flex-col gap-3">
+          <div className="glass rounded-3xl p-5 border border-slate-800/80 flex flex-col sm:flex-row gap-3">
+            <Link
+              href={`/receipt/${order.id}`}
+              className="flex-1 py-3 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white text-slate-200 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+              <FileText className="w-4 h-4 text-emerald-400" />
+              <span>Lihat Struk Digital</span>
+            </Link>
+
+            {whatsappNumber && (
+              <a
+                href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(
+                  `Halo, saya ingin menanyakan tentang pesanan saya dengan nomor antrean *${order.queueNumber}* (ID: ${order.id.substring(0, 8).toUpperCase()}).`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-center"
+              >
+                <Phone className="w-4 h-4" />
+                <span>Hubungi WhatsApp Toko</span>
+              </a>
+            )}
+          </div>
+
           <Link
-            href={`/receipt/${order.id}`}
-            className="flex-1 py-3 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white text-slate-200 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2"
+            href="/order"
+            className="w-full py-3 bg-slate-900 border border-slate-850 hover:bg-slate-800 text-slate-350 hover:text-white text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition-all"
           >
-            <FileText className="w-4 h-4 text-emerald-400" />
-            <span>Lihat Struk Digital</span>
+            <ArrowLeft className="w-4 h-4" />
+            <span>Kembali ke Halaman Menu</span>
           </Link>
-          <button
-            onClick={() => window.open(`/receipt/${order.id}?print=true`, '_blank')}
-            className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Cetak Struk</span>
-          </button>
         </div>
 
       </div>

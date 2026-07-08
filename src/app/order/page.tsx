@@ -10,7 +10,8 @@ import {
   Plus, 
   Minus, 
   Trash2, 
-  ArrowLeft, 
+  ArrowLeft,
+  ArrowRight,
   Sparkles, 
   AlertCircle,
   CheckCircle,
@@ -69,9 +70,10 @@ export default function CustomerOrderPage() {
 
   // Filter products by category and search query
   const filteredProducts = products.filter((p) => {
+    const isActive = p.isActive !== false;
     const matchesCategory = selectedCategory === 'Semua' || p.category === selectedCategory;
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return isActive && matchesCategory && matchesSearch;
   });
 
   // Cart operations
@@ -141,9 +143,12 @@ export default function CustomerOrderPage() {
       return;
     }
 
-    if (!customerPhone.trim()) {
-      setErrorMsg('Nomor WhatsApp wajib diisi untuk konfirmasi.');
-      return;
+    if (customerPhone.trim()) {
+      const cleanPhone = customerPhone.replace(/\D/g, '');
+      if (cleanPhone.length < 9 || cleanPhone.length > 14) {
+        setErrorMsg('Nomor WhatsApp harus berupa angka 9-14 digit.');
+        return;
+      }
     }
 
     if (cart.length === 0) {
@@ -336,21 +341,29 @@ export default function CustomerOrderPage() {
                 >
                   {/* Image container */}
                   <div className="relative aspect-square w-full bg-slate-950 overflow-hidden">
-                    <img 
-                      src={prod.imageUrl} 
-                      alt={prod.name}
-                      className="object-cover w-full h-full transform hover:scale-105 transition-all duration-500" 
-                    />
-                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 text-[10px] font-semibold text-slate-300">
+                    {prod.imageUrl ? (
+                      <img 
+                        src={prod.imageUrl} 
+                        alt={prod.name}
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.opacity = '0';
+                        }}
+                        className="object-cover w-full h-full transform hover:scale-105 transition-all duration-500" 
+                      />
+                    ) : null}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex items-center justify-center text-slate-500 font-black text-xl uppercase pointer-events-none -z-10">
+                      {prod.name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 text-[10px] font-semibold text-slate-350">
                       {prod.category}
                     </span>
                     {prod.stock === 0 ? (
-                      <span className="absolute inset-0 bg-black/70 flex items-center justify-center font-bold text-xs text-rose-400 tracking-wider">
+                      <span className="absolute inset-0 bg-black/75 flex items-center justify-center font-bold text-xs text-rose-450 tracking-wider">
                         HABIS
                       </span>
                     ) : prod.stock <= 5 ? (
-                      <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-amber-500/80 text-[10px] font-black text-slate-950">
-                        Sisa {prod.stock}
+                      <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-amber-550 text-[9px] font-black text-slate-950 uppercase tracking-wide">
+                        Stok Terbatas
                       </span>
                     ) : null}
                   </div>
@@ -471,10 +484,9 @@ export default function CustomerOrderPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">No. WhatsApp *</label>
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">No. WhatsApp (Opsional)</label>
                     <input
                       type="tel"
-                      required
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       placeholder="Contoh: 08123456789"
@@ -520,6 +532,11 @@ export default function CustomerOrderPage() {
                         );
                       })}
                     </div>
+                    <p className="text-[10px] text-slate-450 font-sans mt-2.5 italic leading-relaxed">
+                      {paymentMethod === 'Cash' && '💡 Tunai: Bayar di kasir saat pesanan diambil'}
+                      {paymentMethod === 'QRIS' && '💡 QRIS: Scan QRIS di kasir setelah checkout'}
+                      {paymentMethod === 'Bank Transfer' && '💡 Transfer: Konfirmasi pembayaran ke kasir'}
+                    </p>
                   </div>
 
                   {errorMsg && (
@@ -544,17 +561,26 @@ export default function CustomerOrderPage() {
       </main>
 
       {/* Floating Bottom Cart Bar (Visible on mobile when cart has items) */}
-      {totalItemsCount > 0 && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-slate-900 border-t border-slate-800 z-30 shadow-2xl flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs text-slate-400 font-semibold">{totalItemsCount} Item</p>
-            <p className="text-emerald-400 font-black text-base leading-none mt-1">{formatRupiah(totalAmount)}</p>
-          </div>
-          <button 
+      {totalItemsCount > 0 && !isCartOpen && (
+        <div className="md:hidden fixed bottom-4 inset-x-4 z-40 animate-slide-up">
+          <button
             onClick={() => setIsCartOpen(true)}
-            className="py-3 px-6 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm rounded-xl shadow-lg transition-all"
+            className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-3.5 rounded-2xl flex items-center justify-between shadow-2xl transition-all"
           >
-            Lanjut Bayar
+            <div className="flex items-center gap-3">
+              <span className="bg-slate-950 text-emerald-400 text-xs font-black px-2.5 py-1 rounded-lg">
+                {totalItemsCount}
+              </span>
+              <div className="text-left">
+                <span className="block text-[9px] uppercase font-mono text-slate-900 font-bold tracking-wider leading-none">Total Belanja</span>
+                <span className="text-sm font-black">{formatRupiah(totalAmount)}</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-1 font-bold text-xs">
+              <span>Lihat Keranjang</span>
+              <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
+            </div>
           </button>
         </div>
       )}
@@ -664,10 +690,9 @@ export default function CustomerOrderPage() {
                       </div>
                       
                       <div>
-                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">No. WhatsApp *</label>
+                        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">No. WhatsApp (Opsional)</label>
                         <input
                           type="tel"
-                          required
                           value={customerPhone}
                           onChange={(e) => setCustomerPhone(e.target.value)}
                           placeholder="08123456789"
@@ -713,6 +738,11 @@ export default function CustomerOrderPage() {
                             );
                           })}
                         </div>
+                        <p className="text-[10px] text-slate-450 font-sans mt-2.5 italic leading-relaxed">
+                          {paymentMethod === 'Cash' && '💡 Tunai: Bayar di kasir saat pesanan diambil'}
+                          {paymentMethod === 'QRIS' && '💡 QRIS: Scan QRIS di kasir setelah checkout'}
+                          {paymentMethod === 'Bank Transfer' && '💡 Transfer: Konfirmasi pembayaran ke kasir'}
+                        </p>
                       </div>
 
                       {errorMsg && (

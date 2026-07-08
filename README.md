@@ -333,7 +333,41 @@ Untuk memudahkan peninjauan demo, aplikasi menggunakan **Soft Route Access Guida
 - **Bukan Otentikasi Riil**: Fitur switcher ini murni untuk kebutuhan demonstrasi dan simulasi alur kerja visual. Belum ada enkripsi sandi atau pengamanan token API JWT di sisi server.
 - **Rencana Mendatang**: Integrasi otentikasi nyata menggunakan Supabase Auth dengan aturan Row-Level Security (RLS) PostgreSQL untuk membatasi akses data secara permanen di database.
 
+## 📱 Pengalaman Pemesanan Pelanggan (Phase 5E)
+
+UMKM Pilot menyertakan fitur pemesanan mandiri digital (`/order`) yang dirancang khusus untuk layar mobile (smartphone) agar mempermudah pelanggan dalam memilih menu, melihat ketersediaan stok, dan memantau status antrean secara real-time.
+
+### Alur Pemesanan Pelanggan
+1. **Navigasi ke Halaman Menu**:
+   - Masuk lewat Landing Page (`/`) dan klik **Buka Menu Pesanan** pada kartu Pelanggan. Role Anda akan otomatis diset menjadi `customer`.
+2. **Menjelajahi Menu & Memilih Produk**:
+   - Kategori menu bersifat *horizontally scrollable* di layar mobile.
+   - Bilah pencarian (search bar) bekerja bersama filter kategori untuk mempersempit pencarian secara responsif.
+   - Produk yang tidak aktif (*Inactive*) tidak akan ditampilkan ke pelanggan.
+   - Produk dengan sisa stok `1 - 5` akan menampilkan indikator berwarna kuning **“Stok Terbatas”**.
+   - Produk dengan stok `0` akan menampilkan tanda **“HABIS”** dan tombol tambah dinonaktifkan.
+   - Jika gambar produk gagal dimuat atau URL kosong, sistem akan menampilkan gradien inisial nama menu secara otomatis.
+3. **Keranjang Belanja (Mobile Cart Drawer)**:
+   - Ketika ada item di keranjang, bilah melayang (**Sticky Bottom Cart Bar**) akan muncul di bagian bawah layar mobile menampilkan jumlah item dan total belanja.
+   - Tapping bilah tersebut akan memicu *checkout sheet/drawer* geser dari bawah/kanan.
+   - Di dalam drawer, pelanggan dapat menambah/mengurangi jumlah belanjaan (dibatasi sesuai limit stok maksimum produk), melihat rincian biaya layanan & pajak, serta mengisi formulir data pemesanan.
+4. **Formulir Checkout & Validasi**:
+   - **Nama Lengkap**: Wajib diisi.
+   - **No. WhatsApp**: Opsional. Namun jika diisi, sistem akan memvalidasi agar hanya berisi angka sebanyak 9 hingga 14 digit.
+   - **Metode Pembayaran**: Memilih opsi Tunai, QRIS, atau Transfer Bank. Terdapat petunjuk ringkas (*Indonesian microcopy helper*) di bawah setiap pilihan metode untuk memandu tindakan lanjutan pelanggan.
+5. **Halaman Sukses & Pelacakan Antrean (`/order/success/[orderId]`)**:
+   - Menampilkan nomor antrean utama secara mencolok.
+   - Menyertakan panduan teks instruksi langkah berikutnya sesuai dengan metode pembayaran yang dipilih (misal: *"Silakan scan QRIS toko di kasir"*).
+   - Menyertakan **Timeline Tracker** dengan label bahasa Indonesia: *Menunggu Pembayaran*, *Sudah Dibayar*, *Sedang Diproses*, *Siap Diambil*, *Selesai*. Status ini diperbarui secara dinamis (live polling interval 3 detik).
+   - Menyertakan tombol **Lihat Struk Digital** dan tombol **Hubungi WhatsApp Toko** (jika nomor WhatsApp terdaftar di profil bisnis) untuk mempermudah koordinasi langsung.
+
+### Batasan Saat Ini (Technical Limitations)
+- **Simulasi Pembayaran**: Metode pembayaran bersifat simulasi. Klik konfirmasi akan langsung memotong stok produk lokal di browser pelanggan dan meneruskannya ke dashboard kasir tanpa melalui portal gerbang pembayaran (payment gateway) riil.
+- **Real-time Tracking**: Halaman antrean melakukan polling data berkala ke `localStorage` browser setiap 3 detik. Integrasi server-sent events atau WebSockets akan diaktifkan setelah database Supabase dihubungkan di fase produksi.
+
 ---
+
+
 
 
 

@@ -18,3 +18,35 @@ export function formatDate(dateStr: string): string {
     return dateStr;
   }
 }
+
+export function formatOrderStatus(status: string): string {
+  switch (status) {
+    case 'Waiting for Payment':
+      return 'Menunggu Pembayaran';
+    case 'Paid':
+      return 'Sudah Dibayar';
+    case 'Processing':
+      return 'Sedang Diproses';
+    case 'Ready':
+      return 'Siap Diambil';
+    case 'Completed':
+      return 'Selesai';
+    case 'Cancelled':
+      return 'Dibatalkan';
+    default:
+      return status;
+  }
+}
+
+export function formatPaymentStatus(status: string): string {
+  switch (status) {
+    case 'Pending':
+      return 'Belum Bayar';
+    case 'Paid':
+      return 'Lunas';
+    case 'Failed':
+      return 'Gagal';
+    default:
+      return status;
+  }
+}
