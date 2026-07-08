@@ -18,7 +18,8 @@ import {
   CreditCard,
   FileText,
   CheckCircle2,
-  LogOut
+  LogOut,
+  Printer
 } from 'lucide-react';
 import { orderService } from '../../services/orderService';
 import { authService, UserProfile } from '../../services/authService';
@@ -546,6 +547,27 @@ export default function CashierDashboard() {
                     <span>Pesanan Dibatalkan. Stok dikembalikan.</span>
                   </div>
                 )}
+              </div>
+
+              {/* Receipt Actions */}
+              <div className="flex flex-col gap-2 pt-3 border-t border-slate-800">
+                <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-1">Struk Transaksi</h4>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => window.open(`/receipt/${selectedOrder.id}`, '_blank')}
+                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-750 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Lihat Struk</span>
+                  </button>
+                  <button
+                    onClick={() => window.open(`/receipt/${selectedOrder.id}?print=true`, '_blank')}
+                    className="flex-1 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Cetak Struk</span>
+                  </button>
+                </div>
               </div>
             </>
           ) : (

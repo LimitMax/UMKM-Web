@@ -12,7 +12,8 @@ import {
   CreditCard, 
   AlertCircle,
   FileText,
-  Home
+  Home,
+  Printer
 } from 'lucide-react';
 import { orderService } from '@/services/orderService';
 import { Order } from '@/types';
@@ -279,6 +280,24 @@ export default function OrderSuccessPage() {
           <div className="text-center text-[10px] text-slate-500 mt-6 pt-3 border-t border-slate-900 font-mono">
             {formatDate(order.createdAt)}
           </div>
+        </div>
+
+        {/* Receipt Actions Card */}
+        <div className="glass rounded-3xl p-5 border border-slate-800/80 flex flex-col sm:flex-row gap-3">
+          <Link
+            href={`/receipt/${order.id}`}
+            className="flex-1 py-3 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white text-slate-200 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            <FileText className="w-4 h-4 text-emerald-400" />
+            <span>Lihat Struk Digital</span>
+          </Link>
+          <button
+            onClick={() => window.open(`/receipt/${order.id}?print=true`, '_blank')}
+            className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Cetak Struk</span>
+          </button>
         </div>
 
       </div>

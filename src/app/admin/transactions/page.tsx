@@ -256,6 +256,17 @@ export default function AdminTransactionsPage() {
                   <span className="text-emerald-400 text-base">{formatRupiah(selectedTx.totalAmount)}</span>
                 </div>
               </div>
+
+              {/* Receipt actions link for admin */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => window.open(`/receipt/${selectedTx.id}`, '_blank')}
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5"
+                >
+                  <FileText className="w-4 h-4 text-emerald-400" />
+                  <span>Lihat Struk Digital</span>
+                </button>
+              </div>
             </>
           ) : (
             <div className="text-center py-20 text-slate-500 text-xs flex flex-col items-center justify-center gap-3">
