@@ -24,6 +24,7 @@ import {
 import { productService } from '../../services/productService';
 import { orderService } from '../../services/orderService';
 import { businessService } from '../../services/businessService';
+import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
 import { Product, ProductCategory, OrderItem, PaymentMethod, BusinessProfile } from '../../types';
 import { formatRupiah } from '../../utils/format';
 
@@ -199,17 +200,20 @@ export default function CustomerOrderPage() {
             </div>
           </div>
           
-          <button 
-            onClick={() => setIsCartOpen(true)}
-            className="relative p-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold flex items-center gap-2 hover:bg-emerald-400 transition-all shadow-md shadow-emerald-500/10"
-          >
-            <ShoppingBag className="w-5 h-5" />
-            {totalItemsCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 animate-bounce">
-                {totalItemsCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <DemoRoleSwitcher />
+            <button 
+              onClick={() => setIsCartOpen(true)}
+              className="relative p-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold flex items-center gap-2 hover:bg-emerald-400 transition-all shadow-md shadow-emerald-500/10"
+            >
+              <ShoppingBag className="w-5 h-5" />
+              {totalItemsCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 animate-bounce">
+                  {totalItemsCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 

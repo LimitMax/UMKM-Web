@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { demoRoleService, DemoRole } from '../services/demoRoleService';
+import DemoRoleSwitcher from '../components/DemoRoleSwitcher';
 import { 
   Brain, 
   Smartphone, 
@@ -14,6 +16,7 @@ import {
 import { resetDB } from '../services/db';
 
 export default function LandingPage() {
+  const router = useRouter();
   const [resetSuccess, setResetSuccess] = useState(false);
 
   const handleReset = () => {
@@ -23,6 +26,11 @@ export default function LandingPage() {
       setResetSuccess(false);
       window.location.reload();
     }, 1200);
+  };
+
+  const handleEntry = (role: DemoRole, path: string) => {
+    demoRoleService.setCurrentDemoRole(role);
+    router.push(path);
   };
 
   return (
@@ -45,7 +53,8 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs font-medium text-slate-400 px-3 py-1.5 rounded-full border border-slate-800 bg-slate-900/50">
+          <DemoRoleSwitcher />
+          <span className="text-[11px] font-bold text-slate-400 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900/50 hidden sm:inline-block">
             v1.0 MVP Ready
           </span>
         </div>
@@ -82,19 +91,19 @@ export default function LandingPage() {
                 <Smartphone className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-white mb-2 group-hover:text-emerald-400 transition-colors">
-                Pesan Mandiri
+                Masuk sebagai Pelanggan
               </h3>
               <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                Halaman khusus pelanggan. Scan QR, jelajahi menu makanan/minuman, tambah ke keranjang, dan langsung pesan secara digital.
+                Jelajahi menu kafe dan produk secara interaktif, tambahkan item ke keranjang belanja, dan kirim pesanan meja Anda secara langsung.
               </p>
             </div>
-            <Link 
-              href="/order" 
-              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all shadow-lg hover:shadow-emerald-500/20"
+            <button 
+              onClick={() => handleEntry('customer', '/order')}
+              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all shadow-lg hover:shadow-emerald-500/20 text-xs"
             >
-              <span>Pesan Sekarang</span>
+              <span>Buka Menu Pesanan</span>
               <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-            </Link>
+            </button>
           </div>
 
           {/* Card 2: Cashier Dashboard */}
@@ -105,19 +114,19 @@ export default function LandingPage() {
                 <Laptop className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-400 transition-colors">
-                Dashboard Kasir
+                Masuk sebagai Kasir
               </h3>
               <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                Proses pesanan pelanggan secara instan. Terima pembayaran tunai/e-wallet, kelola antrean, dan pantau status pesanan dapur.
+                Kelola dan konfirmasi antrean pesanan pelanggan, proses pembayaran tunai/transfer, dan mainkan bell notifikasi pemesanan.
               </p>
             </div>
-            <Link 
-              href="/cashier" 
-              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg hover:shadow-indigo-500/20"
+            <button 
+              onClick={() => handleEntry('cashier', '/cashier')}
+              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg hover:shadow-indigo-500/20 text-xs"
             >
-              <span>Buka Layanan Kasir</span>
+              <span>Buka Dashboard Kasir</span>
               <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-            </Link>
+            </button>
           </div>
 
           {/* Card 3: Admin Portal */}
@@ -128,19 +137,19 @@ export default function LandingPage() {
                 <Brain className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-white mb-2 group-hover:text-teal-400 transition-colors">
-                Portal Admin & AI
+                Masuk sebagai Owner/Admin
               </h3>
               <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                Kelola produk, pantau stok dengan peringatan otomatis, riwayat transaksi lengkap, dan dapatkan insight bisnis otomatis bertenaga AI.
+                Ubah konfigurasi profil bisnis & pajak, buat menu QR, edit katalog produk, pantau stok kritis, dan lihat analisis AI laporan keuangan.
               </p>
             </div>
-            <Link 
-              href="/admin" 
-              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-400 font-bold border border-teal-500/20 hover:border-teal-400/40 transition-all"
+            <button 
+              onClick={() => handleEntry('admin', '/admin')}
+              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-400 font-bold border border-teal-500/20 hover:border-teal-400/40 transition-all flex items-center justify-center text-xs"
             >
-              <span>Masuk Admin Panel</span>
+              <span>Buka Dashboard Admin</span>
               <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-            </Link>
+            </button>
           </div>
         </div>
 

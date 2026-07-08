@@ -13,12 +13,14 @@ import {
   X, 
   Home, 
   Sparkles,
-  ShieldAlert,
   LogOut,
   Settings,
   ClipboardList
 } from 'lucide-react';
 import { authService, UserProfile } from '../../services/authService';
+import { demoRoleService } from '../../services/demoRoleService';
+import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
+import RoleGuardBanner from '../../components/RoleGuardBanner';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -44,7 +46,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/login');
   };
 
-  const navItems = [
+  const currentDemoRole = demoRoleService.getCurrentDemoRole();
+
+  let navItems = [
     { href: '/admin', label: 'Ringkasan', icon: BarChart3 },
     { href: '/admin/products', label: 'Kelola Produk', icon: ShoppingBag },
     { href: '/admin/stock', label: 'Kelola Stok', icon: Layers },
@@ -53,6 +57,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/insights', label: 'AI Insights', icon: Brain },
     { href: '/admin/settings', label: 'Pengaturan Bisnis', icon: Settings },
   ];
+
+  if (currentDemoRole === 'cashier') {
+    navItems = [
+      { href: '/cashier', label: 'Dashboard Kasir', icon: BarChart3 },
+      { href: '/admin/transactions', label: 'Struk Transaksi', icon: ClipboardList },
+      { href: '/order', label: 'Order Customer', icon: ShoppingBag },
+    ];
+  } else if (currentDemoRole === 'customer') {
+    navItems = [
+      { href: '/order', label: 'Menu / Order', icon: ShoppingBag },
+      { href: '/', label: 'Halaman Utama', icon: Settings },
+    ];
+  }
 
   if (isLoading) {
     return (
@@ -70,35 +87,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (user.role !== 'admin') {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-md bg-slate-900 border border-slate-850 p-8 rounded-3xl flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
-            <ShieldAlert className="w-6 h-6" />
-          </div>
-          <h2 className="text-xl font-bold text-white">Akses Ditolak</h2>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Halaman Panel Owner hanya dapat diakses oleh pengguna dengan role <strong>Admin / Owner</strong>. Peran Anda saat ini adalah <strong>{user.role}</strong>.
-          </p>
-          <div className="flex gap-3 mt-2 w-full">
-            <button
-              onClick={handleLogout}
-              className="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-all"
-            >
-              Keluar & Ganti Akun
-            </button>
-            <Link
-              href="/cashier"
-              className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all flex items-center justify-center"
-            >
-              Ke Dashboard Kasir
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // No hard redirects for role checks in demo mode
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row text-slate-100">
@@ -113,12 +102,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             UMKM Pilot <span className="text-[10px] font-mono text-emerald-400">Admin</span>
           </span>
         </div>
-        <button 
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-        >
-          {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-3">
+          <DemoRoleSwitcher />
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+          >
+            {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </header>
 
       {/* Sidebar Navigation */}
@@ -167,6 +159,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Footer links */}
         <div className="flex flex-col gap-3 border-t border-slate-850 pt-6 mt-auto">
+          <div className="px-4 pb-2">
+            <DemoRoleSwitcher />
+          </div>
+          
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-rose-450 hover:bg-rose-950/20 hover:text-rose-400 transition-all text-left"
@@ -200,6 +196,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main Content Pane */}
       <div className="flex-1 overflow-x-hidden p-6 md:p-8">
         <div className="max-w-6xl mx-auto">
+          <RoleGuardBanner allowedRoles={['admin']} currentPageName="Owner/Admin Dashboard" />
           {children}
         </div>
       </div>

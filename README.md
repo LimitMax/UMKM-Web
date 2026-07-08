@@ -308,7 +308,34 @@ Spreadsheet CSV yang diunduh menyertakan kolom-kolom berikut:
 - **Data Source**: Data laporan diambil dan dihitung secara lokal dari `localStorage` browser pengguna aktif. Jika data demo direset atau dibersihkan di browser tersebut, riwayat transaksi pada laporan juga akan terhapus.
 - **Future Integration**: Setelah koneksi Supabase diaktifkan, data laporan akan diambil secara realtime dari tabel `orders` PostgreSQL via API query.
 
+## 👥 Simulasi Peran & Switcher Peran Demo (Phase 5D)
+
+UMKM Pilot menyertakan sistem simulasi peran (*Demo Role Switcher*) untuk memudahkan penguji menjelajahi aplikasi dari tiga sudut pandang pengguna yang berbeda: **Pemilik UMKM (Admin)**, **Kasir**, dan **Pelanggan** secara instan tanpa perlu mendaftar atau login manual secara berulang.
+
+### Cara Kerja Demo Role Switcher
+Sistem mendeteksi role aktif dari penyimpanan lokal (`localStorage`). Tampilan antarmuka dan panel navigasi akan otomatis menyesuaikan berdasarkan peran yang dipilih:
+1. **Pemilik UMKM (Admin)**:
+   - Mengakses Dashboard Admin, Kelola Produk, Stok, Transaksi, Laporan Penjualan, AI Insights, dan Pengaturan Toko.
+   - Menggunakan komponen `DemoRoleSwitcher` untuk berpindah ke mode lain kapan saja.
+2. **Kasir**:
+   - Mengakses Dashboard Kasir Pintar, menyaring antrean pesanan masuk, memproses status dapur, dan mencetak struk digital.
+   - Batasan: Navigasi sidebar admin akan otomatis disederhanakan hanya untuk menampilkan link kasir dan daftar struk.
+3. **Pelanggan**:
+   - Mengakses menu pesanan mandiri (`/order`), berbelanja makanan/minuman, melihat banner toko, dan meninjau status antrean digital.
+
+### Panduan Akses Halaman (Soft Route Guard)
+Untuk memudahkan peninjauan demo, aplikasi menggunakan **Soft Route Access Guidance** (bukan blokade keamanan produksi keras):
+- Jika peran aktif Anda saat ini adalah **Pelanggan** tetapi Anda membuka halaman `/admin` atau `/cashier`, aplikasi akan menampilkan banner peringatan berwarna kuning di bagian atas:
+  - *“Anda sedang berada dalam mode Pelanggan. Halaman ini biasanya digunakan oleh Admin/Owner.”*
+- Anda dapat mengklik **Ganti ke Admin/Kasir Demo** untuk menyesuaikan peran secara instan, atau klik **Lanjutkan** untuk tetap meninjau halaman tersebut tanpa dialihkan secara pasang.
+
+### Batasan Saat Ini (Technical Limitations)
+- **Bukan Otentikasi Riil**: Fitur switcher ini murni untuk kebutuhan demonstrasi dan simulasi alur kerja visual. Belum ada enkripsi sandi atau pengamanan token API JWT di sisi server.
+- **Rencana Mendatang**: Integrasi otentikasi nyata menggunakan Supabase Auth dengan aturan Row-Level Security (RLS) PostgreSQL untuk membatasi akses data secara permanen di database.
+
 ---
+
+
 
 
 ## 🛣️ Remaining Technical Debt

@@ -22,6 +22,8 @@ import {
   Printer
 } from 'lucide-react';
 import { orderService } from '../../services/orderService';
+import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
+import RoleGuardBanner from '../../components/RoleGuardBanner';
 import { authService, UserProfile } from '../../services/authService';
 import { Order, OrderStatus } from '../../types';
 import { formatRupiah } from '../../utils/format';
@@ -207,6 +209,7 @@ export default function CashierDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            <DemoRoleSwitcher />
             {/* User Meta display */}
             {user && (
               <div className="hidden md:block text-right">
@@ -247,7 +250,9 @@ export default function CashierDashboard() {
       </header>
 
       {/* Main Workspace Layout */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-6 flex flex-col lg:flex-row gap-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-6 flex flex-col gap-6">
+        <RoleGuardBanner allowedRoles={['admin', 'cashier']} currentPageName="Dashboard Kasir" />
+        <div className="flex flex-col lg:flex-row gap-6 w-full">
         
         {/* Left Section: Order Lists */}
         <div className="flex-1 flex flex-col gap-4">
@@ -577,7 +582,7 @@ export default function CashierDashboard() {
             </div>
           )}
         </div>
-
+      </div>
       </main>
     </div>
   );
