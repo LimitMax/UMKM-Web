@@ -15,7 +15,8 @@ import {
   Sparkles,
   ShieldAlert,
   LogOut,
-  Settings
+  Settings,
+  ClipboardList
 } from 'lucide-react';
 import { authService, UserProfile } from '../../services/authService';
 
@@ -48,6 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/products', label: 'Kelola Produk', icon: ShoppingBag },
     { href: '/admin/stock', label: 'Kelola Stok', icon: Layers },
     { href: '/admin/transactions', label: 'Transaksi', icon: History },
+    { href: '/admin/reports', label: 'Laporan', icon: ClipboardList },
     { href: '/admin/insights', label: 'AI Insights', icon: Brain },
     { href: '/admin/settings', label: 'Pengaturan Bisnis', icon: Settings },
   ];

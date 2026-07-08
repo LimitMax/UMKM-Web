@@ -282,7 +282,34 @@ This section documents the complete happy-path flow for verifying the MVP end-to
 - Close and reopen the browser tab → data still persists
 - Click **Reset Demo Data** on the landing page → all orders cleared, products restored to seed
 
+## 📊 Laporan dan Ekspor Data (Phase 5C)
+
+UMKM Pilot menyediakan modul **Laporan & Ekspor Data** di `/admin/reports` bagi pemilik bisnis untuk memfilter, meringkas, dan mengekspor data transaksi ke file format CSV.
+
+### Cara Memfilter dan Mengekspor Laporan
+1. Masuk sebagai **Admin/Owner** (`admin@tokoku.com`).
+2. Klik menu **Laporan** pada sidebar kiri.
+3. Gunakan filter untuk menyaring data:
+   - **Tanggal Mulai & Selesai**: Memfilter berdasarkan rentang waktu pembuatan pesanan.
+   - **Status Pesanan**: Menyaring status tertentu. Secara default, pesanan dibatalkan (*Cancelled*) dikecualikan agar tidak mengacaukan perhitungan omzet utama.
+   - **Status Pembayaran & Metode**: Menyaring tunai, QRIS, atau transfer bank.
+4. Klik **Ekspor CSV** untuk mengunduh laporan. File akan diunduh dengan nama dinamis, misalnya `umkm-pilot-transactions-YYYY-MM-DD-to-YYYY-MM-DD.csv`.
+5. Klik **Reset Filter** untuk mengembalikan filter ke kondisi default.
+
+### Kolom Data yang Diekspor
+Spreadsheet CSV yang diunduh menyertakan kolom-kolom berikut:
+- **Informasi Transaksi**: ID Pesanan, No. Antrean, Nama Pelanggan, No. WhatsApp, Tanggal Pesanan (Format Lokal).
+- **Metode & Status**: Metode Pembayaran (Tunai/Transfer/QRIS), Status Pembayaran (Lunas/Pending/Gagal), Status Pesanan.
+- **Rincian Produk**: Daftar Menu (contoh: `"Es Kopi Susu x2, Roti Bakar x1"`), Total Qty barang terjual, Catatan pelanggan.
+- **Rincian Biaya**: Subtotal, Biaya Layanan, Pajak, Total Akhir (Omzet bersih).
+- **Informasi Toko**: Nama Toko, Kategori Toko (dari Profil Bisnis aktif).
+
+### Batasan Saat Ini (Technical Limitations)
+- **Data Source**: Data laporan diambil dan dihitung secara lokal dari `localStorage` browser pengguna aktif. Jika data demo direset atau dibersihkan di browser tersebut, riwayat transaksi pada laporan juga akan terhapus.
+- **Future Integration**: Setelah koneksi Supabase diaktifkan, data laporan akan diambil secara realtime dari tabel `orders` PostgreSQL via API query.
+
 ---
+
 
 ## 🛣️ Remaining Technical Debt
 
