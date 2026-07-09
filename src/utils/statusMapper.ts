@@ -48,8 +48,9 @@ export function mapFrontendPaymentStatusToDb(fePaymentStatus: string): string {
 export function mapDbPaymentMethodToFrontend(dbPaymentMethod: string): PaymentMethod {
   switch (dbPaymentMethod) {
     case 'cash': return 'Cash';
-    case 'qris': return 'QRIS';
-    case 'bank_transfer': return 'Bank Transfer';
+    case 'qris': return 'Non-Cash';
+    case 'bank_transfer': return 'Non-Cash';
+    case 'non_cash': return 'Non-Cash';
     default: return dbPaymentMethod as PaymentMethod;
   }
 }
@@ -57,8 +58,7 @@ export function mapDbPaymentMethodToFrontend(dbPaymentMethod: string): PaymentMe
 export function mapFrontendPaymentMethodToDb(fePaymentMethod: string): string {
   switch (fePaymentMethod) {
     case 'Cash': return 'cash';
-    case 'QRIS': return 'qris';
-    case 'Bank Transfer': return 'bank_transfer';
+    case 'Non-Cash': return 'non_cash';
     default: return fePaymentMethod;
   }
 }

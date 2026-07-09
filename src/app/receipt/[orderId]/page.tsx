@@ -7,7 +7,7 @@ import { orderService } from '../../../services/orderService';
 import { businessService } from '../../../services/businessService';
 import { realtimeService } from '../../../lib/services/realtimeService';
 import { Order, BusinessProfile } from '../../../types';
-import { formatRupiah, formatDate, formatOrderStatus } from '../../../utils/format';
+import { formatPaymentMethod, formatRupiah, formatDate, formatOrderStatus } from '../../../utils/format';
 import { formatEtaMinutes, formatEstimatedTime, getEtaLabel } from '../../../utils/etaHelpers';
 
 export default function ReceiptPage() {
@@ -100,7 +100,7 @@ export default function ReceiptPage() {
       `*Nomor Antrean:* ${order.queueNumber}\n` +
       `*Nama:* ${order.customerName}\n` +
       `*ID Pesanan:* ${order.id.slice(6, 14).toUpperCase()}\n` +
-      `*Metode Pembayaran:* ${order.paymentMethod}\n` +
+      `*Metode Pembayaran:* ${formatPaymentMethod(order.paymentMethod)}\n` +
       `*Total Tagihan:* ${formatRupiah(order.totalAmount)}\n\n` +
       `Terima kasih!`;
     return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;

@@ -20,7 +20,7 @@ import {
 import { orderService } from '../../../services/orderService';
 import { businessService } from '../../../services/businessService';
 import { Order, BusinessProfile } from '../../../types';
-import { formatRupiah, formatDate } from '../../../utils/format';
+import { formatPaymentMethod, formatRupiah, formatDate } from '../../../utils/format';
 import { 
   ReportFilters, 
   filterOrders, 
@@ -330,8 +330,7 @@ export default function ReportsPage() {
             >
               <option value="All">Semua Metode</option>
               <option value="Cash">Tunai</option>
-              <option value="QRIS">QRIS</option>
-              <option value="Bank Transfer">Transfer Bank</option>
+              <option value="Non-Cash">Non-Tunai</option>
             </select>
           </div>
         </div>
@@ -404,12 +403,8 @@ export default function ReportsPage() {
               <span className="text-xs font-bold text-slate-200">{formatRupiah(summary.paymentMethodBreakdown.cash)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">QRIS:</span>
-              <span className="text-xs font-bold text-slate-200">{formatRupiah(summary.paymentMethodBreakdown.qris)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Transfer Bank:</span>
-              <span className="text-xs font-bold text-slate-200">{formatRupiah(summary.paymentMethodBreakdown.transfer)}</span>
+              <span className="text-xs text-slate-400">Non-Tunai:</span>
+              <span className="text-xs font-bold text-slate-200">{formatRupiah(summary.paymentMethodBreakdown.nonCash)}</span>
             </div>
           </div>
         </div>
@@ -495,7 +490,7 @@ export default function ReportsPage() {
                     <td className="py-2.5 px-2 text-slate-200 uppercase font-semibold">{order.customerName}</td>
                     <td className="py-2.5 px-2">{formatDate(order.createdAt)}</td>
                     <td className="py-2.5 px-2 text-center text-[10px]">
-                      {order.paymentMethod === 'Cash' ? 'Tunai' : order.paymentMethod === 'Bank Transfer' ? 'Transfer' : 'QRIS'}
+                      {formatPaymentMethod(order.paymentMethod)}
                     </td>
                     <td className="py-2.5 px-2 text-center">
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${

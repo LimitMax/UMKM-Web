@@ -272,6 +272,66 @@ Aplikasi UMKM Pilot mendukung perhitungan ongkos kirim fleksibel dengan dua tipe
 
 ---
 
+## Midtrans Sandbox Snap (Phase 9A/9B)
+
+UMKM Pilot mendukung pembayaran QRIS dan Transfer Bank melalui Midtrans Snap Sandbox. Pembayaran tunai tetap berjalan seperti sebelumnya dan dikonfirmasi manual oleh kasir.
+
+### Konfigurasi Environment
+
+Tambahkan variabel berikut ke `.env.local`:
+
+```env
+MIDTRANS_IS_PRODUCTION=false
+MIDTRANS_MERCHANT_ID=your-midtrans-sandbox-merchant-id
+NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=SB-Mid-client-your-client-key
+MIDTRANS_SERVER_KEY=SB-Mid-server-your-server-key
+MIDTRANS_SNAP_BASE_URL=https://app.sandbox.midtrans.com
+MIDTRANS_CORE_API_BASE_URL=https://api.sandbox.midtrans.com
+MIDTRANS_WEBHOOK_SECRET=
+```
+
+`MIDTRANS_SERVER_KEY` hanya dipakai di API route server-side. Jangan beri prefix `NEXT_PUBLIC_` pada server key.
+
+### Migrasi Database Wajib
+
+Jalankan SQL berikut melalui Supabase SQL Editor sebelum menguji pembayaran:
+
+```text
+supabase/migrations/phase_9a_midtrans_payments.sql
+supabase/migrations/phase_9b_simplify_payment_method.sql
+```
+
+Migration ini menambahkan kolom Snap seperti `snap_token`, `snap_redirect_url`, `payment_type`, `fraud_status`, `transaction_time`, dan `settlement_time` ke tabel `payments`. Jika Supabase masih menampilkan error schema cache, jalankan ulang migration tersebut agar perintah `NOTIFY pgrst, 'reload schema';` ikut memuat ulang cache API.
+Migration Phase 9B menambahkan dukungan `payment_method = non_cash` untuk alur checkout Tunai / Non-Tunai.
+
+### Cara Mendapatkan Key Sandbox
+
+1. Masuk ke dashboard Midtrans Sandbox.
+2. Buka menu Settings atau Access Keys.
+3. Salin Merchant ID, Client Key Sandbox, dan Server Key Sandbox.
+4. Pastikan `MIDTRANS_IS_PRODUCTION=false`.
+
+### Cara Menguji QRIS Sandbox
+
+1. Buka `/order`, pilih menu, lalu pilih metode pembayaran `QRIS`.
+2. Setelah pesanan dibuat, aplikasi memanggil `/api/payments/midtrans/create`.
+3. Snap Sandbox akan terbuka sebagai popup. Jika popup gagal, gunakan redirect URL Midtrans.
+4. Selesaikan simulasi pembayaran melalui halaman atau simulator Midtrans Sandbox.
+
+### Cara Menguji Transfer Bank Sandbox
+
+1. Buka `/order`, pilih menu, lalu pilih metode pembayaran `Transfer Bank`.
+2. Snap Sandbox akan menampilkan opsi bank transfer/virtual account yang didukung Sandbox.
+3. Gunakan simulator Midtrans Sandbox untuk menyelesaikan pembayaran VA.
+
+### Batasan Saat Ini
+
+- Integrasi ini memakai Midtrans Snap Sandbox, bukan production.
+- Status order tetap `Menunggu Pembayaran` sampai webhook Midtrans diimplementasikan pada fase berikutnya.
+- Metadata pembayaran disimpan ke tabel `payments`, termasuk Snap token, redirect URL, provider reference ID, metode, amount, dan status.
+
+---
+
 ## 🛣️ Remaining Technical Debt
 
 | Area | Issue | Priority |

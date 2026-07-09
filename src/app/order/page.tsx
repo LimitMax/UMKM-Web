@@ -15,7 +15,6 @@ import {
   Sparkles, 
   AlertCircle,
   CheckCircle,
-  CreditCard,
   Wallet,
   DollarSign,
   MapPin,
@@ -31,6 +30,28 @@ import { Product, ProductCategory, OrderItem, PaymentMethod, BusinessProfile, Fu
 import { formatRupiah } from '../../utils/format';
 import { calculateOrderTotals } from '../../utils/calculations';
 import { previewOrderEta, getEtaLabel, formatEtaDisplay } from '../../utils/etaHelpers';
+
+type SnapCallbacks = {
+  onSuccess?: (result: unknown) => void;
+  onPending?: (result: unknown) => void;
+  onError?: (result: unknown) => void;
+  onClose?: () => void;
+};
+
+declare global {
+  interface Window {
+    snap?: {
+      pay: (token: string, callbacks?: SnapCallbacks) => void;
+    };
+  }
+}
+
+interface MidtransCreateResponse {
+  snapToken: string;
+  redirectUrl?: string | null;
+  orderId: string;
+  paymentId: string;
+}
 
 export default function CustomerOrderPage() {
   const router = useRouter();
@@ -48,7 +69,7 @@ export default function CustomerOrderPage() {
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [orderNotes, setOrderNotes] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Non-Cash');
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('dine_in');
   const [recipientName, setRecipientName] = useState<string>('');
   const [deliveryPhone, setDeliveryPhone] = useState<string>('');
@@ -177,6 +198,103 @@ export default function CustomerOrderPage() {
   const totalAmount = totals.totalAmount;
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  const getPaymentHelperText = () => {
+    if (paymentMethod === 'Cash') {
+      return 'Bayar langsung di kasir.';
+    }
+    return 'Bayar melalui Midtrans. Pilih QRIS, VA, e-wallet, atau metode lain di halaman pembayaran.';
+  };
+
+  const loadMidtransSnapScript = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (typeof window === 'undefined') {
+        reject(new Error('Snap hanya tersedia di browser.'));
+        return;
+      }
+
+      if (window.snap) {
+        resolve();
+        return;
+      }
+
+      const existingScript = document.getElementById('midtrans-snap-script') as HTMLScriptElement | null;
+      if (existingScript) {
+        existingScript.addEventListener('load', () => resolve(), { once: true });
+        existingScript.addEventListener('error', () => reject(new Error('Gagal memuat Snap Midtrans.')), { once: true });
+        return;
+      }
+
+      const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
+      if (!clientKey) {
+        reject(new Error('Client key Midtrans belum dikonfigurasi.'));
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.id = 'midtrans-snap-script';
+      script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
+      script.async = true;
+      script.setAttribute('data-client-key', clientKey);
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Gagal memuat Snap Midtrans.'));
+      document.body.appendChild(script);
+    });
+  };
+
+  const openMidtransPayment = async (payment: MidtransCreateResponse) => {
+    const goToSuccess = () => router.push(`/order/success/${payment.orderId}`);
+
+    try {
+      await loadMidtransSnapScript();
+
+      if (!window.snap) {
+        throw new Error('Snap Midtrans tidak tersedia.');
+      }
+
+      window.snap.pay(payment.snapToken, {
+        onSuccess: goToSuccess,
+        onPending: goToSuccess,
+        onClose: goToSuccess,
+        onError: () => {
+          if (payment.redirectUrl) {
+            window.location.href = payment.redirectUrl;
+            return;
+          }
+          setErrorMsg('Pembayaran Midtrans belum dapat dibuka. Silakan coba lagi dari halaman sukses pesanan.');
+          goToSuccess();
+        },
+      });
+    } catch {
+      if (payment.redirectUrl) {
+        window.location.href = payment.redirectUrl;
+        return;
+      }
+
+      setErrorMsg('Pesanan dibuat, tetapi halaman Midtrans gagal dibuka. Silakan lanjutkan dari halaman sukses pesanan.');
+      goToSuccess();
+    }
+  };
+
+  const createMidtransPayment = async (orderId: string): Promise<MidtransCreateResponse> => {
+    const response = await fetch('/api/payments/midtrans/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        orderId,
+        paymentMethod: 'non_cash',
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.message || 'Gagal membuat pembayaran Midtrans.');
+    }
+
+    return response.json();
+  };
+
   // Handle Checkout submission
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -269,9 +387,14 @@ export default function CustomerOrderPage() {
 
       // Clear cart
       setCart([]);
-      
-      // Redirect to success page
-      router.push(`/order/success/${order.id}`);
+
+      if (paymentMethod === 'Cash') {
+        router.push(`/order/success/${order.id}`);
+        return;
+      }
+
+      const payment = await createMidtransPayment(order.id);
+      await openMidtransPayment(payment);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Terjadi kesalahan saat memproses pesanan.');
     } finally {
@@ -758,11 +881,10 @@ export default function CustomerOrderPage() {
                   {/* Payment Method */}
                   <div>
                     <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1.5">Metode Pembayaran *</label>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
                       {[
                         { id: 'Cash', label: 'Tunai', icon: DollarSign },
-                        { id: 'QRIS', label: 'QRIS', icon: Wallet },
-                        { id: 'Bank Transfer', label: 'Transfer', icon: CreditCard },
+                        { id: 'Non-Cash', label: 'Non-Tunai', icon: Wallet },
                       ].map((method) => {
                         const Icon = method.icon;
                         const isSelected = paymentMethod === method.id;
@@ -784,9 +906,7 @@ export default function CustomerOrderPage() {
                       })}
                     </div>
                     <p className="text-[9px] text-slate-450 font-sans mt-2 italic leading-relaxed">
-                      {paymentMethod === 'Cash' && '💡 Tunai: Bayar di kasir saat pesanan diambil'}
-                      {paymentMethod === 'QRIS' && '💡 QRIS: Scan QRIS di kasir setelah checkout'}
-                      {paymentMethod === 'Bank Transfer' && '💡 Transfer: Konfirmasi pembayaran ke kasir'}
+                      {getPaymentHelperText()}
                     </p>
                   </div>
                 </div>
@@ -873,7 +993,7 @@ export default function CustomerOrderPage() {
                   disabled={isCheckoutDisabled}
                   className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-500 text-slate-950 font-black rounded-xl transition-all shadow-lg hover:shadow-emerald-500/20 text-xs uppercase tracking-wider cursor-pointer"
                 >
-                  {isLoading ? 'Memproses...' : 'Konfirmasi & Bayar'}
+                  {isLoading ? 'Memproses...' : paymentMethod === 'Cash' ? 'Konfirmasi Pesanan' : 'Bayar via Midtrans'}
                 </button>
               </div>
             </form>
@@ -1101,11 +1221,10 @@ export default function CustomerOrderPage() {
 
                     <div>
                       <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1.5">Metode Pembayaran *</label>
-                      <div className="grid grid-cols-3 gap-1.5">
+                      <div className="grid grid-cols-2 gap-1.5">
                         {[
                           { id: 'Cash', label: 'Tunai', icon: DollarSign },
-                          { id: 'QRIS', label: 'QRIS', icon: Wallet },
-                          { id: 'Bank Transfer', label: 'Transfer', icon: CreditCard },
+                          { id: 'Non-Cash', label: 'Non-Tunai', icon: Wallet },
                         ].map((method) => {
                           const Icon = method.icon;
                           const isSelected = paymentMethod === method.id;
@@ -1127,9 +1246,7 @@ export default function CustomerOrderPage() {
                         })}
                       </div>
                       <p className="text-[9px] text-slate-455 font-sans mt-2 italic leading-relaxed">
-                        {paymentMethod === 'Cash' && '💡 Tunai: Bayar di kasir saat pesanan diambil'}
-                        {paymentMethod === 'QRIS' && '💡 QRIS: Scan QRIS di kasir setelah checkout'}
-                        {paymentMethod === 'Bank Transfer' && '💡 Transfer: Konfirmasi pembayaran ke kasir'}
+                        {getPaymentHelperText()}
                       </p>
                     </div>
                   </div>
@@ -1193,7 +1310,7 @@ export default function CustomerOrderPage() {
                     disabled={isCheckoutDisabled}
                     className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-500 text-slate-950 font-black rounded-xl transition-all shadow-lg text-xs uppercase tracking-wider cursor-pointer"
                   >
-                    {isLoading ? 'Memproses...' : 'Konfirmasi & Bayar'}
+                    {isLoading ? 'Memproses...' : paymentMethod === 'Cash' ? 'Konfirmasi Pesanan' : 'Bayar via Midtrans'}
                   </button>
                 </div>
               </form>

@@ -19,10 +19,20 @@ import { orderService } from '@/services/orderService';
 import { businessService } from '@/services/businessService';
 import { realtimeService } from '@/lib/services/realtimeService';
 import { Order, BusinessProfile } from '@/types';
-import { formatRupiah, formatDate, formatOrderStatus, formatPaymentStatus } from '@/utils/format';
+import { formatPaymentMethod, formatRupiah, formatDate, formatOrderStatus, formatPaymentStatus } from '@/utils/format';
 import { getEtaLabel, formatEstimatedTime, formatEtaDisplay } from '@/utils/etaHelpers';
 
-
+interface LatestMidtransPayment {
+  id: string;
+  provider: string;
+  providerReferenceId: string;
+  paymentMethod: string;
+  amount: number;
+  status: string;
+  redirectUrl?: string | null;
+  createdAt: string;
+  paidAt?: string | null;
+}
 
 export default function OrderSuccessPage() {
   const { orderId } = useParams() as { orderId: string };
@@ -30,6 +40,7 @@ export default function OrderSuccessPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [whatsappNumber, setWhatsappNumber] = useState<string>('');
+  const [latestPayment, setLatestPayment] = useState<LatestMidtransPayment | null>(null);
 
   useEffect(() => {
     async function loadBusiness() {
@@ -39,6 +50,28 @@ export default function OrderSuccessPage() {
     }
     loadBusiness();
   }, []);
+
+  useEffect(() => {
+    if (!orderId) return;
+
+    const fetchLatestPayment = async () => {
+      try {
+        const response = await fetch(`/api/payments/midtrans/latest?orderId=${encodeURIComponent(orderId)}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setLatestPayment(data.payment || null);
+      } catch (err) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Failed to load latest Midtrans payment:', err);
+        }
+      }
+    };
+
+    fetchLatestPayment();
+    const interval = setInterval(fetchLatestPayment, 5000);
+
+    return () => clearInterval(interval);
+  }, [orderId]);
 
   // Subscribe to realtime changes and poll as a robust fallback
   useEffect(() => {
@@ -158,6 +191,8 @@ export default function OrderSuccessPage() {
   }
 
   const isCancelled = order.status === 'Cancelled';
+  const isMidtransOrder = order.paymentMethod === 'Non-Cash';
+  const isWaitingMidtransPayment = isMidtransOrder && order.paymentStatus === 'Waiting for Payment';
 
   return (
     <div className="min-h-screen bg-slate-950 py-8 px-4 flex justify-center items-center">
@@ -214,9 +249,7 @@ export default function OrderSuccessPage() {
               {order.status === 'Waiting for Payment' && (
                 order.paymentMethod === 'Cash' 
                   ? '💡 Lakukan pembayaran tunai ke kasir dengan menunjukkan nomor antrean ini.' 
-                  : order.paymentMethod === 'QRIS'
-                    ? `💡 Silakan bayar tagihan sebesar ${formatRupiah(order.totalAmount)} dengan memindai kode QRIS toko di meja kasir.`
-                    : `💡 Silakan transfer sebesar ${formatRupiah(order.totalAmount)} ke rekening bank toko dan tunjukkan tanda buktinya ke kasir.`
+                  : `Silakan selesaikan pembayaran non-tunai sebesar ${formatRupiah(order.totalAmount)} melalui halaman Midtrans Sandbox. Status akan diperbarui otomatis setelah pembayaran berhasil.`
               )}
               {(order.status === 'Paid' || order.status === 'Processing') && (
                 order.fulfillmentType === 'delivery'
@@ -250,6 +283,45 @@ export default function OrderSuccessPage() {
             )}
           </div>
         </div>
+
+        {isWaitingMidtransPayment && (
+          <div className="glass rounded-3xl p-5 border border-amber-500/25 bg-amber-500/5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col gap-2">
+                <div className="inline-flex w-fit items-center gap-2 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Menunggu Pembayaran Non-Tunai</span>
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-white">Pembayaran Midtrans Sandbox</h2>
+                  <p className="text-xs text-slate-350 leading-relaxed mt-1">
+                    Silakan selesaikan pembayaran melalui Midtrans. Order tetap pending sampai webhook pembayaran mengubah status menjadi lunas.
+                  </p>
+                </div>
+                <div className="text-[11px] text-slate-400 flex flex-col gap-1">
+                  <span>Provider: <strong className="text-slate-200">Midtrans Sandbox</strong></span>
+                  {latestPayment?.providerReferenceId && (
+                    <span>Reference: <strong className="text-slate-200">{latestPayment.providerReferenceId}</strong></span>
+                  )}
+                </div>
+              </div>
+              <CreditCard className="w-8 h-8 text-amber-300 flex-shrink-0" />
+            </div>
+
+            <button
+              type="button"
+              disabled={!latestPayment?.redirectUrl}
+              onClick={() => {
+                if (latestPayment?.redirectUrl) {
+                  window.location.href = latestPayment.redirectUrl;
+                }
+              }}
+              className="mt-4 w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-black text-xs uppercase tracking-wider transition-all"
+            >
+              {latestPayment?.redirectUrl ? 'Lanjutkan Pembayaran' : 'Link Pembayaran Belum Tersedia'}
+            </button>
+          </div>
+        )}
 
         {/* ETA Card — Phase 6.8 */}
         {!isCancelled && businessProfile?.etaSettings?.etaEnabled && order.estimatedTotalMinutes !== undefined && (
@@ -370,7 +442,7 @@ export default function OrderSuccessPage() {
             </div>
             <div className="col-span-2 flex items-center gap-1.5 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
               <CreditCard className="w-3.5 h-3.5 text-slate-500" />
-              <span>Pembayaran: <strong className="text-slate-200">{order.paymentMethod} ({formatPaymentStatus(order.paymentStatus)})</strong></span>
+              <span>Pembayaran: <strong className="text-slate-200">{formatPaymentMethod(order.paymentMethod)} ({formatPaymentStatus(order.paymentStatus)})</strong></span>
             </div>
             <div className="col-span-2 flex items-center gap-1.5 text-slate-400 border-t border-slate-900 pt-1.5">
               <Clock className="w-3.5 h-3.5 text-slate-500" />

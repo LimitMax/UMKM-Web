@@ -52,3 +52,20 @@ export function formatPaymentStatus(status: string): string {
       return status;
   }
 }
+
+export function formatPaymentMethod(method: string): string {
+  switch (method) {
+    case 'Cash':
+    case 'cash':
+      return 'Tunai';
+    case 'Non-Cash':
+    case 'non_cash':
+    case 'QRIS':
+    case 'qris':
+    case 'Bank Transfer':
+    case 'bank_transfer':
+      return 'Non-Tunai';
+    default:
+      return method;
+  }
+}

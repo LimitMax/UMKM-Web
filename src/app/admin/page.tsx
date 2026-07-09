@@ -14,7 +14,7 @@ import {
 import { orderService } from '../../services/orderService';
 import { productService } from '../../services/productService';
 import { Order, Product } from '../../types';
-import { formatRupiah, formatDate } from '../../utils/format';
+import { formatPaymentMethod, formatRupiah, formatDate } from '../../utils/format';
 
 import { realtimeService } from '../../lib/services/realtimeService';
 import { useAuth } from '../../components/AuthProvider';
@@ -386,7 +386,7 @@ export default function AdminDashboardPage() {
                     <td className="py-3 font-mono font-bold text-emerald-400">{tr.queueNumber}</td>
                     <td className="py-3 font-semibold text-white">{tr.customerName}</td>
                     <td className="py-3 text-slate-500">{formatDate(tr.createdAt)}</td>
-                    <td className="py-3 text-right font-semibold text-slate-400">{tr.paymentMethod}</td>
+                    <td className="py-3 text-right font-semibold text-slate-400">{formatPaymentMethod(tr.paymentMethod)}</td>
                     <td className="py-3 text-right font-bold text-emerald-400">{formatRupiah(tr.totalAmount)}</td>
                   </tr>
                 ))}

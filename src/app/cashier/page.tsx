@@ -28,7 +28,7 @@ import { realtimeService } from '../../lib/services/realtimeService';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
 import { useAuth } from '../../components/AuthProvider';
 import { Order, OrderStatus, BusinessProfile } from '../../types';
-import { formatRupiah } from '../../utils/format';
+import { formatPaymentMethod, formatRupiah } from '../../utils/format';
 import { formatEtaMinutes, formatEstimatedTime } from '../../utils/etaHelpers';
 import { Clock } from 'lucide-react';
 
@@ -498,7 +498,7 @@ export default function CashierDashboard() {
                           </span>
                         </div>
                         <p className="text-[10px] text-slate-500 mt-1">
-                          {ord.items.length} Item &bull; <span className="text-slate-300 font-semibold">{formatRupiah(ord.totalAmount)}</span> &bull; {ord.paymentMethod}
+                          {ord.items.length} Item &bull; <span className="text-slate-300 font-semibold">{formatRupiah(ord.totalAmount)}</span> &bull; {formatPaymentMethod(ord.paymentMethod)}
                         </p>
                       </div>
                     </div>
@@ -602,8 +602,14 @@ export default function CashierDashboard() {
                     </div>
                     <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-2 mt-1">
                       <CreditCard className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Metode: <strong className="text-white">{selectedOrder.paymentMethod}</strong></span>
+                      <span>Metode: <strong className="text-white">{formatPaymentMethod(selectedOrder.paymentMethod)}</strong></span>
                     </div>
+                    {selectedOrder.paymentMethod === 'Non-Cash' && (
+                      <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-2 mt-1">
+                        <CreditCard className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Provider: <strong className="text-white">Midtrans Sandbox</strong></span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-2 mt-1">
                       <ShoppingBag className="w-3.5 h-3.5 text-slate-500" />
                       <span>Layanan: <strong className="text-white">
@@ -826,14 +832,34 @@ export default function CashierDashboard() {
                   <div className="flex flex-col gap-2">
                     {selectedOrder.status === 'Waiting for Payment' && (
                       <div className="flex flex-col gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateStatus(selectedOrder.id, 'Paid')}
-                          className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer shadow-md hover:shadow-emerald-500/10"
-                        >
-                          <Check className="w-4 h-4 stroke-[2.5]" />
-                          <span>Konfirmasi Pembayaran Lunas</span>
-                        </button>
+                        {selectedOrder.paymentMethod === 'Non-Cash' ? (
+                          <>
+                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-3 py-2.5 text-xs text-amber-300 leading-relaxed">
+                              <span className="font-bold">Non-Tunai</span> &bull; Provider Midtrans Sandbox. Status: Menunggu Pembayaran.
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm('Tandai pembayaran non-tunai ini lunas secara manual?')) {
+                                  handleUpdateStatus(selectedOrder.id, 'Paid');
+                                }
+                              }}
+                              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
+                            >
+                              <Check className="w-4 h-4 stroke-[2.5]" />
+                              <span>Tandai Manual Lunas</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateStatus(selectedOrder.id, 'Paid')}
+                            className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer shadow-md hover:shadow-emerald-500/10"
+                          >
+                            <Check className="w-4 h-4 stroke-[2.5]" />
+                            <span>Konfirmasi Pembayaran Lunas</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleUpdateStatus(selectedOrder.id, 'Cancelled')}

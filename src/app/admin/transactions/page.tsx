@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { orderService } from '../../../services/orderService';
 import { Order } from '../../../types';
-import { formatRupiah, formatDate } from '../../../utils/format';
+import { formatPaymentMethod, formatRupiah, formatDate } from '../../../utils/format';
 
 import { useAuth } from '../../../components/AuthProvider';
 import { realtimeService } from '../../../lib/services/realtimeService';
@@ -154,7 +154,7 @@ export default function AdminTransactionsPage() {
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {['Semua', 'Cash', 'QRIS', 'Bank Transfer'].map((method) => (
+          {['Semua', 'Cash', 'Non-Cash'].map((method) => (
             <button
               key={method}
               onClick={() => setMethodFilter(method)}
@@ -164,7 +164,7 @@ export default function AdminTransactionsPage() {
                   : 'bg-slate-900/50 text-slate-400 border border-slate-855 hover:text-white'
               }`}
             >
-              {method === 'Cash' ? 'Tunai' : method === 'Bank Transfer' ? 'Transfer' : method}
+              {method === 'Cash' ? 'Tunai' : method === 'Non-Cash' ? 'Non-Tunai' : method}
             </button>
           ))}
         </div>
@@ -213,7 +213,8 @@ export default function AdminTransactionsPage() {
                           </span>
                         </div>
                         <p className="text-[10px] text-slate-500 mt-1">
-                          {formatDate(tx.createdAt)} &bull; {tx.paymentMethod}
+                          {formatDate(tx.createdAt)} &bull; {formatPaymentMethod(tx.paymentMethod)}
+                          {tx.paymentMethod !== 'Cash' ? ' via Midtrans' : ''}
                         </p>
                       </div>
                     </div>
@@ -257,8 +258,14 @@ export default function AdminTransactionsPage() {
                 </div>
                 <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
                   <CreditCard className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Metode: <strong className="text-white">{selectedTx.paymentMethod}</strong></span>
+                  <span>Metode: <strong className="text-white">{formatPaymentMethod(selectedTx.paymentMethod)}</strong></span>
                 </div>
+                {selectedTx.paymentMethod !== 'Cash' && (
+                  <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
+                    <Briefcase className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Provider: <strong className="text-white">Midtrans Sandbox</strong></span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
                   <Clock className="w-3.5 h-3.5 text-slate-500" />
                   <span>Selesai: <strong className="text-white">{formatDate(selectedTx.createdAt)}</strong></span>

@@ -1,4 +1,5 @@
 import { Order, BusinessProfile } from '../types';
+import { formatPaymentMethod } from './format';
 
 export interface ReportFilters {
   startDate: string; // YYYY-MM-DD
@@ -17,8 +18,7 @@ export interface ReportSummary {
   bestSellerQty: number;
   paymentMethodBreakdown: {
     cash: number;
-    qris: number;
-    transfer: number;
+    nonCash: number;
   };
 }
 
@@ -69,8 +69,7 @@ export function calculateReportSummary(orders: Order[]): ReportSummary {
   let totalItemsSold = 0;
   const productSales: { [name: string]: number } = {};
   let cash = 0;
-  let qris = 0;
-  let transfer = 0;
+  let nonCash = 0;
 
   orders.forEach((order) => {
     totalRevenue += order.totalAmount;
@@ -78,10 +77,8 @@ export function calculateReportSummary(orders: Order[]): ReportSummary {
     // Sum payment methods
     if (order.paymentMethod === 'Cash') {
       cash += order.totalAmount;
-    } else if (order.paymentMethod === 'QRIS') {
-      qris += order.totalAmount;
-    } else if (order.paymentMethod === 'Bank Transfer') {
-      transfer += order.totalAmount;
+    } else {
+      nonCash += order.totalAmount;
     }
 
     // Process items
@@ -113,8 +110,7 @@ export function calculateReportSummary(orders: Order[]): ReportSummary {
     bestSellerQty,
     paymentMethodBreakdown: {
       cash,
-      qris,
-      transfer,
+      nonCash,
     },
   };
 }
@@ -175,7 +171,7 @@ export function generateCSVReport(orders: Order[], businessProfile: BusinessProf
       escapeCsvValue(order.customerName),
       escapeCsvValue(order.customerPhone),
       escapeCsvValue(new Date(order.createdAt).toLocaleString('id-ID')),
-      escapeCsvValue(order.paymentMethod === 'Cash' ? 'Tunai' : order.paymentMethod === 'Bank Transfer' ? 'Transfer Bank' : 'QRIS'),
+      escapeCsvValue(formatPaymentMethod(order.paymentMethod)),
       escapeCsvValue(order.paymentStatus === 'Paid' ? 'Lunas' : order.paymentStatus === 'Failed' ? 'Gagal' : 'Belum Bayar'),
       escapeCsvValue(order.status),
       escapeCsvValue(itemNames),

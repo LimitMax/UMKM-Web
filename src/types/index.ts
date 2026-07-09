@@ -49,7 +49,7 @@ export interface Product {
   isActive: boolean;
 }
 
-export type PaymentMethod = 'Cash' | 'QRIS' | 'Bank Transfer';
+export type PaymentMethod = 'Cash' | 'Non-Cash';
 
 export type PaymentStatus = 'Waiting for Payment' | 'Paid' | 'Failed';
 
