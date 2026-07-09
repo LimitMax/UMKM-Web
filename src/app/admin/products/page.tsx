@@ -17,6 +17,8 @@ import {
 import { productService } from '../../../services/productService';
 import { Product, ProductCategory } from '../../../types';
 import { formatRupiah } from '../../../utils/format';
+import { useAuth } from '../../../components/AuthProvider';
+import { realtimeService } from '../../../lib/services/realtimeService';
 
 const CATEGORY_IMAGES = {
   Makanan: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80',
@@ -54,9 +56,33 @@ export default function AdminProductsPage() {
     }, 0);
   };
 
+  const { profile } = useAuth();
+
   useEffect(() => {
     loadProducts();
-  }, []);
+
+    if (!profile) return;
+    const bizId = profile.business_id || 'biz-1';
+    let debounceTimer: NodeJS.Timeout;
+
+    const triggerReload = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadProducts, 500); // 500ms debounce
+    };
+
+    // Subscribe to realtime products changes
+    const channel = realtimeService.subscribeToProductsByBusinessId(bizId, (payload) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEBUG] Admin products page realtime change:', payload.eventType);
+      }
+      triggerReload();
+    });
+
+    return () => {
+      clearTimeout(debounceTimer);
+      realtimeService.unsubscribeChannel(channel);
+    };
+  }, [profile]);
 
   // Open modal for creating product
   const openCreateModal = () => {

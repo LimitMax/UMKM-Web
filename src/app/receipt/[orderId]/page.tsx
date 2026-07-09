@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Printer, ArrowLeft, Phone, AlertTriangle } from 'lucide-react';
 import { orderService } from '../../../services/orderService';
 import { businessService } from '../../../services/businessService';
+import { realtimeService } from '../../../lib/services/realtimeService';
 import { Order, BusinessProfile } from '../../../types';
 import { formatRupiah, formatDate, formatOrderStatus } from '../../../utils/format';
 import { formatEtaMinutes, formatEstimatedTime, getEtaLabel } from '../../../utils/etaHelpers';
@@ -18,22 +19,59 @@ export default function ReceiptPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!orderId) return;
+    if (!orderId) return;
+
+    const fetchOrder = async () => {
       try {
         const foundOrder = await orderService.getOrderById(orderId);
         if (foundOrder) {
           setOrder(foundOrder);
+          if (foundOrder.status === 'Completed' || foundOrder.status === 'Cancelled') {
+            clearInterval(interval);
+          }
         }
-        const profile = await businessService.getProfile();
-        setBusinessProfile(profile);
       } catch (err) {
         console.error('Error loading receipt data:', err);
       } finally {
         setIsLoading(false);
       }
     };
+
+    const loadData = async () => {
+      await fetchOrder();
+      try {
+        const profile = await businessService.getProfile();
+        setBusinessProfile(profile);
+      } catch (err) {
+        console.error('Error loading business profile:', err);
+      }
+    };
+
     loadData();
+
+    // Poll every 5 seconds as requested by fallback specification
+    const interval = setInterval(fetchOrder, 5000);
+
+    // Subscribe to realtime updates for this specific order
+    const channel = realtimeService.subscribeToOrderById(orderId, async (payload) => {
+      if (payload.new) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[DEBUG] Receipt page realtime change for order:', orderId);
+        }
+        const foundOrder = await orderService.getOrderById(orderId);
+        if (foundOrder) {
+          setOrder(foundOrder);
+          if (foundOrder.status === 'Completed' || foundOrder.status === 'Cancelled') {
+            clearInterval(interval);
+          }
+        }
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      realtimeService.unsubscribeChannel(channel);
+    };
   }, [orderId]);
 
   // Handle auto-printing on load if ?print=true is present
@@ -147,9 +185,13 @@ export default function ReceiptPage() {
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Kembali</span>
         </button>
-        <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">
-          Struk Pembelian
-        </span>
+        <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold font-mono">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+          </span>
+          <span>Live</span>
+        </div>
       </div>
 
       {/* Thermal Receipt Body */}

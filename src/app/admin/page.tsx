@@ -16,6 +16,7 @@ import { productService } from '../../services/productService';
 import { Order, Product } from '../../types';
 import { formatRupiah, formatDate } from '../../utils/format';
 
+import { realtimeService } from '../../lib/services/realtimeService';
 import { useAuth } from '../../components/AuthProvider';
 
 export default function AdminDashboardPage() {
@@ -24,9 +25,12 @@ export default function AdminDashboardPage() {
   const { profile } = useAuth();
 
   useEffect(() => {
-    const loadData = async () => {
-      const bizId = profile?.business_id || 'biz-1';
+    if (!profile) return;
 
+    const bizId = profile.business_id || 'biz-1';
+    let debounceTimer: NodeJS.Timeout;
+
+    const loadData = async () => {
       if (process.env.NODE_ENV === 'development') {
         console.log(`[DEBUG] Admin fetching dashboard summary for business_id: ${bizId}`);
       }
@@ -40,9 +44,35 @@ export default function AdminDashboardPage() {
         console.log(`[DEBUG] Admin fetched dashboard summary order count: ${allOrders.length}`);
       }
     };
-    if (profile) {
-      loadData();
-    }
+
+    // Initial load
+    loadData();
+
+    const triggerReload = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadData, 500); // 500ms debounce
+    };
+
+    // Subscribe to realtime orders and transactions
+    const channelOrders = realtimeService.subscribeToOrdersByBusinessId(bizId, (payload) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEBUG] Admin dashboard order change event:', payload.eventType);
+      }
+      triggerReload();
+    });
+
+    const channelTx = realtimeService.subscribeToTransactionsByBusinessId(bizId, (payload) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEBUG] Admin dashboard transaction change event:', payload.eventType);
+      }
+      triggerReload();
+    });
+
+    return () => {
+      clearTimeout(debounceTimer);
+      realtimeService.unsubscribeChannel(channelOrders);
+      realtimeService.unsubscribeChannel(channelTx);
+    };
   }, [profile]);
 
   // Today's Date

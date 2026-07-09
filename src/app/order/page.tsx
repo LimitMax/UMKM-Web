@@ -25,6 +25,7 @@ import {
 import { productService } from '../../services/productService';
 import { orderService } from '../../services/orderService';
 import { businessService } from '../../services/businessService';
+import { realtimeService } from '../../lib/services/realtimeService';
 import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
 import { Product, ProductCategory, OrderItem, PaymentMethod, BusinessProfile, FulfillmentType } from '../../types';
 import { formatRupiah } from '../../utils/format';
@@ -71,8 +72,30 @@ export default function CustomerOrderPage() {
       const profile = await businessService.getProfile();
       setBusinessProfile(profile);
     };
+
     loadProducts();
     loadProfile();
+
+    const bizId = 'biz-1';
+    let debounceTimer: NodeJS.Timeout;
+
+    const triggerReload = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadProducts, 500); // 500ms debounce
+    };
+
+    // Subscribe to realtime products changes (public read is allowed for active products)
+    const channel = realtimeService.subscribeToProductsByBusinessId(bizId, (payload) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEBUG] Customer menu products realtime change:', payload.eventType);
+      }
+      triggerReload();
+    });
+
+    return () => {
+      clearTimeout(debounceTimer);
+      realtimeService.unsubscribeChannel(channel);
+    };
   }, []);
 
   // Filter categories

@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { productService } from '../../../services/productService';
 import { Product } from '../../../types';
+import { useAuth } from '../../../components/AuthProvider';
+import { realtimeService } from '../../../lib/services/realtimeService';
 
 export default function AdminStockPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -24,9 +26,33 @@ export default function AdminStockPage() {
     }, 0);
   };
 
+  const { profile } = useAuth();
+
   useEffect(() => {
     loadProducts();
-  }, []);
+
+    if (!profile) return;
+    const bizId = profile.business_id || 'biz-1';
+    let debounceTimer: NodeJS.Timeout;
+
+    const triggerReload = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadProducts, 500); // 500ms debounce
+    };
+
+    // Subscribe to realtime products changes
+    const channel = realtimeService.subscribeToProductsByBusinessId(bizId, (payload) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEBUG] Admin stock page realtime change:', payload.eventType);
+      }
+      triggerReload();
+    });
+
+    return () => {
+      clearTimeout(debounceTimer);
+      realtimeService.unsubscribeChannel(channel);
+    };
+  }, [profile]);
 
   // Adjust stock directly
   const handleAdjustStock = async (id: string, delta: number) => {

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { orderService } from '@/services/orderService';
 import { businessService } from '@/services/businessService';
+import { realtimeService } from '@/lib/services/realtimeService';
 import { Order, BusinessProfile } from '@/types';
 import { formatRupiah, formatDate, formatOrderStatus, formatPaymentStatus } from '@/utils/format';
 import { getEtaLabel, formatEstimatedTime, formatEtaDisplay } from '@/utils/etaHelpers';
@@ -39,23 +40,52 @@ export default function OrderSuccessPage() {
     loadBusiness();
   }, []);
 
-  // Poll localStorage to get live cashier status updates
+  // Subscribe to realtime changes and poll as a robust fallback
   useEffect(() => {
     if (!orderId) return;
 
     const fetchOrder = async () => {
-      const found = await orderService.getOrderById(orderId);
-      if (found) {
-        setOrder(found);
+      try {
+        const found = await orderService.getOrderById(orderId);
+        if (found) {
+          setOrder(found);
+          if (found.status === 'Completed' || found.status === 'Cancelled') {
+            clearInterval(interval);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to poll order status:', err);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchOrder();
-    
-    // Poll every 3 seconds
-    const interval = setInterval(fetchOrder, 3000);
-    return () => clearInterval(interval);
+
+    // Poll every 5 seconds as requested by fallback specification
+    const interval = setInterval(fetchOrder, 5000);
+
+    // Subscribe to realtime updates for this specific order
+    const channel = realtimeService.subscribeToOrderById(orderId, async (payload) => {
+      if (payload.new) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[DEBUG] Realtime status change received for order:', orderId, payload.new.order_status);
+        }
+        // Fetch order details with its items
+        const found = await orderService.getOrderById(orderId);
+        if (found) {
+          setOrder(found);
+          if (found.status === 'Completed' || found.status === 'Cancelled') {
+            clearInterval(interval);
+          }
+        }
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      realtimeService.unsubscribeChannel(channel);
+    };
   }, [orderId]);
 
   if (isLoading) {
@@ -155,6 +185,15 @@ export default function OrderSuccessPage() {
 
           <h1 className="text-2xl font-black text-white mb-1">Pesanan Berhasil Dikirim!</h1>
           <p className="text-xs text-slate-400">Silakan tunjukkan struk digital ini ke kasir jika diperlukan.</p>
+
+          {/* Live Realtime Status Indicator */}
+          <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-bold mt-4 font-mono select-none">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>Live • Status otomatis diperbarui</span>
+          </div>
 
           <div className="my-6 py-4 bg-slate-950/60 rounded-2xl border border-slate-900 flex flex-col items-center">
             <span className="text-[10px] font-mono tracking-widest text-slate-500 uppercase">Nomor Antrean</span>

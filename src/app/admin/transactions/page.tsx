@@ -17,6 +17,7 @@ import { Order } from '../../../types';
 import { formatRupiah, formatDate } from '../../../utils/format';
 
 import { useAuth } from '../../../components/AuthProvider';
+import { realtimeService } from '../../../lib/services/realtimeService';
 
 export default function AdminTransactionsPage() {
   const [transactions, setTransactions] = useState<Order[]>([]);
@@ -26,9 +27,12 @@ export default function AdminTransactionsPage() {
   const { profile } = useAuth();
 
   useEffect(() => {
-    const loadTx = async () => {
-      const bizId = profile?.business_id || 'biz-1';
+    if (!profile) return;
 
+    const bizId = profile.business_id || 'biz-1';
+    let debounceTimer: NodeJS.Timeout;
+
+    const loadTx = async () => {
       if (process.env.NODE_ENV === 'development') {
         console.log(`[DEBUG] Admin fetching transactions for business_id: ${bizId}`);
       }
@@ -40,9 +44,35 @@ export default function AdminTransactionsPage() {
         console.log(`[DEBUG] Admin fetched transactions count: ${data.length}`);
       }
     };
-    if (profile) {
-      loadTx();
-    }
+
+    // Initial load
+    loadTx();
+
+    const triggerReload = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadTx, 500); // 500ms debounce
+    };
+
+    // Subscribe to realtime orders and transactions
+    const channelOrders = realtimeService.subscribeToOrdersByBusinessId(bizId, (payload) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEBUG] Admin transactions order change event:', payload.eventType);
+      }
+      triggerReload();
+    });
+
+    const channelTx = realtimeService.subscribeToTransactionsByBusinessId(bizId, (payload) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEBUG] Admin transactions transaction change event:', payload.eventType);
+      }
+      triggerReload();
+    });
+
+    return () => {
+      clearTimeout(debounceTimer);
+      realtimeService.unsubscribeChannel(channelOrders);
+      realtimeService.unsubscribeChannel(channelTx);
+    };
   }, [profile]);
 
   // Filtered transactions list

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { orderService } from '../../services/orderService';
 import { businessService } from '../../services/businessService';
+import { realtimeService } from '../../lib/services/realtimeService';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
 import { useAuth } from '../../components/AuthProvider';
 import { Order, OrderStatus, BusinessProfile } from '../../types';
@@ -49,6 +50,7 @@ export default function CashierDashboard() {
   const [etaAdjustReason, setEtaAdjustReason] = useState<string>('');
   const [etaAdjustLoading, setEtaAdjustLoading] = useState<boolean>(false);
   const [etaAdjustSuccess, setEtaAdjustSuccess] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   
   // Track previous order count to play notification chime on new order
   const prevOrdersCountRef = useRef<number | null>(null);
@@ -132,7 +134,14 @@ export default function CashierDashboard() {
     router.push('/login');
   };
 
-  // Poll orders
+  const showToastNotification = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
+
+  // Poll orders & subscribe to Supabase Realtime updates
   useEffect(() => {
     if (!isAuthenticated || !profile) return;
 
@@ -149,20 +158,53 @@ export default function CashierDashboard() {
       if (process.env.NODE_ENV === 'development') {
         console.log(`[DEBUG] Cashier fetched order count: ${allOrders.length}`);
       }
-
-      // Play chime if a new order is received
-      if (prevOrdersCountRef.current !== null && allOrders.length > prevOrdersCountRef.current) {
-        playNotificationChime();
-      }
       
       // Update ref
       prevOrdersCountRef.current = allOrders.length;
     };
 
     fetchOrders();
-    const interval = setInterval(fetchOrders, 3000); // Poll every 3 seconds
 
-    return () => clearInterval(interval);
+    // Subscribe to realtime orders for cashier's business
+    const bizId = profile.business_id || 'biz-1';
+    const channel = realtimeService.subscribeToOrdersByBusinessId(bizId, async (payload) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEBUG] Cashier realtime change payload:', payload);
+      }
+
+      if (payload.eventType === 'DELETE') {
+        const deletedId = payload.old.id as string;
+        setOrders(prev => prev.filter(o => o.id !== deletedId));
+        return;
+      }
+
+      // For INSERT or UPDATE, we fetch the updated order using getOrderById
+      // to resolve items correctly, and then update local state
+      const updatedOrderId = payload.new.id as string;
+      const fullOrder = await orderService.getOrderById(updatedOrderId);
+      if (fullOrder) {
+        setOrders(prev => {
+          const index = prev.findIndex(o => o.id === updatedOrderId);
+          if (index > -1) {
+            // Update existing order in place
+            const next = [...prev];
+            next[index] = fullOrder;
+            return next;
+          } else {
+            // New order insertion
+            if (payload.eventType === 'INSERT') {
+              playNotificationChime();
+              showToastNotification('Pesanan baru masuk!');
+            }
+            return [fullOrder, ...prev];
+          }
+        });
+      }
+    });
+
+    return () => {
+      realtimeService.unsubscribeChannel(channel);
+    };
   }, [isAuthenticated, profile]);
 
   // Actions handler
@@ -904,6 +946,14 @@ export default function CashierDashboard() {
         })()}
       </div>
       </main>
+
+      {/* Toast Notification Popup */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 p-4 bg-emerald-500 text-slate-950 font-bold text-xs rounded-2xl shadow-2xl border border-emerald-400 flex items-center gap-2 animate-bounce">
+          <ShoppingBag className="w-4 h-4 text-slate-950" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -35,6 +35,7 @@ interface Toast {
 }
 
 import { useAuth } from '../../../components/AuthProvider';
+import { realtimeService } from '../../../lib/services/realtimeService';
 
 export default function ReportsPage() {
   const isSupabaseActive = isSupabaseConfigured();
@@ -74,10 +75,13 @@ export default function ReportsPage() {
   const summary = calculateReportSummary(filteredOrders);
 
   useEffect(() => {
+    if (!authProfile) return;
+
+    const bizId = authProfile.business_id || 'biz-1';
+    let debounceTimer: NodeJS.Timeout;
+
     const loadInitialData = async () => {
       try {
-        const bizId = authProfile?.business_id || 'biz-1';
-
         if (process.env.NODE_ENV === 'development') {
           console.log(`[DEBUG] Admin reports fetching orders for business_id: ${bizId}`);
         }
@@ -97,9 +101,35 @@ export default function ReportsPage() {
         setIsLoading(false);
       }
     };
-    if (authProfile) {
-      loadInitialData();
-    }
+
+    // Initial load
+    loadInitialData();
+
+    const triggerReload = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadInitialData, 500); // 500ms debounce
+    };
+
+    // Subscribe to realtime orders and transactions
+    const channelOrders = realtimeService.subscribeToOrdersByBusinessId(bizId, (payload) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEBUG] Admin reports order change event:', payload.eventType);
+      }
+      triggerReload();
+    });
+
+    const channelTx = realtimeService.subscribeToTransactionsByBusinessId(bizId, (payload) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEBUG] Admin reports transaction change event:', payload.eventType);
+      }
+      triggerReload();
+    });
+
+    return () => {
+      clearTimeout(debounceTimer);
+      realtimeService.unsubscribeChannel(channelOrders);
+      realtimeService.unsubscribeChannel(channelTx);
+    };
   }, [authProfile]);
 
   const showToast = (type: 'success' | 'error', message: string) => {
