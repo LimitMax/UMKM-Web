@@ -51,7 +51,7 @@ export interface Product {
 
 export type PaymentMethod = 'Cash' | 'Non-Cash';
 
-export type PaymentStatus = 'Waiting for Payment' | 'Paid' | 'Failed';
+export type PaymentStatus = 'Waiting for Payment' | 'Paid' | 'Failed' | 'Refunded';
 
 export type OrderStatus =
   | 'Waiting for Payment'

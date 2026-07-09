@@ -51,6 +51,7 @@ export default function CashierDashboard() {
   const [etaAdjustLoading, setEtaAdjustLoading] = useState<boolean>(false);
   const [etaAdjustSuccess, setEtaAdjustSuccess] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [paymentSyncLoading, setPaymentSyncLoading] = useState(false);
   
   // Track previous order count to play notification chime on new order
   const prevOrdersCountRef = useRef<number | null>(null);
@@ -217,6 +218,33 @@ export default function CashierDashboard() {
       setOrders(allOrders);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Gagal mengubah status.');
+    }
+  };
+
+  const handleSyncMidtransStatus = async (orderId: string) => {
+    setPaymentSyncLoading(true);
+    try {
+      const response = await fetch('/api/payments/midtrans/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderId }),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || 'Gagal cek status Midtrans.');
+      }
+
+      const bizId = profile?.business_id || 'biz-1';
+      const allOrders = await orderService.getOrdersByBusinessId(bizId);
+      setOrders(allOrders);
+      showToastNotification(data?.orderPaymentStatus === 'paid' ? 'Pembayaran Midtrans sudah lunas.' : 'Status Midtrans diperbarui.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gagal cek status Midtrans.');
+    } finally {
+      setPaymentSyncLoading(false);
     }
   };
 
@@ -837,6 +865,15 @@ export default function CashierDashboard() {
                             <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-3 py-2.5 text-xs text-amber-300 leading-relaxed">
                               <span className="font-bold">Non-Tunai</span> &bull; Provider Midtrans Sandbox. Status: Menunggu Pembayaran.
                             </div>
+                            <button
+                              type="button"
+                              disabled={paymentSyncLoading}
+                              onClick={() => handleSyncMidtransStatus(selectedOrder.id)}
+                              className="w-full py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-60 text-amber-300 border border-amber-500/20 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
+                            >
+                              <CreditCard className="w-4 h-4" />
+                              <span>{paymentSyncLoading ? 'Mengecek...' : 'Cek Status Midtrans'}</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => {

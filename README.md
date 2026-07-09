@@ -327,8 +327,25 @@ Migration Phase 9B menambahkan dukungan `payment_method = non_cash` untuk alur c
 ### Batasan Saat Ini
 
 - Integrasi ini memakai Midtrans Snap Sandbox, bukan production.
-- Status order tetap `Menunggu Pembayaran` sampai webhook Midtrans diimplementasikan pada fase berikutnya.
 - Metadata pembayaran disimpan ke tabel `payments`, termasuk Snap token, redirect URL, provider reference ID, metode, amount, dan status.
+
+### Webhook Midtrans Sandbox
+
+Konfigurasi Payment Notification URL di Midtrans Dashboard:
+
+```text
+https://your-domain.com/api/webhooks/midtrans
+```
+
+Lokasi konfigurasi biasanya berada di Settings / Configuration / Payment Notification URL. Webhook ini memverifikasi `signature_key` dengan rumus SHA512 `order_id + status_code + gross_amount + serverKey`, lalu memperbarui `payments`, `orders`, dan membuat `transactions` secara idempotent.
+
+Untuk pengujian lokal, gunakan salah satu opsi:
+
+1. Deploy ke Vercel Preview lalu pakai URL preview sebagai Payment Notification URL.
+2. Gunakan tunnel publik ke localhost.
+3. Gunakan tombol manual `Cek Status Pembayaran` di halaman sukses order atau `Cek Status Midtrans` di dashboard kasir.
+
+Simulator Sandbox Midtrans dapat dipakai untuk mensimulasikan respons bank/e-wallet. Setelah status menjadi lunas, Supabase Realtime akan memperbarui halaman customer, kasir, admin, transaksi, dan laporan.
 
 ---
 

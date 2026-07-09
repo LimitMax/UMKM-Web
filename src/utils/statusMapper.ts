@@ -32,6 +32,7 @@ export function mapDbPaymentStatusToFrontend(dbPaymentStatus: string): PaymentSt
     case 'pending': return 'Waiting for Payment';
     case 'paid': return 'Paid';
     case 'failed': return 'Failed';
+    case 'refunded': return 'Refunded';
     default: return dbPaymentStatus as PaymentStatus;
   }
 }
@@ -41,6 +42,7 @@ export function mapFrontendPaymentStatusToDb(fePaymentStatus: string): string {
     case 'Waiting for Payment': return 'pending';
     case 'Paid': return 'paid';
     case 'Failed': return 'failed';
+    case 'Refunded': return 'refunded';
     default: return fePaymentStatus;
   }
 }

@@ -48,6 +48,8 @@ export function formatPaymentStatus(status: string): string {
       return 'Lunas';
     case 'Failed':
       return 'Gagal';
+    case 'Refunded':
+      return 'Refund';
     default:
       return status;
   }

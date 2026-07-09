@@ -41,6 +41,8 @@ export default function OrderSuccessPage() {
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [whatsappNumber, setWhatsappNumber] = useState<string>('');
   const [latestPayment, setLatestPayment] = useState<LatestMidtransPayment | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadBusiness() {
@@ -194,6 +196,37 @@ export default function OrderSuccessPage() {
   const isMidtransOrder = order.paymentMethod === 'Non-Cash';
   const isWaitingMidtransPayment = isMidtransOrder && order.paymentStatus === 'Waiting for Payment';
 
+  const handleSyncPaymentStatus = async () => {
+    if (!order) return;
+    setSyncLoading(true);
+    setSyncMessage(null);
+
+    try {
+      const response = await fetch('/api/payments/midtrans/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || 'Gagal cek status pembayaran.');
+      }
+
+      const found = await orderService.getOrderById(order.id);
+      if (found) {
+        setOrder(found);
+      }
+      setSyncMessage(data?.orderPaymentStatus === 'paid' ? 'Pembayaran sudah lunas.' : 'Status pembayaran diperbarui.');
+    } catch (err) {
+      setSyncMessage(err instanceof Error ? err.message : 'Gagal cek status pembayaran.');
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 py-8 px-4 flex justify-center items-center">
       <div className="max-w-xl w-full flex flex-col gap-6">
@@ -320,6 +353,17 @@ export default function OrderSuccessPage() {
             >
               {latestPayment?.redirectUrl ? 'Lanjutkan Pembayaran' : 'Link Pembayaran Belum Tersedia'}
             </button>
+            <button
+              type="button"
+              disabled={syncLoading}
+              onClick={handleSyncPaymentStatus}
+              className="mt-2 w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 font-black text-xs uppercase tracking-wider transition-all"
+            >
+              {syncLoading ? 'Mengecek...' : 'Cek Status Pembayaran'}
+            </button>
+            {syncMessage && (
+              <p className="mt-2 text-center text-[11px] text-slate-350">{syncMessage}</p>
+            )}
           </div>
         )}
 

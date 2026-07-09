@@ -37,6 +37,8 @@ export interface MidtransNotificationPayload {
   [key: string]: unknown;
 }
 
+export type MidtransTransactionStatusResponse = MidtransNotificationPayload;
+
 function assertServerOnly() {
   if (typeof window !== 'undefined') {
     throw new Error('Midtrans client must only be used on the server side.');
@@ -49,6 +51,10 @@ export function isMidtransProductionEnabled(): boolean {
 
 export function getMidtransSnapBaseUrl(): string {
   return (process.env.MIDTRANS_SNAP_BASE_URL || 'https://app.sandbox.midtrans.com').replace(/\/+$/, '');
+}
+
+export function getMidtransCoreApiBaseUrl(): string {
+  return (process.env.MIDTRANS_CORE_API_BASE_URL || 'https://api.sandbox.midtrans.com').replace(/\/+$/, '');
 }
 
 export function getMidtransServerKey(): string {
@@ -138,4 +144,38 @@ export function verifyMidtransNotification(payload: MidtransNotificationPayload)
     .digest('hex');
 
   return signature === payload.signature_key;
+}
+
+export async function getMidtransTransactionStatus(
+  providerReferenceId: string
+): Promise<MidtransTransactionStatusResponse> {
+  assertServerOnly();
+
+  const endpoint = `${getMidtransCoreApiBaseUrl()}/v2/${encodeURIComponent(providerReferenceId)}/status`;
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      Authorization: getBasicAuthHeader(),
+      Accept: 'application/json',
+    },
+  });
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Midtrans] status response', {
+      endpoint,
+      status: response.status,
+    });
+  }
+
+  if (!response.ok) {
+    const safeBody = await readSafeError(response);
+    console.error('[Midtrans] status lookup failed', {
+      endpoint,
+      status: response.status,
+      body: safeBody,
+    });
+    throw new Error(`Midtrans status request failed with status ${response.status}`);
+  }
+
+  return response.json();
 }
