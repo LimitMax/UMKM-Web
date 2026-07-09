@@ -172,6 +172,50 @@ export interface AIInsight {
   promoRecommendations?: PromoRecommendation[];
 }
 
+export type AiInsightSource = 'llm' | 'rule_based';
+
+export interface GeneratedBusinessInsight {
+  executiveSummary: string;
+  salesHighlights: string[];
+  riskAlerts: string[];
+  productInsights: string[];
+  stockRecommendations: string[];
+  deliveryInsights: string[];
+  etaInsights: string[];
+  actionPlan: Array<{
+    priority: 'high' | 'medium' | 'low';
+    action: string;
+  }>;
+  generatedAt: string;
+  source: AiInsightSource;
+  fallbackReason?: string;
+  fallbackMessage?: string;
+}
+
+export interface GeneratedPromoRecommendation {
+  title: string;
+  suggestedPromoName: string;
+  campaignGoal: string;
+  mainProductName: string;
+  bundleProductName: string;
+  reason: string;
+  normalPrice: number;
+  suggestedPrice: number;
+  estimatedSavings: number;
+  targetTime: string;
+  targetCustomer: string;
+  confidenceScore: number;
+  basedOnSignals: string[];
+  whatsappCaption: string;
+  instagramCaption: string;
+  shortCaption: string;
+  checklist: string[];
+  generatedAt: string;
+  source: AiInsightSource;
+  fallbackReason?: string;
+  fallbackMessage?: string;
+}
+
 export const FULFILLMENT_LABELS = {
   dine_in: 'Makan di Tempat',
   pickup: 'Ambil Sendiri',
