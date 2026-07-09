@@ -15,8 +15,6 @@ import {
   Lock
 } from 'lucide-react';
 import { authService as supabaseAuthService } from '../../lib/services/authService';
-import { authService as mockAuthService } from '../../services/authService';
-import { demoRoleService } from '../../services/demoRoleService';
 import { useAuth } from '../../components/AuthProvider';
 import { supabaseClient } from '../../lib/supabase/client';
 
@@ -77,7 +75,12 @@ export default function RegisterPage() {
       return;
     }
 
-    if (isSupabaseConfigured && !isBizSeeded) {
+    if (!isSupabaseConfigured) {
+      setErrorMsg('Supabase tidak dikonfigurasi. Registrasi tidak dapat diproses.');
+      return;
+    }
+
+    if (!isBizSeeded) {
       setErrorMsg('Tidak dapat mendaftar: Database Supabase belum di-seed dengan bisnis default "biz-1". Silakan jalankan seed.sql terlebih dahulu.');
       return;
     }
@@ -85,37 +88,18 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      if (isSupabaseConfigured) {
-        // Real Supabase register
-        await supabaseAuthService.signUpWithEmail(email, password, name, role, 'biz-1');
-        
-        // Auto-update demo role switcher state to align with registered user
-        demoRoleService.setCurrentDemoRole(role);
+      // Real Supabase register
+      await supabaseAuthService.signUpWithEmail(email, password, name, role, 'biz-1');
 
-        setSuccessMsg('Pendaftaran berhasil! Akun dan profil telah dibuat. Mengalihkan...');
-        
-        setTimeout(() => {
-          if (role === 'admin') {
-            router.push('/admin');
-          } else {
-            router.push('/cashier');
-          }
-        }, 1500);
-      } else {
-        // Mock register
-        const mockUser = await mockAuthService.register(name, email, role, 'Warung Kopi Nusantara');
-        demoRoleService.setCurrentDemoRole(role);
-        
-        setSuccessMsg('Pendaftaran demo berhasil! Mengalihkan...');
-        
-        setTimeout(() => {
-          if (mockUser.role === 'admin') {
-            router.push('/admin');
-          } else {
-            router.push('/cashier');
-          }
-        }, 1500);
-      }
+      setSuccessMsg('Pendaftaran berhasil! Akun dan profil telah dibuat. Mengalihkan...');
+      
+      setTimeout(() => {
+        if (role === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/cashier');
+        }
+      }, 1500);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Pendaftaran gagal.');
       setIsLoading(false);
@@ -127,7 +111,7 @@ export default function RegisterPage() {
       
       {/* Decorative glows */}
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 w-80 h-80 bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 w-80 h-85 bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 w-80 h-80 bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="max-w-md w-full flex flex-col gap-6 relative z-10">
         
@@ -167,11 +151,11 @@ export default function RegisterPage() {
               </div>
             )
           ) : (
-            <div className="mb-5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] leading-relaxed font-mono flex items-start gap-2.5">
-              <Database className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="mb-5 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-350 text-[10px] leading-relaxed font-mono flex items-start gap-2.5">
+              <Database className="w-4 h-4 text-rose-450 flex-shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold block mb-0.5">Mode Demo Aktif</span>
-                Supabase belum dikonfigurasi. Form akan menyimpan akun pendaftaran secara lokal.
+                <span className="font-bold block mb-0.5">Koneksi Database Belum Dikonfigurasi</span>
+                Konfigurasi Supabase (.env.local) diperlukan sebelum melakukan registrasi UMKM baru.
               </div>
             </div>
           )}

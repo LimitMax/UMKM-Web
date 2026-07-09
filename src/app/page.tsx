@@ -1,47 +1,19 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { demoRoleService, DemoRole } from '../services/demoRoleService';
-import DemoRoleSwitcher from '../components/DemoRoleSwitcher';
+import Link from 'next/link';
 import { useAuth } from '../components/AuthProvider';
 import { 
   Brain, 
   Smartphone, 
   Laptop, 
-  ShieldAlert, 
   ArrowRight, 
   Sparkles,
-  RotateCcw
+  UserPlus,
+  LogIn
 } from 'lucide-react';
-import { resetDB } from '../services/db';
 
 export default function LandingPage() {
-  const router = useRouter();
-  const { user, profile, isDemoMode, isSupabaseConfigured } = useAuth();
-  const [resetSuccess, setResetSuccess] = useState(false);
-
-  const handleReset = () => {
-    resetDB();
-    setResetSuccess(true);
-    setTimeout(() => {
-      setResetSuccess(false);
-      window.location.reload();
-    }, 1200);
-  };
-
-  const handleEntry = (role: DemoRole, path: string) => {
-    if (isSupabaseConfigured && !isDemoMode && user && profile) {
-      if (profile.role === 'admin') {
-        router.push('/admin');
-      } else {
-        router.push('/cashier');
-      }
-    } else {
-      demoRoleService.setCurrentDemoRole(role);
-      router.push(path);
-    }
-  };
+  const { user, profile } = useAuth();
 
   return (
     <div className="relative min-h-screen flex flex-col justify-between overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black">
@@ -63,9 +35,23 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <DemoRoleSwitcher />
-          <span className="text-[11px] font-bold text-slate-400 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900/50 hidden sm:inline-block">
-            v1.0 MVP Ready
+          {user && profile ? (
+            <Link
+              href={profile.role === 'admin' ? '/admin' : '/cashier'}
+              className="text-[11px] font-bold text-emerald-400 px-3.5 py-2 rounded-xl border border-emerald-500/25 bg-emerald-950/20 hover:bg-emerald-950/40 transition-all font-mono"
+            >
+              Dashboard ({profile.role === 'admin' ? 'Owner' : 'Kasir'})
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="text-[11px] font-bold text-slate-350 hover:text-white px-3.5 py-2 rounded-xl border border-slate-800 bg-slate-900/50 transition-all"
+            >
+              Masuk Toko
+            </Link>
+          )}
+          <span className="text-[11px] font-bold text-slate-450 px-3 py-1.5 rounded-xl border border-slate-850 bg-slate-900/30 hidden sm:inline-block">
+            v1.0 Production Ready
           </span>
         </div>
       </header>
@@ -100,20 +86,20 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6 text-emerald-400">
                 <Smartphone className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-emerald-400 transition-colors">
-                Masuk sebagai Pelanggan
+              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-emerald-400 transition-colors font-sans">
+                Pesan Sekarang
               </h3>
-              <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                Jelajahi menu kafe dan produk secara interaktif, tambahkan item ke keranjang belanja, dan kirim pesanan meja Anda secara langsung.
+              <p className="text-sm text-slate-400 leading-relaxed mb-6 font-sans">
+                Akses halaman pemesanan pelanggan untuk menjelajahi menu digital, memesan mandiri, dan melihat estimasi waktu hidangan (ETA).
               </p>
             </div>
-            <button 
-              onClick={() => handleEntry('customer', '/order')}
-              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all shadow-lg hover:shadow-emerald-500/20 text-xs"
+            <Link 
+              href="/order"
+              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all shadow-lg hover:shadow-emerald-500/20 text-xs font-sans"
             >
               <span>Buka Menu Pesanan</span>
               <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-            </button>
+            </Link>
           </div>
 
           {/* Card 2: Cashier Dashboard */}
@@ -123,59 +109,44 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-6 text-indigo-400">
                 <Laptop className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-400 transition-colors">
-                Masuk sebagai Kasir
+              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-400 transition-colors font-sans">
+                Login Admin & Kasir
               </h3>
-              <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                Kelola dan konfirmasi antrean pesanan pelanggan, proses pembayaran tunai/transfer, dan mainkan bell notifikasi pemesanan.
+              <p className="text-sm text-slate-400 leading-relaxed mb-6 font-sans">
+                Masuk ke panel manajemen kasir atau dashboard utama untuk memproses pembayaran, mengelola stok produk, dan memantau pesanan aktif.
               </p>
             </div>
-            <button 
-              onClick={() => handleEntry('cashier', '/cashier')}
-              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg hover:shadow-indigo-500/20 text-xs"
+            <Link 
+              href="/login"
+              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg hover:shadow-indigo-500/20 text-xs font-sans"
             >
-              <span>Buka Dashboard Kasir</span>
-              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-            </button>
+              <span>Masuk Aplikasi</span>
+              <LogIn className="w-4 h-4 stroke-[2.5]" />
+            </Link>
           </div>
 
-          {/* Card 3: Admin Portal */}
+          {/* Card 3: Register */}
           <div className="glass group relative rounded-2xl p-6 transition-all duration-300 hover:border-teal-500/30 hover:shadow-xl hover:shadow-teal-500/5 flex flex-col justify-between">
             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-teal-500/10 to-transparent rounded-tr-2xl pointer-events-none" />
             <div>
               <div className="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mb-6 text-teal-400">
                 <Brain className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-teal-400 transition-colors">
-                Masuk sebagai Owner/Admin
+              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-teal-400 transition-colors font-sans">
+                Daftar UMKM
               </h3>
-              <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                Ubah konfigurasi profil bisnis & pajak, buat menu QR, edit katalog produk, pantau stok kritis, dan lihat analisis AI laporan keuangan.
+              <p className="text-sm text-slate-400 leading-relaxed mb-6 font-sans">
+                Belum terdaftar? Buat akun bisnis baru, konfigurasi profil toko Anda, dan mulailah proses digitalisasi UMKM Anda hari ini.
               </p>
             </div>
-            <button 
-              onClick={() => handleEntry('admin', '/admin')}
-              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-400 font-bold border border-teal-500/20 hover:border-teal-400/40 transition-all flex items-center justify-center text-xs"
+            <Link 
+              href="/register"
+              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-400 font-bold border border-teal-500/20 hover:border-teal-400/40 transition-all text-xs font-sans"
             >
-              <span>Buka Dashboard Admin</span>
-              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-            </button>
+              <span>Daftar Sekarang</span>
+              <UserPlus className="w-4 h-4 stroke-[2.5]" />
+            </Link>
           </div>
-        </div>
-
-        {/* Security & Database Warning Banner */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 px-5 py-4 rounded-2xl border border-slate-800 bg-slate-900/30 max-w-2xl text-center sm:text-left text-xs text-slate-400">
-          <ShieldAlert className="w-5 h-5 text-amber-500 flex-shrink-0" />
-          <div className="flex-1">
-            <strong>Mode Demo MVP:</strong> Seluruh data disimpan lokal pada browser (LocalStorage).
-          </div>
-          <button
-            onClick={handleReset}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-all border border-slate-700 flex items-center justify-center gap-2"
-          >
-            <RotateCcw className={`w-3.5 h-3.5 ${resetSuccess ? 'animate-spin' : ''}`} />
-            <span>{resetSuccess ? 'Data Direset...' : 'Reset Demo Data'}</span>
-          </button>
         </div>
       </main>
 

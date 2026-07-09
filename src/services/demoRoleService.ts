@@ -1,3 +1,6 @@
+/**
+ * @deprecated Legacy demo role service. Demo role switching is no longer supported.
+ */
 export type DemoRole = 'admin' | 'cashier' | 'customer';
 
 export interface DemoUser {

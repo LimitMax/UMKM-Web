@@ -24,9 +24,7 @@ import {
 } from 'lucide-react';
 import { orderService } from '../../services/orderService';
 import { businessService } from '../../services/businessService';
-import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
-import { authService as mockAuthService } from '../../services/authService';
 import { useAuth } from '../../components/AuthProvider';
 import { Order, OrderStatus, BusinessProfile } from '../../types';
 import { formatRupiah } from '../../utils/format';
@@ -35,7 +33,7 @@ import { Clock } from 'lucide-react';
 
 export default function CashierDashboard() {
   const router = useRouter();
-  const { user: supabaseUser, profile, isDemoMode, isSupabaseConfigured, loading: authLoading, signOut } = useAuth();
+  const { user: supabaseUser, profile, loading: authLoading, signOut } = useAuth();
   const [user, setUser] = useState<{ name: string; role: string } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(() => businessService.getProfileSync());
@@ -95,53 +93,28 @@ export default function CashierDashboard() {
   // Track session on mount & react to auth loading changes
   useEffect(() => {
     if (!authLoading) {
-      if (isSupabaseConfigured && !isDemoMode) {
-        if (!supabaseUser || !profile) {
-          setTimeout(() => {
-            router.push('/login');
-          }, 0);
-        } else {
-          setTimeout(async () => {
-            try {
-              const p = await businessService.getProfile();
-              setBusinessProfile(p);
-            } catch (err) {
-              console.error('Failed to load profile in cashier:', err);
-            }
-            setUser({
-              name: profile.full_name,
-              role: profile.role === 'admin' ? 'Owner/Admin' : 'Kasir',
-            });
-            setIsAuthenticated(true);
-            setIsLoading(false);
-          }, 0);
-        }
+      if (!supabaseUser || !profile) {
+        setTimeout(() => {
+          router.push('/login');
+        }, 0);
       } else {
-        // Demo mode check
-        const mockSession = mockAuthService.getCurrentUser();
-        if (!mockSession) {
-          setTimeout(() => {
-            router.push('/login');
-          }, 0);
-        } else {
-          setTimeout(async () => {
-            try {
-              const p = await businessService.getProfile();
-              setBusinessProfile(p);
-            } catch (err) {
-              console.error('Failed to load profile in cashier:', err);
-            }
-            setUser({
-              name: mockSession.name,
-              role: mockSession.role === 'admin' ? 'Owner Demo' : 'Kasir Demo',
-            });
-            setIsAuthenticated(true);
-            setIsLoading(false);
-          }, 0);
-        }
+        setTimeout(async () => {
+          try {
+            const p = await businessService.getProfile();
+            setBusinessProfile(p);
+          } catch (err) {
+            console.error('Failed to load profile in cashier:', err);
+          }
+          setUser({
+            name: profile.full_name,
+            role: profile.role === 'admin' ? 'Owner/Admin' : 'Kasir',
+          });
+          setIsAuthenticated(true);
+          setIsLoading(false);
+        }, 0);
       }
     }
-  }, [supabaseUser, profile, isDemoMode, isSupabaseConfigured, authLoading, router]);
+  }, [supabaseUser, profile, authLoading, router]);
 
   // Listen for Escape key to close drawer (Phase 6.9)
   useEffect(() => {
@@ -270,7 +243,6 @@ export default function CashierDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            <DemoRoleSwitcher />
             {/* User Meta display */}
             {user && (
               <div className="hidden md:block text-right">

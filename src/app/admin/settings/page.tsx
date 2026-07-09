@@ -211,8 +211,8 @@ export default function AdminSettingsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Auth & data source mode
-  const { isSupabaseConfigured, isDemoMode, user: supabaseUser } = useAuth();
-  const isSupabaseActive = isSupabaseConfigured && !isDemoMode && !!supabaseUser;
+  const { isSupabaseConfigured, user: supabaseUser } = useAuth();
+  const isSupabaseActive = isSupabaseConfigured && !!supabaseUser;
   const [isMigrationLoading, setIsMigrationLoading] = useState(false);
 
   // Load business profile and stats

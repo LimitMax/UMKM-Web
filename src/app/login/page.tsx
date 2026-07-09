@@ -9,37 +9,27 @@ import {
   Lock, 
   ArrowRight, 
   AlertCircle,
-  UserCheck,
-  ShieldCheck,
   Database
 } from 'lucide-react';
 import { authService as supabaseAuthService } from '../../lib/services/authService';
-import { authService as mockAuthService } from '../../services/authService';
-import { demoRoleService } from '../../services/demoRoleService';
 import { useAuth } from '../../components/AuthProvider';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, profile, isDemoMode, isSupabaseConfigured } = useAuth();
+  const { user, profile, isSupabaseConfigured } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // If already authenticated via Supabase or demo mode, redirect
+  // If already authenticated via Supabase, redirect
   useEffect(() => {
-    if (isSupabaseConfigured && !isDemoMode && user && profile) {
+    if (isSupabaseConfigured && user && profile) {
       if (profile.role === 'admin') router.push('/admin');
       else router.push('/cashier');
-    } else if (isDemoMode) {
-      const mockSession = mockAuthService.getCurrentUser();
-      if (mockSession) {
-        if (mockSession.role === 'admin') router.push('/admin');
-        else router.push('/cashier');
-      }
     }
-  }, [user, profile, isDemoMode, isSupabaseConfigured, router]);
+  }, [user, profile, isSupabaseConfigured, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,9 +45,6 @@ export default function LoginPage() {
         if (currentUser) {
           const currentProfile = await supabaseAuthService.getCurrentProfile();
           if (currentProfile) {
-            // Update demo role switcher state to align with logged-in user
-            demoRoleService.setCurrentDemoRole(currentProfile.role);
-            
             if (currentProfile.role === 'admin') {
               router.push('/admin');
             } else {
@@ -68,36 +55,7 @@ export default function LoginPage() {
         }
         throw new Error('Gagal memuat profil akun dari database Supabase.');
       } else {
-        // Fallback to Mock Auth
-        const userSession = await mockAuthService.login(email);
-        demoRoleService.setCurrentDemoRole(userSession.role);
-        
-        if (userSession.role === 'admin') {
-          router.push('/admin');
-        } else {
-          router.push('/cashier');
-        }
-      }
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Terjadi kesalahan saat masuk.');
-      setIsLoading(false);
-    }
-  };
-
-  // Quick Login Test Helper (Demo mode)
-  const handleQuickLogin = async (role: 'admin' | 'cashier') => {
-    setErrorMsg('');
-    setIsLoading(true);
-    const mockEmail = role === 'admin' ? 'admin@tokoku.com' : 'cashier@tokoku.com';
-    
-    try {
-      const userSession = await mockAuthService.login(mockEmail);
-      demoRoleService.setCurrentDemoRole(role);
-      
-      if (userSession.role === 'admin') {
-        router.push('/admin');
-      } else {
-        router.push('/cashier');
+        throw new Error('Supabase belum dikonfigurasi. Silakan hubungi admin sistem.');
       }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Terjadi kesalahan saat masuk.');
@@ -132,19 +90,19 @@ export default function LoginPage() {
           
           {/* Supabase status notice */}
           {!isSupabaseConfigured ? (
-            <div className="mb-6 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] leading-relaxed font-mono flex items-start gap-2.5">
-              <Database className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="mb-6 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-350 text-[10px] leading-relaxed font-mono flex items-start gap-2.5">
+              <Database className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold block mb-0.5">Mode Demo Aktif</span>
-                Supabase belum dikonfigurasi. Form di bawah akan disimulasikan menggunakan data lokal.
+                <span className="font-bold block mb-0.5">Database Belum Siap</span>
+                Supabase belum dikonfigurasi. Silakan isi file konfigurasi <code className="bg-slate-950 px-1 py-0.5 rounded text-white text-[9px]">.env.local</code>.
               </div>
             </div>
           ) : (
-            <div className="mb-6 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] leading-relaxed font-mono flex items-start gap-2.5">
+            <div className="mb-6 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-350 text-[10px] leading-relaxed font-mono flex items-start gap-2.5">
               <Database className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold block mb-0.5">Koneksi Supabase Siap</span>
-                Otentikasi nyata aktif. Masuk menggunakan email dan password terdaftar.
+                <span className="font-bold block mb-0.5">Koneksi Supabase Aktif</span>
+                Gunakan email dan kata sandi yang telah Anda daftarkan di dashboard.
               </div>
             </div>
           )}
@@ -164,7 +122,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nama@email.com"
-                  className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-650 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
@@ -181,13 +139,13 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-650 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
 
             {errorMsg && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-450 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 <span>{errorMsg}</span>
               </div>
@@ -209,32 +167,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Quick Login Test buttons */}
-          <div className="border-t border-slate-850 pt-6 mt-6">
-            <span className="block text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-3 text-center">
-              Akses Cepat Pengujian (Demo)
-            </span>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin')}
-                disabled={isLoading}
-                className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-400 font-bold text-xs transition-all"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Akun Admin</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('cashier')}
-                disabled={isLoading}
-                className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 font-bold text-xs transition-all"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>Akun Kasir</span>
-              </button>
-            </div>
-          </div>
         </div>
 
         <div className="text-center text-xs text-slate-500">
@@ -243,7 +175,6 @@ export default function LoginPage() {
             Daftar Sekarang
           </Link>
         </div>
-
       </div>
     </div>
   );

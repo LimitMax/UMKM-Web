@@ -1,3 +1,6 @@
+/**
+ * @deprecated Legacy mock auth service. Superceded by src/lib/services/authService.ts.
+ */
 import { getStorageItem, setStorageItem } from './db';
 
 export interface UserProfile {

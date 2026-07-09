@@ -15,49 +15,75 @@ import {
   Sparkles,
   LogOut,
   Settings,
-  ClipboardList
+  ClipboardList,
+  ShieldAlert
 } from 'lucide-react';
-import { authService as mockAuthService } from '../../services/authService';
-import { demoRoleService } from '../../services/demoRoleService';
 import { useAuth } from '../../components/AuthProvider';
-import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { user: supabaseUser, profile, isDemoMode, isSupabaseConfigured, loading: authLoading, signOut } = useAuth();
+  const { user: supabaseUser, profile, loading: authLoading, signOut } = useAuth();
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
-      if (isSupabaseConfigured && !isDemoMode) {
-        if (!supabaseUser || !profile) {
-          setTimeout(() => {
-            setIsRedirecting(true);
-            router.push('/login');
-          }, 0);
-        }
-      } else {
-        // Demo mode check
-        const mockSession = mockAuthService.getCurrentUser();
-        if (!mockSession) {
-          setTimeout(() => {
-            setIsRedirecting(true);
-            router.push('/login');
-          }, 0);
-        }
+      if (!supabaseUser || !profile) {
+        setTimeout(() => {
+          setIsRedirecting(true);
+          router.push('/login');
+        }, 0);
       }
     }
-  }, [supabaseUser, profile, isDemoMode, isSupabaseConfigured, authLoading, router]);
+  }, [supabaseUser, profile, authLoading, router]);
 
   const handleLogout = async () => {
     await signOut();
     router.push('/login');
   };
 
-  const currentRole = isDemoMode ? demoRoleService.getCurrentDemoRole() : (profile?.role || 'admin');
+  if (authLoading || isRedirecting) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-500 text-xs font-mono animate-pulse">Memverifikasi sesi admin...</div>
+      </div>
+    );
+  }
+
+  // Double check: if user is logged in as cashier, block access to administrative layout children
+  if (profile && profile.role === 'cashier') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+          <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-white mb-2 font-sans">Akses Terbatas</h1>
+          <p className="text-xs text-slate-400 mb-6 leading-relaxed font-sans">
+            Akun Anda terdaftar sebagai <span className="font-bold text-emerald-400">Kasir</span>. Halaman administrasi ini hanya diperuntukkan bagi Owner/Admin.
+          </p>
+          <div className="flex flex-col gap-3">
+            <Link
+              href="/cashier"
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all text-xs font-sans block"
+            >
+              Ke Dashboard Kasir
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white font-bold rounded-xl transition-all text-xs border border-slate-700 font-sans"
+            >
+              Keluar Akun
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const currentRole = profile?.role || 'admin';
 
   let navItems = [
     { href: '/admin', label: 'Ringkasan', icon: BarChart3 },
@@ -75,38 +101,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       { href: '/admin/transactions', label: 'Struk Transaksi', icon: ClipboardList },
       { href: '/order', label: 'Order Customer', icon: ShoppingBag },
     ];
-  } else if (currentRole === 'customer') {
-    navItems = [
-      { href: '/order', label: 'Menu / Order', icon: ShoppingBag },
-      { href: '/', label: 'Halaman Utama', icon: Settings },
-    ];
-  }
-
-  if (authLoading || isRedirecting) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-slate-500 text-xs font-mono animate-pulse">Memverifikasi sesi admin...</div>
-      </div>
-    );
   }
 
   // Display fields based on auth mode
-  let displayName = 'Owner Demo';
-  let displayRole = 'Pemilik UMKM';
-  let displayBusiness = 'Warung Kopi Nusantara';
-
-  if (isSupabaseConfigured && !isDemoMode && profile) {
-    displayName = profile.full_name;
-    displayRole = profile.role === 'admin' ? 'Owner/Admin' : 'Kasir';
-    displayBusiness = 'Kopi & Cemilan Pilot';
-  } else {
-    const mockSession = mockAuthService.getCurrentUser();
-    if (mockSession) {
-      displayName = mockSession.name;
-      displayRole = mockSession.role === 'admin' ? 'Owner Demo' : 'Kasir Demo';
-      displayBusiness = mockSession.businessName;
-    }
-  }
+  const displayName = profile?.full_name || 'Pemilik UMKM';
+  const displayRole = profile?.role === 'admin' ? 'Pemilik/Admin' : 'Kasir';
+  const displayBusiness = 'Kopi & Cemilan Pilot';
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row text-slate-100">
@@ -122,7 +122,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <DemoRoleSwitcher />
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="p-1.5 rounded-lg bg-slate-800 text-slate-350 hover:text-white"
@@ -178,10 +177,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Footer links */}
         <div className="flex flex-col gap-3 border-t border-slate-850 pt-6 mt-auto">
-          <div className="px-4 pb-2">
-            <DemoRoleSwitcher />
-          </div>
-
           {/* Display User Card Info */}
           <div className="px-4 py-2 bg-slate-950/40 border border-slate-850 rounded-xl mb-1.5 flex flex-col gap-0.5 leading-tight">
             <span className="text-[8px] font-mono text-slate-500 uppercase">Akses Aktif</span>
@@ -191,7 +186,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-rose-450 hover:bg-rose-950/20 hover:text-rose-400 transition-all text-left"
+            className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-950/20 hover:text-rose-350 transition-all text-left font-sans"
           >
             <LogOut className="w-4.5 h-4.5" />
             <span>Keluar Sesi</span>
@@ -199,7 +194,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           
           <Link
             href="/"
-            className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-350 transition-all hover:bg-slate-800/30"
+            className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-350 transition-all hover:bg-slate-800/30 font-sans"
           >
             <Home className="w-4.5 h-4.5" />
             <span>Ke Halaman Utama</span>

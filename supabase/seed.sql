@@ -37,17 +37,7 @@ INSERT INTO businesses (
     name = EXCLUDED.name,
     description = EXCLUDED.description;
 
--- 2. Seed Staff Profiles
-INSERT INTO profiles (
-    id,
-    business_id,
-    full_name,
-    role,
-    email
-) VALUES 
-('profile-admin-1', 'biz-1', 'Budi Santoso', 'admin', 'budi.admin@umkmpilot.com'),
-('profile-cashier-1', 'biz-1', 'Siti Rahma', 'cashier', 'siti.cashier@umkmpilot.com')
-ON CONFLICT (id) DO NOTHING;
+-- 2. Staff Profiles seeding removed in Phase 7B.5 (Profiles must be created via real Supabase Auth registration)
 
 -- 3. Seed Products Aligned with SEED_PRODUCTS in db.ts
 INSERT INTO products (

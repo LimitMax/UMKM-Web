@@ -67,16 +67,16 @@ After clicking **Generate Pesanan Demo**, the following data is created for toda
 
 ---
 
-## 🔑 Demo Account Credentials
+## 🔑 Registrasi Akun Staf (Owner / Admin & Kasir)
 
-Both dashboards are protected by role-based mock authentication. You can sign in using these demo credentials directly or by using the **Akses Cepat Pengujian (Quick Login Helpers)** on the login screen:
+Aplikasi tidak lagi menggunakan akun demo/mock bawaan (seperti `admin@tokoku.com`). Untuk masuk ke sistem, Anda wajib mendaftarkan akun baru melalui halaman register:
 
-*   **Owner / Admin Access**:
-    *   **Email**: `admin@tokoku.com`
-    *   **Role**: `admin` (Has full access to admin panels, products catalog editing, stock adjustments, and AI insights)
-*   **Kasir / Cashier Access**:
-    *   **Email**: `cashier@tokoku.com`
-    *   **Role**: `cashier` (Has terminal access to confirm payments, update order progress steps, and play chime notifications)
+1. Buka halaman `/register`.
+2. Masukkan nama lengkap, alamat email, kata sandi, dan pilih peran staf (**Pemilik UMKM** atau **Staf Kasir**).
+3. Setelah pendaftaran berhasil, Anda akan dialihkan ke dashboard masing-masing.
+4. Anda dapat menggunakan email dan password tersebut untuk masuk kembali di `/login`.
+
+*Catatan: Pendaftaran membutuhkan koneksi Supabase Auth yang aktif dan database yang telah terisi data bisnis default `biz-1` (via seed.sql).*
 
 ---
 
@@ -113,9 +113,9 @@ To enable real login and registration:
 ### 5. Database Schema Details
 For a detailed review of all columns, relationships, check constraints, indexes, and planned RLS policies, refer to the [docs/SUPABASE_SCHEMA.md](file:///d:/Riset/UMKM%20Web/docs/SUPABASE_SCHEMA.md) file.
 
-### 6. Current Limitations
-- **Main Transaction Routing**: Sales orders, products, and insights are still retrieved from and stored in `localStorage` to preserve offline compatibility. Their database tables are structured and seeded but will be integrated into the app code in subsequent phases (Phase 7C/7D).
-- **Demo Mode Switcher**: If the user is logged out, the Demo Role Switcher remains fully functional. Logging in via Supabase locks access to the authenticated user's real role and details and labels it as "Login Supabase Aktif".
+### 6. Current Limitations & Identity Scope
+- **Supabase Auth as Identity Source**: Supabase Auth + `profiles` table is now the single source of truth for user identities and roles (`admin`/`cashier`). Demo/mock authentication has been fully removed.
+- **Main Transaction Routing**: Sales orders, receipts, and insights are still retrieved from and stored in `localStorage` temporarily. Their database integration will happen in subsequent phases (Phase 7C/7D).
 
 ---
 
@@ -123,9 +123,10 @@ For a detailed review of all columns, relationships, check constraints, indexes,
 
 This section documents the complete happy-path flow for verifying the MVP end-to-end.
 
-### Step 1 — Reset Demo Data (Optional)
-- Open the landing page at `http://localhost:3000/`
-- Click the **"Reset Demo Data"** button in the banner to restore seed products and clear all orders
+### Step 1 — Setup Account (Register)
+- Open `http://localhost:3000/register`
+- Register a new account as **Pemilik UMKM (Admin)** (e.g. `budi@gmail.com`)
+- Register another account as **Staf Kasir** (e.g. `siti@gmail.com`)
 
 ### Step 2 — Customer Ordering Flow
 1. Go to `http://localhost:3000/order`
@@ -144,7 +145,7 @@ This section documents the complete happy-path flow for verifying the MVP end-to
 
 ### Step 3 — Cashier Dashboard Flow
 1. Go to `http://localhost:3000/login`
-2. Click **Akun Kasir** (quick login) to log in as cashier
+2. Log in using your registered **Kasir** email and password
 3. Verify the incoming order appears in the list with the correct queue number
 4. Click on the order to see its details
 5. Click **Konfirmasi Pembayaran Lunas** → status becomes "Lunas"
@@ -158,7 +159,7 @@ This section documents the complete happy-path flow for verifying the MVP end-to
 
 ### Step 4 — Admin Dashboard Flow
 1. Log out and go back to `/login`
-2. Click **Akun Admin** (quick login) to log in as admin/owner
+2. Log in using your registered **Admin/Owner** email and password
 3. Verify the dashboard shows:
    - Today's revenue from completed/paid orders
    - Total orders count
@@ -173,7 +174,7 @@ This section documents the complete happy-path flow for verifying the MVP end-to
 ### Step 5 — Data Persistence Verification
 - Refresh the browser on any page → data persists (not lost on refresh)
 - Close and reopen the browser tab → data still persists
-- Click **Reset Demo Data** on the landing page → all orders cleared, products restored to seed
+- To clear/reset demo order data: Log in as **Admin**, navigate to **Pengaturan Bisnis** -> **Alat Demo**, and use the data operations there.
 
 ## 📊 Laporan dan Ekspor Data (Phase 5C)
 
@@ -201,26 +202,14 @@ Spreadsheet CSV yang diunduh menyertakan kolom-kolom berikut:
 - **Data Source**: Data laporan diambil dan dihitung secara lokal dari `localStorage` browser pengguna aktif. Jika data demo direset atau dibersihkan di browser tersebut, riwayat transaksi pada laporan juga akan terhapus.
 - **Future Integration**: Setelah koneksi Supabase diaktifkan, data laporan akan diambil secara realtime dari tabel `orders` PostgreSQL via API query.
 
-## 👥 Simulasi Peran & Switcher Peran Demo (Phase 5D)
+## 👥 Otentikasi Peran Staff Produksi (Update Phase 7B.5)
 
-UMKM Pilot menyertakan sistem simulasi peran (*Demo Role Switcher*) untuk memudahkan penguji menjelajahi aplikasi dari tiga sudut pandang pengguna yang berbeda: **Pemilik UMKM (Admin)**, **Kasir**, dan **Pelanggan** secara instan tanpa perlu mendaftar atau login manual secara berulang.
+Fitur Simulasi Peran (*Demo Role Switcher*) dan Akun Uji Coba Bawaan telah **dihapus sepenuhnya** pada Phase 7B.5 untuk menghindari kebingungan data. UMKM Pilot sekarang menggunakan integrasi penuh dengan **Supabase Auth** dan tabel `profiles` di PostgreSQL.
 
-### Cara Kerja Demo Role Switcher
-Sistem mendeteksi role aktif dari penyimpanan lokal (`localStorage`). Tampilan antarmuka dan panel navigasi akan otomatis menyesuaikan berdasarkan peran yang dipilih:
-1. **Pemilik UMKM (Admin)**:
-   - Mengakses Dashboard Admin, Kelola Produk, Stok, Transaksi, Laporan Penjualan, AI Insights, dan Pengaturan Toko.
-   - Menggunakan komponen `DemoRoleSwitcher` untuk berpindah ke mode lain kapan saja.
-2. **Kasir**:
-   - Mengakses Dashboard Kasir Pintar, menyaring antrean pesanan masuk, memproses status dapur, dan mencetak struk digital.
-   - Batasan: Navigasi sidebar admin akan otomatis disederhanakan hanya untuk menampilkan link kasir dan daftar struk.
-3. **Pelanggan**:
-   - Mengakses menu pesanan mandiri (`/order`), berbelanja makanan/minuman, melihat banner toko, dan meninjau status antrean digital.
-
-### Panduan Akses Halaman (Soft Route Guard)
-Untuk memudahkan peninjauan demo, aplikasi menggunakan **Soft Route Access Guidance** (bukan blokade keamanan produksi keras):
-- Jika peran aktif Anda saat ini adalah **Pelanggan** tetapi Anda membuka halaman `/admin` atau `/cashier`, aplikasi akan menampilkan banner peringatan berwarna kuning di bagian atas:
-  - *“Anda sedang berada dalam mode Pelanggan. Halaman ini biasanya digunakan oleh Admin/Owner.”*
-- Anda dapat mengklik **Ganti ke Admin/Kasir Demo** untuk menyesuaikan peran secara instan, atau klik **Lanjutkan** untuk tetap meninjau halaman tersebut tanpa dialihkan secara pasang.
+### Ketentuan Keamanan & Guarding:
+- **Halaman Admin (`/admin/*`)**: Hanya dapat diakses oleh akun dengan peran (*role*) `admin`. Jika kasir mengakses halaman ini, sistem akan memblokir rendering dan menampilkan halaman khusus: *"Akses Terbatas: Akun Anda adalah Kasir"*. Jika belum masuk, pengguna akan dialihkan ke `/login`.
+- **Halaman Kasir (`/cashier`)**: Dapat diakses oleh kasir dan admin. Jika belum masuk, dialihkan ke `/login`.
+- **Halaman Pelanggan (`/order`)**: Tetap bersifat publik dan dapat diakses oleh siapa saja tanpa perlu masuk (*unauthenticated*).
 
 ### Batasan Saat Ini (Technical Limitations)
 - **Bukan Otentikasi Riil**: Fitur switcher ini murni untuk kebutuhan demonstrasi dan simulasi alur kerja visual. Belum ada enkripsi sandi atau pengamanan token API JWT di sisi server.
@@ -287,21 +276,16 @@ Aplikasi UMKM Pilot mendukung perhitungan ongkos kirim fleksibel dengan dua tipe
 
 | Area | Issue | Priority |
 |------|-------|----------|
-| Auth | Password is ignored in mock login (any password accepted) | Medium |
-| Auth | Registered users reset on page reload (in-memory MOCK_PROFILES) | Medium |
-| Stock | Stock not re-validated in cart if another user orders while cart is open | Low |
-| Orders | No pagination for large order lists | Low |
-| Admin | Weekly trend chart uses seeded fake data for past days | Low |
-| DB | Not connected to Supabase yet | When ready |
-| AI | Insights are rule-based, not real LLM | When ready |
+| Orders | Orders are stored locally in `localStorage` | High |
+| Receipts | Receipt data relies on `localStorage` order references | Medium |
+| Products | Product inventory updates are still applied to `localStorage` | Medium |
+| Reports | Reports generate statistics based on `localStorage` | Medium |
+| AI | Insights are rule-based, not real LLM | Low |
 
 ---
 
 ## 📋 Recommended Next Steps
 
-1. **Connect Supabase**: Set `NEXT_PUBLIC_USE_SUPABASE=true` and populate `.env.local`
-2. **Enable Supabase Auth**: Replace mock auth with `supabase.auth.signInWithPassword()`
-3. **Real-time subscriptions**: Replace polling with `supabase.channel().on()` listeners
-4. **Connect an LLM API**: Replace `insightService.generateInsights()` with a GPT/Gemini API call
-5. **Print receipt**: Add a print/PDF receipt button on the cashier detail panel
-6. **Multi-tenancy**: Add `business_id` scoping to all queries for SaaS isolation
+1. **Migrate Business/Products/Orders to Supabase (Phase 7C & 7D)**: Move remaining operations from `localStorage` into Supabase tables with appropriate Postgres RLS policies.
+2. **Connect an LLM API**: Replace `insightService.generateInsights()` with a real Google Gemini or OpenAI API call.
+3. **Print receipt**: Add a print/PDF receipt button on the cashier detail panel.
