@@ -16,12 +16,10 @@ import {
   Target,
   Zap,
 } from 'lucide-react';
-import { insightService } from '../../../services/insightService';
 import { orderService } from '../../../services/orderService';
-import { productService } from '../../../services/productService';
 import { useAuth } from '../../../components/AuthProvider';
 import { supabaseClient } from '../../../lib/supabase/client';
-import { AIInsight, GeneratedBusinessInsight, GeneratedPromoRecommendation, Order, PromoRecommendation } from '../../../types';
+import { GeneratedBusinessInsight, GeneratedPromoRecommendation, Order } from '../../../types';
 import { formatRupiah } from '../../../utils/format';
 import { FloatingAIChatAssistant } from '../../../components/ai/FloatingAIChatAssistant';
 import { AI_DATE_RANGE_LABELS, AiDateRangeKey, buildAiDateRange } from '../../../lib/ai/dateRange';
@@ -50,34 +48,6 @@ const rangeOptions: Array<{ key: RangeKey; label: string }> = [
   { key: '7d', label: AI_DATE_RANGE_LABELS['7d'] },
   { key: '30d', label: AI_DATE_RANGE_LABELS['30d'] },
 ];
-
-function mapLegacyPromo(promo: PromoRecommendation): GeneratedPromoRecommendation {
-  return {
-    title: promo.title,
-    suggestedPromoName: promo.suggestedPromoName,
-    campaignGoal: promo.campaignGoal,
-    mainProductName: promo.mainProductName,
-    bundleProductName: promo.bundleProductName,
-    reason: promo.reason,
-    normalPrice: promo.normalPrice,
-    suggestedPrice: promo.suggestedPrice,
-    estimatedSavings: promo.estimatedSavings,
-    targetTime: promo.targetTime,
-    targetCustomer: promo.targetCustomer,
-    confidenceScore: promo.confidenceScore,
-    basedOnSignals: promo.basedOnSignals,
-    whatsappCaption: promo.whatsappCaption,
-    instagramCaption: promo.instagramCaption,
-    shortCaption: promo.shortCaption,
-    checklist: [
-      'Pastikan stok produk promo aman.',
-      'Publikasikan caption di kanal utama.',
-      'Evaluasi performa promo setelah 3 hari.',
-    ],
-    generatedAt: new Date().toISOString(),
-    source: 'rule_based',
-  };
-}
 
 function formatDateTime(value?: string) {
   if (!value) return '-';
@@ -112,7 +82,7 @@ function getStatusMeta(aiStatus: AiStatus | null, insight?: GeneratedBusinessIns
   const hasLlmResult = insight?.source === 'llm' || promo?.source === 'llm';
 
   if (!aiStatus?.configured) {
-    return { label: 'Belum Dikonfigurasi', className: 'border-slate-700 bg-slate-800/70 text-slate-300' };
+    return { label: 'LLM belum dikonfigurasi', className: 'border-slate-700 bg-slate-800/70 text-slate-300' };
   }
   if (latestFallbackReason === 'timeout') {
     return { label: 'LLM Timeout', className: 'border-amber-500/25 bg-amber-500/10 text-amber-300' };
@@ -120,7 +90,7 @@ function getStatusMeta(aiStatus: AiStatus | null, insight?: GeneratedBusinessIns
   if (hasLlmResult) {
     return { label: 'AI Aktif', className: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-400' };
   }
-  return { label: 'Mode Rule-Based', className: 'border-amber-500/25 bg-amber-500/10 text-amber-300' };
+  return { label: 'AI siap digunakan', className: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-400' };
 }
 
 function getPriorityClass(priority: string) {
@@ -131,13 +101,16 @@ function getPriorityClass(priority: string) {
 
 export default function AdminInsightsPage() {
   const { profile, role } = useAuth();
-  const [legacyInsight, setLegacyInsight] = useState<AIInsight | null>(null);
   const [businessInsight, setBusinessInsight] = useState<GeneratedBusinessInsight | null>(null);
   const [promo, setPromo] = useState<GeneratedPromoRecommendation | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingBase, setLoadingBase] = useState(true);
-  const [generatingInsight, setGeneratingInsight] = useState(false);
-  const [generatingPromo, setGeneratingPromo] = useState(false);
+  const [businessInsightLoading, setBusinessInsightLoading] = useState(false);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [hasGeneratedBusinessInsight, setHasGeneratedBusinessInsight] = useState(false);
+  const [hasGeneratedPromoRecommendation, setHasGeneratedPromoRecommendation] = useState(false);
+  const [businessInsightSource, setBusinessInsightSource] = useState<'llm' | 'rule_based' | null>(null);
+  const [promoSource, setPromoSource] = useState<'llm' | 'rule_based' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [captionTab, setCaptionTab] = useState<CaptionTab>('whatsapp');
   const [copiedCaption, setCopiedCaption] = useState<CaptionTab | null>(null);
@@ -149,8 +122,10 @@ export default function AdminInsightsPage() {
   const lastGeneratedAt = businessInsight?.generatedAt || promo?.generatedAt;
   const statusMeta = getStatusMeta(aiStatus, businessInsight, promo);
   const kpis = useMemo(() => getKpis(orders, range), [orders, range]);
-  const isGenerating = generatingInsight || generatingPromo;
-  const sourceLabel = businessInsight?.source === 'llm' || promo?.source === 'llm' ? 'LLM' : 'Rule-Based';
+  const isGenerating = businessInsightLoading || promoLoading;
+  const sourceLabel = businessInsightSource || promoSource
+    ? [businessInsightSource, promoSource].filter(Boolean).map((item) => item === 'llm' ? 'LLM' : 'Rule-Based').join(' / ')
+    : '-';
   const activeCaption = useMemo(() => {
     if (!promo) return '';
     if (captionTab === 'whatsapp') return promo.whatsappCaption;
@@ -182,17 +157,8 @@ export default function AdminInsightsPage() {
       setLoadingBase(true);
       setErrorMessage('');
       try {
-        const [loadedOrders, products] = await Promise.all([
-          orderService.getOrdersByBusinessId(businessId),
-          productService.getProducts('supabase', businessId),
-        ]);
-        const ruleBased = insightService.generateInsights(loadedOrders, products);
+        const loadedOrders = await orderService.getOrdersByBusinessId(businessId);
         setOrders(loadedOrders);
-        setLegacyInsight(ruleBased);
-
-        if (ruleBased.promoRecommendations?.[0]) {
-          setPromo(mapLegacyPromo(ruleBased.promoRecommendations[0]));
-        }
       } catch (error) {
         console.error('Failed to load rule-based insights:', error);
         setErrorMessage('Gagal memuat data insight. Coba refresh halaman.');
@@ -211,7 +177,7 @@ export default function AdminInsightsPage() {
 
   const generateBusinessInsight = async () => {
     if (!businessId) return;
-    setGeneratingInsight(true);
+    setBusinessInsightLoading(true);
     setErrorMessage('');
 
     try {
@@ -228,6 +194,8 @@ export default function AdminInsightsPage() {
       if (!response.ok) throw new Error('Request failed');
       const nextInsight = (await response.json()) as GeneratedBusinessInsight;
       setBusinessInsight(nextInsight);
+      setHasGeneratedBusinessInsight(true);
+      setBusinessInsightSource(nextInsight.source);
       if (nextInsight.source === 'rule_based') {
         setErrorMessage(nextInsight.fallbackMessage || fallbackMessage);
       }
@@ -235,13 +203,13 @@ export default function AdminInsightsPage() {
       console.error('Generate business insight failed:', error);
       setErrorMessage('Insight AI belum bisa dibuat. Rekomendasi rule-based tetap tersedia.');
     } finally {
-      setGeneratingInsight(false);
+      setBusinessInsightLoading(false);
     }
   };
 
   const generatePromo = async () => {
     if (!businessId) return;
-    setGeneratingPromo(true);
+    setPromoLoading(true);
     setErrorMessage('');
 
     try {
@@ -258,6 +226,8 @@ export default function AdminInsightsPage() {
       if (!response.ok) throw new Error('Request failed');
       const nextPromo = (await response.json()) as GeneratedPromoRecommendation;
       setPromo(nextPromo);
+      setHasGeneratedPromoRecommendation(true);
+      setPromoSource(nextPromo.source);
       if (nextPromo.source === 'rule_based') {
         setErrorMessage(nextPromo.fallbackMessage || 'Rekomendasi promo fallback rule-based ditampilkan.');
       }
@@ -265,7 +235,7 @@ export default function AdminInsightsPage() {
       console.error('Generate promo failed:', error);
       setErrorMessage('Rekomendasi promo AI belum bisa dibuat. Promo rule-based tetap tersedia.');
     } finally {
-      setGeneratingPromo(false);
+      setPromoLoading(false);
     }
   };
 
@@ -292,8 +262,12 @@ export default function AdminInsightsPage() {
         sourceLabel={sourceLabel}
         lastGeneratedAt={lastGeneratedAt}
         isGenerating={isGenerating}
-        generatingInsight={generatingInsight}
-        generatingPromo={generatingPromo}
+        generatingInsight={businessInsightLoading}
+        generatingPromo={promoLoading}
+        hasGeneratedBusinessInsight={hasGeneratedBusinessInsight}
+        hasGeneratedPromoRecommendation={hasGeneratedPromoRecommendation}
+        businessInsightRange={businessInsight?.dateRange}
+        promoRange={promo?.dateRange}
         onGenerateInsight={generateBusinessInsight}
         onGeneratePromo={generatePromo}
       />
@@ -307,21 +281,25 @@ export default function AdminInsightsPage() {
           <main className="flex min-w-0 flex-col gap-5">
             <ExecutiveSummaryCard
               insight={businessInsight}
-              legacyInsight={legacyInsight}
               kpis={kpis}
               aiConfigured={Boolean(aiStatus?.configured)}
               selectedRange={range}
+              hasGenerated={hasGeneratedBusinessInsight}
+              onGenerate={generateBusinessInsight}
             />
 
-            {businessInsight ? (
+            {hasGeneratedBusinessInsight && businessInsight ? (
               <InsightGrid insight={businessInsight} />
             ) : (
-              <EmptyInsightState />
+              <EmptyInsightState onGenerate={generateBusinessInsight} loading={businessInsightLoading} />
             )}
           </main>
 
           <PromoRecommendationPanel
             promo={promo}
+            hasGenerated={hasGeneratedPromoRecommendation}
+            onGenerate={generatePromo}
+            loading={promoLoading}
             selectedRange={range}
             captionTab={captionTab}
             setCaptionTab={setCaptionTab}
@@ -382,6 +360,10 @@ function AIControlPanel({
   isGenerating,
   generatingInsight,
   generatingPromo,
+  hasGeneratedBusinessInsight,
+  hasGeneratedPromoRecommendation,
+  businessInsightRange,
+  promoRange,
   onGenerateInsight,
   onGeneratePromo,
 }: {
@@ -394,9 +376,19 @@ function AIControlPanel({
   isGenerating: boolean;
   generatingInsight: boolean;
   generatingPromo: boolean;
+  hasGeneratedBusinessInsight: boolean;
+  hasGeneratedPromoRecommendation: boolean;
+  businessInsightRange?: string;
+  promoRange?: string;
   onGenerateInsight: () => void;
   onGeneratePromo: () => void;
 }) {
+  const hasGeneratedAny = hasGeneratedBusinessInsight || hasGeneratedPromoRecommendation;
+  const hasStaleResult = Boolean(
+    (businessInsightRange && businessInsightRange !== range) ||
+    (promoRange && promoRange !== range)
+  );
+
   return (
     <section className="rounded-2xl border border-slate-850 bg-slate-900/80 p-4">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_auto_auto] xl:items-center">
@@ -449,6 +441,11 @@ function AIControlPanel({
           </span>
         )}
       </div>
+      {hasGeneratedAny && hasStaleResult && (
+        <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-200">
+          Rentang waktu berubah. Klik Generate untuk memperbarui hasil.
+        </div>
+      )}
       <p className="mt-2 text-[11px] text-slate-600">LLM hanya dipanggil saat tombol generate atau chat dikirim untuk mengontrol biaya.</p>
     </section>
   );
@@ -456,18 +453,20 @@ function AIControlPanel({
 
 function ExecutiveSummaryCard({
   insight,
-  legacyInsight,
   kpis,
   aiConfigured,
   selectedRange,
+  hasGenerated,
+  onGenerate,
 }: {
   insight: GeneratedBusinessInsight | null;
-  legacyInsight: AIInsight | null;
   kpis: KpiSummary;
   aiConfigured: boolean;
   selectedRange: RangeKey;
+  hasGenerated: boolean;
+  onGenerate: () => void;
 }) {
-  const summary = insight?.executiveSummary || legacyInsight?.summary || 'Belum ada insight AI. Klik Generate Insight AI untuk mulai analisis.';
+  const summary = insight?.executiveSummary || 'Pilih rentang waktu, lalu klik Generate Insight AI untuk mulai menganalisis performa bisnis.';
   const stale = Boolean(insight?.dateRange && insight.dateRange !== selectedRange);
 
   return (
@@ -477,9 +476,13 @@ function ExecutiveSummaryCard({
           <span className="text-[10px] font-black uppercase tracking-wide text-emerald-400">Ringkasan Eksekutif</span>
           <h2 className="mt-1 text-lg font-black text-white">Snapshot performa bisnis</h2>
         </div>
-        {insight?.source === 'rule_based' && (
-          <span className="w-fit rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold text-amber-300">
-            Fallback Rule-Based
+        {insight?.source && (
+          <span className={`w-fit rounded-full border px-2.5 py-1 text-[10px] font-bold ${
+            insight.source === 'llm'
+              ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-400'
+              : 'border-amber-500/25 bg-amber-500/10 text-amber-300'
+          }`}>
+            {insight.source === 'llm' ? 'Insight AI Aktif' : 'Fallback Rule-Based'}
           </span>
         )}
         {insight?.dateRangeLabel && (
@@ -489,11 +492,30 @@ function ExecutiveSummaryCard({
         )}
       </div>
 
-      <p className="max-w-4xl text-sm leading-relaxed text-slate-300">{summary}</p>
-
-      {!insight && aiConfigured && (
-        <div className="mt-4 rounded-2xl border border-dashed border-slate-800 bg-slate-950/35 p-4 text-xs text-slate-400">
-          Belum ada insight AI. Klik Generate Insight AI untuk mulai analisis.
+      {hasGenerated ? (
+        <p className="max-w-4xl text-sm leading-relaxed text-slate-300">{summary}</p>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/35 p-4">
+          <h3 className="text-sm font-black text-white">Belum ada insight AI</h3>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-400">
+            Pilih rentang waktu, lalu klik Generate Insight AI untuk mulai menganalisis performa bisnis.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {['Highlight penjualan', 'Risiko bisnis', 'Rekomendasi stok', 'Action plan'].map((item) => (
+              <span key={item} className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-bold text-slate-400">
+                {item}
+              </span>
+            ))}
+          </div>
+          {aiConfigured && (
+            <button
+              onClick={onGenerate}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-black text-slate-950 transition-all hover:bg-emerald-400"
+            >
+              <Sparkles className="h-4 w-4" />
+              Generate Insight AI
+            </button>
+          )}
         </div>
       )}
 
@@ -526,6 +548,9 @@ function InsightGrid({ insight }: { insight: GeneratedBusinessInsight }) {
 
 function PromoRecommendationPanel({
   promo,
+  hasGenerated,
+  onGenerate,
+  loading,
   selectedRange,
   captionTab,
   setCaptionTab,
@@ -534,6 +559,9 @@ function PromoRecommendationPanel({
   copyCaption,
 }: {
   promo: GeneratedPromoRecommendation | null;
+  hasGenerated: boolean;
+  onGenerate: () => void;
+  loading: boolean;
   selectedRange: RangeKey;
   captionTab: CaptionTab;
   setCaptionTab: (tab: CaptionTab) => void;
@@ -553,14 +581,18 @@ function PromoRecommendationPanel({
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">Promo actionable berbasis pola transaksi.</p>
         </div>
-        {promo?.source === 'rule_based' && (
-          <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold text-amber-300">
-            Rule-Based
+        {hasGenerated && promo?.source && (
+          <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${
+            promo.source === 'llm'
+              ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-400'
+              : 'border-amber-500/25 bg-amber-500/10 text-amber-300'
+          }`}>
+            {promo.source === 'llm' ? 'LLM' : 'Fallback Rule-Based'}
           </span>
         )}
       </div>
 
-      {promo ? (
+      {hasGenerated && promo ? (
         <div className="flex flex-col gap-5">
           <section>
             <h3 className="text-base font-black leading-tight text-white">{promo.suggestedPromoName}</h3>
@@ -637,7 +669,16 @@ function PromoRecommendationPanel({
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-800 p-6 text-center">
           <Package className="mx-auto mb-3 h-7 w-7 text-slate-600" />
-          <p className="text-xs leading-relaxed text-slate-500">Belum ada rekomendasi promo. Klik Generate Promo AI untuk membuat kampanye.</p>
+          <h3 className="text-sm font-black text-white">Belum ada rekomendasi promo</h3>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">Klik Generate Promo AI untuk membuat ide kampanye berdasarkan produk, transaksi, dan pola pelanggan.</p>
+          <button
+            onClick={onGenerate}
+            disabled={loading}
+            className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-xs font-black text-emerald-400 transition-all hover:bg-emerald-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />}
+            Generate Promo AI
+          </button>
         </div>
       )}
     </aside>
@@ -698,12 +739,22 @@ function LoadingInsightCard() {
   );
 }
 
-function EmptyInsightState() {
+function EmptyInsightState({ onGenerate, loading }: { onGenerate: () => void; loading: boolean }) {
   return (
     <section className="rounded-3xl border border-dashed border-slate-800 bg-slate-900/60 p-8 text-center">
       <Brain className="mx-auto mb-3 h-8 w-8 text-slate-600" />
       <h3 className="text-sm font-black text-white">Belum ada insight AI</h3>
-      <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-500">Klik Generate Insight AI untuk mulai analisis. Hasil rule-based tetap tersedia sebagai ringkasan awal.</p>
+      <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-500">
+        Pilih rentang waktu, lalu klik Generate Insight AI untuk mulai menganalisis performa bisnis.
+      </p>
+      <button
+        onClick={onGenerate}
+        disabled={loading}
+        className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-black text-slate-950 transition-all hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+        Generate Insight AI
+      </button>
     </section>
   );
 }
