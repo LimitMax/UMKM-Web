@@ -107,6 +107,9 @@ export interface Order {
   etaUpdatedAt?: string;         // ISO string
   etaManuallyAdjusted?: boolean;
   etaAdjustmentReason?: string;
+  paidAt?: string;               // ISO string
+  completedAt?: string;          // ISO string
+  cancelledAt?: string;          // ISO string
 }
 
 export interface BusinessProfile {

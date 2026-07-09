@@ -80,173 +80,36 @@ Both dashboards are protected by role-based mock authentication. You can sign in
 
 ---
 
-## ⚙️ Swappable Database Configuration
+## ⚙️ Configuration & Supabase Setup (Phase 7A)
 
 UMKM Pilot is built with a swappable repository layer. It operates offline/locally via `localStorage` by default, but it is **Supabase PostgreSQL ready**. 
 
-To migrate to a live Supabase backend:
-
-1.  **Configure Credentials**:
-    Create a `.env.local` file at the root of the project and fill it with your live keys (see template in `.env.example`):
-    ```env
-    NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-    NEXT_PUBLIC_USE_SUPABASE=true
-    ```
-2.  **Toggle the Flag**:
-    By setting `NEXT_PUBLIC_USE_SUPABASE=true`, all services (`productService`, `orderService`, etc.) will bypass localStorage and route queries directly to your Supabase tables.
-
----
-
-## 🗄️ Database Schemas (Supabase / PostgreSQL)
-
-Run the following SQL DDL query inside your Supabase SQL Editor to generate all required tables and relationships:
-
-```sql
--- 1. Businesses Table (Enables multi-tenancy SaaS partitioning)
-CREATE TABLE businesses (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  address TEXT,
-  phone VARCHAR(50),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 2. Profiles Table (Extends Supabase auth.users with custom roles)
-CREATE TABLE profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  business_id UUID REFERENCES businesses(id) ON DELETE SET NULL,
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  role VARCHAR(50) CHECK (role IN ('admin', 'cashier')) DEFAULT 'cashier' NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 3. Products Table (Inventory & Menus)
-CREATE TABLE products (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  category VARCHAR(100) CHECK (category IN ('Makanan', 'Minuman', 'Snack', 'Paket Promo')) NOT NULL,
-  price NUMERIC(12, 2) NOT NULL,
-  stock INT NOT NULL DEFAULT 0,
-  image_url TEXT,
-  is_active BOOLEAN DEFAULT true NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 4. Orders Table (Checkout queue ledger)
-CREATE TABLE orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE NOT NULL,
-  queue_number VARCHAR(10) NOT NULL,
-  customer_name VARCHAR(255) NOT NULL,
-  customer_phone VARCHAR(50) NOT NULL,
-  notes TEXT,
-  subtotal NUMERIC(12, 2),
-  service_charge_amount NUMERIC(12, 2),
-  tax_amount NUMERIC(12, 2),
-  delivery_fee_amount NUMERIC(12, 2),
-  delivery_admin_fee_amount NUMERIC(12, 2),
-  free_delivery_applied BOOLEAN,
-  total_amount NUMERIC(12, 2) NOT NULL,
-  payment_method VARCHAR(50) CHECK (payment_method IN ('Cash', 'QRIS', 'Bank Transfer')) NOT NULL,
-  payment_status VARCHAR(50) CHECK (payment_status IN ('Waiting for Payment', 'Paid', 'Failed')) DEFAULT 'Waiting for Payment' NOT NULL,
-  status VARCHAR(50) CHECK (status IN ('Waiting for Payment', 'Paid', 'Processing', 'Ready', 'delivering', 'Completed', 'Cancelled')) DEFAULT 'Waiting for Payment' NOT NULL,
-  fulfillment_type VARCHAR(50) CHECK (fulfillment_type IN ('dine_in', 'pickup', 'delivery')) DEFAULT 'dine_in' NOT NULL,
-  recipient_name VARCHAR(255),
-  delivery_phone VARCHAR(50),
-  delivery_address TEXT,
-  delivery_notes TEXT,
-  delivery_distance_km NUMERIC(5, 2),
-  delivery_distance_source VARCHAR(50) CHECK (delivery_distance_source IN ('manual', 'mock', 'maps_api')),
-  delivery_fee_calculation_type VARCHAR(50) CHECK (delivery_fee_calculation_type IN ('fixed', 'distance_based')),
-  -- Phase 6.8 ETA columns
-  estimated_preparation_minutes INT,
-  estimated_delivery_minutes INT,
-  estimated_total_minutes INT,
-  estimated_ready_at TIMESTAMP WITH TIME ZONE,
-  estimated_arrival_at TIMESTAMP WITH TIME ZONE,
-  eta_label VARCHAR(100),
-  eta_updated_at TIMESTAMP WITH TIME ZONE,
-  eta_manually_adjusted BOOLEAN DEFAULT false NOT NULL,
-  eta_adjustment_reason TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 5. Order Items Table (Detailed items cart expansion)
-CREATE TABLE order_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID REFERENCES orders(id) ON DELETE CASCADE NOT NULL,
-  product_id UUID REFERENCES products(id) ON DELETE SET NULL,
-  name VARCHAR(255) NOT NULL,
-  price NUMERIC(12, 2) NOT NULL,
-  quantity INT NOT NULL CHECK (quantity > 0)
-);
-
--- 6. Transactions Table (Accounting ledger)
-CREATE TABLE transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID REFERENCES orders(id) ON DELETE CASCADE UNIQUE NOT NULL,
-  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE NOT NULL,
-  amount NUMERIC(12, 2) NOT NULL,
-  payment_method VARCHAR(50) NOT NULL,
-  completed_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 7. Insights Table (Weekly cache for AI advice)
-CREATE TABLE insights (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE NOT NULL,
-  date DATE NOT NULL DEFAULT CURRENT_DATE,
-  summary TEXT NOT NULL,
-  recommendations TEXT[] NOT NULL,
-  promo_title VARCHAR(255) NOT NULL,
-  promo_description TEXT NOT NULL,
-  promo_caption TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  UNIQUE(business_id, date)
-);
+### 1. Configure Credentials
+Create a `.env.local` file at the root of the project (copying `.env.example`) and fill it with your keys:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_SERVICE_ROLE_KEY=your-private-service-role-key
+NEXT_PUBLIC_USE_SUPABASE=false
 ```
 
-### Row Level Security (RLS) Recommendations
+> [!CAUTION]
+> **Security Notice**: Never expose your `SUPABASE_SERVICE_ROLE_KEY` to client-side code. This key bypasses all Row-Level Security (RLS) policies and must only be used in server-side contexts. Ensure it does not have the `NEXT_PUBLIC_` prefix.
 
-To isolate client data between separate businesses, enable Row Level Security (RLS) on your tables:
+### 2. How to Run schema.sql
+Go to your Supabase project dashboard, open the **SQL Editor**, create a new query, copy the contents of [supabase/schema.sql](file:///d:/Riset/UMKM%20Web/supabase/schema.sql), and run it. This creates the DDL structure including check constraints, indexes, and planned RLS definitions.
 
-```sql
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+### 3. How to Run seed.sql
+In your Supabase project dashboard, open the **SQL Editor**, create a new query, copy the contents of [supabase/seed.sql](file:///d:/Riset/UMKM%20Web/supabase/seed.sql), and run it. This populates your database with a default business profile (`biz-1`), admin and cashier user profiles, and the initial products catalog matching our mock dataset.
 
--- Example: Select only products belonging to the user's business_id
-CREATE POLICY business_isolation_policy ON products
-  FOR ALL
-  USING (
-    business_id = (
-      SELECT business_id FROM profiles WHERE id = auth.uid()
-    )
-  );
-```
+### 4. Database Schema Details
+For a detailed review of all columns, relationships, check constraints, indexes, and planned RLS policies, refer to the [docs/SUPABASE_SCHEMA.md](file:///d:/Riset/UMKM%20Web/docs/SUPABASE_SCHEMA.md) file.
 
----
+### 5. Current Limitation
+Although the environment setup, client initialization, database schema, and data source abstractions are ready in Phase 7A, **the app still uses `localStorage` as its active default data source** to preserve local offline capabilities. 
 
-## 🚀 Supabase Integration Steps
-
-Follow these steps to connect your Next.js application to your active database:
-
-1.  **Run SQL schemas**: Copy the SQL DDL commands above and run them inside your Supabase project's SQL editor.
-2.  **Enable Supabase Auth**: Configure Email Auth providers inside your Supabase Auth settings console.
-3.  **Insert Seed Data**: In your Supabase dashboard table editor, insert initial catalog items into the `products` table matching your business ID.
-4.  **Connect Auth triggers**: Write a database trigger function inside Supabase to automatically create a `profiles` row in the public schema whenever a user registers through Supabase auth:
-    ```sql
-    CREATE FUNCTION public.handle_new_user()
-    RETURNS trigger AS $$
-    BEGIN
-      INSERT INTO public.profiles (id, name, email, role)
-      VALUES (new.id, new.raw_user_meta_data->>'name', new.email, 'cashier');
-      RETURN new;
-    END;
-    $$ LANGUAGE plpgsql SECURITY DEFINER;
+### 6. Next Phase
+The next phase (Phase 7C/7D) will implement the migration of the business profile and product catalog over to Supabase while routing transactions securely.
 
 ---
 

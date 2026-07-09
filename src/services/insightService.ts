@@ -1,4 +1,4 @@
-import { Order, Product, AIInsight } from '../types';
+import { Order, Product, AIInsight, PromoRecommendation } from '../types';
 import { formatRupiah } from '../utils/format';
 import { businessService } from './businessService';
 
