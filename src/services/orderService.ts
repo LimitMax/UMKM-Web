@@ -4,6 +4,7 @@ import { productService } from './productService';
 import { USE_SUPABASE } from '../config/dbConfig';
 import { supabase } from '../lib/supabase';
 import { businessService } from './businessService';
+import { calculateOrderTotals } from '../utils/calculations';
 
 export const orderService = {
   async getOrders(): Promise<Order[]> {
@@ -74,6 +75,11 @@ export const orderService = {
     notes?: string;
     items: OrderItem[];
     paymentMethod: Order['paymentMethod'];
+    fulfillmentType?: Order['fulfillmentType'];
+    recipientName?: string;
+    deliveryPhone?: string;
+    deliveryAddress?: string;
+    deliveryNotes?: string;
   }): Promise<Order> {
     // 1. Validate customer name
     if (!orderData.customerName.trim()) {
@@ -102,13 +108,16 @@ export const orderService = {
       (sum, item) => sum + item.price * item.quantity,
       0
     );
-    const serviceChargeAmount = profile.serviceChargeEnabled
-      ? Math.round(subtotal * (profile.serviceChargePercentage / 100))
-      : 0;
-    const taxAmount = profile.taxEnabled
-      ? Math.round(subtotal * (profile.taxPercentage / 100))
-      : 0;
-    const totalAmount = subtotal + serviceChargeAmount + taxAmount;
+
+    const totals = calculateOrderTotals({
+      subtotal,
+      fulfillmentType: orderData.fulfillmentType || 'dine_in',
+      taxEnabled: profile.taxEnabled,
+      taxPercentage: profile.taxPercentage,
+      serviceChargeEnabled: profile.serviceChargeEnabled,
+      serviceChargePercentage: profile.serviceChargePercentage,
+      deliverySettings: profile.deliverySettings,
+    });
 
     // 4. Generate queue number and order ID
     const queueNumber = await this.generateQueueNumber();
@@ -127,7 +136,18 @@ export const orderService = {
           customer_name: orderData.customerName,
           customer_phone: orderData.customerPhone,
           notes: orderData.notes,
-          total_amount: totalAmount,
+          subtotal: totals.subtotal,
+          service_charge_amount: totals.serviceChargeAmount,
+          tax_amount: totals.taxAmount,
+          delivery_fee_amount: totals.deliveryFeeAmount,
+          delivery_admin_fee_amount: totals.deliveryAdminFeeAmount,
+          free_delivery_applied: totals.freeDeliveryApplied,
+          fulfillment_type: orderData.fulfillmentType || 'dine_in',
+          recipient_name: orderData.recipientName,
+          delivery_phone: orderData.deliveryPhone,
+          delivery_address: orderData.deliveryAddress,
+          delivery_notes: orderData.deliveryNotes,
+          total_amount: totals.totalAmount,
           payment_method: orderData.paymentMethod,
           payment_status: 'Waiting for Payment',
           status: 'Waiting for Payment'
@@ -165,6 +185,17 @@ export const orderService = {
         customerPhone: order.customer_phone,
         notes: order.notes,
         items: orderData.items,
+        subtotal: order.subtotal,
+        serviceChargeAmount: order.service_charge_amount,
+        taxAmount: order.tax_amount,
+        deliveryFeeAmount: order.delivery_fee_amount,
+        deliveryAdminFeeAmount: order.delivery_admin_fee_amount,
+        freeDeliveryApplied: order.free_delivery_applied,
+        fulfillmentType: order.fulfillment_type || 'dine_in',
+        recipientName: order.recipient_name,
+        deliveryPhone: order.delivery_phone,
+        deliveryAddress: order.delivery_address,
+        deliveryNotes: order.delivery_notes,
         totalAmount: order.total_amount,
         paymentMethod: order.payment_method,
         paymentStatus: order.payment_status,
@@ -183,10 +214,18 @@ export const orderService = {
       customerPhone: orderData.customerPhone,
       notes: orderData.notes,
       items: orderData.items,
-      subtotal,
-      serviceChargeAmount,
-      taxAmount,
-      totalAmount,
+      subtotal: totals.subtotal,
+      serviceChargeAmount: totals.serviceChargeAmount,
+      taxAmount: totals.taxAmount,
+      deliveryFeeAmount: totals.deliveryFeeAmount,
+      deliveryAdminFeeAmount: totals.deliveryAdminFeeAmount,
+      freeDeliveryApplied: totals.freeDeliveryApplied,
+      totalAmount: totals.totalAmount,
+      fulfillmentType: orderData.fulfillmentType || 'dine_in',
+      recipientName: orderData.recipientName,
+      deliveryPhone: orderData.deliveryPhone,
+      deliveryAddress: orderData.deliveryAddress,
+      deliveryNotes: orderData.deliveryNotes,
       paymentMethod: orderData.paymentMethod,
       paymentStatus: 'Waiting for Payment',
       status: 'Waiting for Payment',

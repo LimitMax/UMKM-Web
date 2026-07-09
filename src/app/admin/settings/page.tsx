@@ -92,6 +92,44 @@ export default function AdminSettingsPage() {
     return businessService.getProfile().serviceChargePercentage;
   });
 
+  // Delivery Settings states
+  const [deliveryEnabled, setDeliveryEnabled] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return businessService.getProfile().deliverySettings?.deliveryEnabled ?? true;
+  });
+  const [deliveryFeeEnabled, setDeliveryFeeEnabled] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return businessService.getProfile().deliverySettings?.deliveryFeeEnabled ?? true;
+  });
+  const [deliveryFeeAmount, setDeliveryFeeAmount] = useState(() => {
+    if (typeof window === 'undefined') return 10000;
+    return businessService.getProfile().deliverySettings?.deliveryFeeAmount ?? 10000;
+  });
+  const [freeDeliveryEnabled, setFreeDeliveryEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return businessService.getProfile().deliverySettings?.freeDeliveryEnabled ?? false;
+  });
+  const [freeDeliveryMinimumAmount, setFreeDeliveryMinimumAmount] = useState(() => {
+    if (typeof window === 'undefined') return 50000;
+    return businessService.getProfile().deliverySettings?.freeDeliveryMinimumAmount ?? 50000;
+  });
+  const [deliveryAdminFeeEnabled, setDeliveryAdminFeeEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return businessService.getProfile().deliverySettings?.deliveryAdminFeeEnabled ?? false;
+  });
+  const [deliveryAdminFeeType, setDeliveryAdminFeeType] = useState<'fixed' | 'percentage'>(() => {
+    if (typeof window === 'undefined') return 'fixed';
+    return businessService.getProfile().deliverySettings?.deliveryAdminFeeType ?? 'fixed';
+  });
+  const [deliveryAdminFeeValue, setDeliveryAdminFeeValue] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    return businessService.getProfile().deliverySettings?.deliveryAdminFeeValue ?? 0;
+  });
+  const [deliveryInstruction, setDeliveryInstruction] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return businessService.getProfile().deliverySettings?.deliveryInstruction ?? '';
+  });
+
   // Dynamic order link state
   const [orderLink, setOrderLink] = useState('');
 
@@ -173,6 +211,17 @@ export default function AdminSettingsPage() {
         taxPercentage: Number(taxPercentage),
         serviceChargeEnabled,
         serviceChargePercentage: Number(serviceChargePercentage),
+        deliverySettings: {
+          deliveryEnabled,
+          deliveryFeeEnabled,
+          deliveryFeeAmount: Number(deliveryFeeAmount),
+          freeDeliveryEnabled,
+          freeDeliveryMinimumAmount: Number(freeDeliveryMinimumAmount),
+          deliveryAdminFeeEnabled,
+          deliveryAdminFeeType,
+          deliveryAdminFeeValue: Number(deliveryAdminFeeValue),
+          deliveryInstruction,
+        }
       });
 
       // Sync user session businessName
@@ -229,6 +278,17 @@ export default function AdminSettingsPage() {
           setTaxPercentage(defaults.taxPercentage);
           setServiceChargeEnabled(defaults.serviceChargeEnabled);
           setServiceChargePercentage(defaults.serviceChargePercentage);
+
+          // Reset delivery settings states
+          setDeliveryEnabled(defaults.deliverySettings?.deliveryEnabled ?? true);
+          setDeliveryFeeEnabled(defaults.deliverySettings?.deliveryFeeEnabled ?? true);
+          setDeliveryFeeAmount(defaults.deliverySettings?.deliveryFeeAmount ?? 10000);
+          setFreeDeliveryEnabled(defaults.deliverySettings?.freeDeliveryEnabled ?? false);
+          setFreeDeliveryMinimumAmount(defaults.deliverySettings?.freeDeliveryMinimumAmount ?? 50000);
+          setDeliveryAdminFeeEnabled(defaults.deliverySettings?.deliveryAdminFeeEnabled ?? false);
+          setDeliveryAdminFeeType(defaults.deliverySettings?.deliveryAdminFeeType ?? 'fixed');
+          setDeliveryAdminFeeValue(defaults.deliverySettings?.deliveryAdminFeeValue ?? 0);
+          setDeliveryInstruction(defaults.deliverySettings?.deliveryInstruction ?? '');
 
           // Reset user session businessName
           const sessionKey = 'umkm_pilot_user_session';
@@ -674,6 +734,180 @@ export default function AdminSettingsPage() {
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div className="border-b border-slate-800 pb-3 pt-2">
+                <h3 className="text-sm font-bold text-white">Pengaturan Delivery</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Konfigurasi opsi pengiriman, ongkos kirim, gratis ongkir, dan biaya admin delivery.</p>
+              </div>
+
+              <div className="flex flex-col gap-5 bg-slate-950/40 p-4 rounded-xl border border-slate-850">
+                {/* Delivery Option Switch */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200">Aktifkan Layanan Delivery</h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Ijinkan pelanggan memilih opsi pengiriman kurir toko saat checkout.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={deliveryEnabled}
+                      onChange={(e) => setDeliveryEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
+                  </label>
+                </div>
+
+                {deliveryEnabled && (
+                  <div className="flex flex-col gap-5 pt-3 border-t border-slate-850/50">
+                    
+                    {/* Delivery Fee Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h5 className="text-[11px] font-bold text-slate-300">Biaya Ongkos Kirim (Ongkir)</h5>
+                            <p className="text-[9px] text-slate-550">Terapkan tarif flat untuk setiap pengiriman.</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer scale-90">
+                            <input
+                              type="checkbox"
+                              checked={deliveryFeeEnabled}
+                              onChange={(e) => setDeliveryFeeEnabled(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
+                          </label>
+                        </div>
+                        {deliveryFeeEnabled && (
+                          <div className="mt-1">
+                            <input
+                              type="number"
+                              min="0"
+                              value={deliveryFeeAmount}
+                              onChange={(e) => setDeliveryFeeAmount(Number(e.target.value))}
+                              placeholder="10000"
+                              className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
+                            />
+                            <span className="text-[10px] text-slate-500 block mt-1">Nominal ongkir flat dalam Rupiah (Rp).</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Free Delivery Section */}
+                      <div className="flex flex-col gap-2 border-t md:border-t-0 md:border-l border-slate-850/60 pt-4 md:pt-0 md:pl-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h5 className="text-[11px] font-bold text-slate-300">Gratis Ongkir</h5>
+                            <p className="text-[9px] text-slate-550">Gratiskan ongkir dengan minimal pembelian tertentu.</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer scale-90">
+                            <input
+                              type="checkbox"
+                              checked={freeDeliveryEnabled}
+                              onChange={(e) => setFreeDeliveryEnabled(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
+                          </label>
+                        </div>
+                        {freeDeliveryEnabled && (
+                          <div className="mt-1 flex flex-col gap-1.5">
+                            <input
+                              type="number"
+                              min="0"
+                              value={freeDeliveryMinimumAmount}
+                              onChange={(e) => setFreeDeliveryMinimumAmount(Number(e.target.value))}
+                              placeholder="50000"
+                              className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
+                            />
+                            <p className="text-[9px] text-amber-400 italic">
+                              💡 Gratis ongkir akan otomatis diterapkan apabila subtotal belanja pelanggan &ge; {formatRupiah(freeDeliveryMinimumAmount)}.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Delivery Admin Fee Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-850/50 pt-4">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h5 className="text-[11px] font-bold text-slate-300">Biaya Admin Delivery</h5>
+                            <p className="text-[9px] text-slate-550">Biaya tambahan penanganan/packaging kiriman.</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer scale-90">
+                            <input
+                              type="checkbox"
+                              checked={deliveryAdminFeeEnabled}
+                              onChange={(e) => setDeliveryAdminFeeEnabled(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
+                          </label>
+                        </div>
+                        {deliveryAdminFeeEnabled && (
+                          <div className="mt-2 flex flex-col gap-2.5">
+                            <div className="flex gap-2">
+                              <button
+                                key="btn-fixed"
+                                type="button"
+                                onClick={() => setDeliveryAdminFeeType('fixed')}
+                                className={`px-2.5 py-1 rounded text-[10px] font-bold border transition-all cursor-pointer ${
+                                  deliveryAdminFeeType === 'fixed'
+                                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                Nominal (Rp)
+                              </button>
+                              <button
+                                key="btn-pct"
+                                type="button"
+                                onClick={() => setDeliveryAdminFeeType('percentage')}
+                                className={`px-2.5 py-1 rounded text-[10px] font-bold border transition-all cursor-pointer ${
+                                  deliveryAdminFeeType === 'percentage'
+                                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                Persentase (%)
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={deliveryAdminFeeValue}
+                                onChange={(e) => setDeliveryAdminFeeValue(Number(e.target.value))}
+                                className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white text-center focus:outline-none focus:border-emerald-500"
+                              />
+                              <span className="text-xs text-slate-400">
+                                {deliveryAdminFeeType === 'percentage' ? '%' : 'Rupiah (Rp)'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Delivery Instructions Section */}
+                      <div className="flex flex-col gap-2 border-t md:border-t-0 md:border-l border-slate-850/60 pt-4 md:pt-0 md:pl-4">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Instruksi Pengiriman</label>
+                        <textarea
+                          value={deliveryInstruction}
+                          onChange={(e) => setDeliveryInstruction(e.target.value)}
+                          placeholder="Contoh: Pesanan delivery akan dikonfirmasi oleh kasir sebelum dikirim."
+                          rows={2.5}
+                          className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all resize-none font-sans"
+                        />
+                        <span className="text-[9px] text-slate-500 block">Pesan khusus/petunjuk yang akan ditampilkan pada halaman sukses order pelanggan.</span>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
               </div>
 
               {/* Form Action Buttons */}

@@ -9,7 +9,8 @@ import {
   Phone, 
   Clock, 
   FileText,
-  Briefcase
+  Briefcase,
+  ShoppingBag
 } from 'lucide-react';
 import { orderService } from '../../../services/orderService';
 import { Order } from '../../../types';
@@ -154,7 +155,18 @@ export default function AdminTransactionsPage() {
                       </span>
                       
                       <div>
-                        <h4 className="font-bold text-xs text-white">{tx.customerName}</h4>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-bold text-xs text-white">{tx.customerName}</h4>
+                          <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold ${
+                            tx.fulfillmentType === 'delivery'
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              : tx.fulfillmentType === 'pickup'
+                                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700'
+                          }`}>
+                            {tx.fulfillmentType === 'delivery' ? 'Deliv' : tx.fulfillmentType === 'pickup' ? 'Ambil' : 'Meja'}
+                          </span>
+                        </div>
                         <p className="text-[10px] text-slate-500 mt-1">
                           {formatDate(tx.createdAt)} &bull; {tx.paymentMethod}
                         </p>
@@ -206,12 +218,43 @@ export default function AdminTransactionsPage() {
                   <Clock className="w-3.5 h-3.5 text-slate-500" />
                   <span>Selesai: <strong className="text-white">{formatDate(selectedTx.createdAt)}</strong></span>
                 </div>
+                <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
+                  <ShoppingBag className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Layanan: <strong className="text-white">
+                    {selectedTx.fulfillmentType === 'delivery' ? 'Delivery' : selectedTx.fulfillmentType === 'pickup' ? 'Ambil Sendiri' : 'Makan di Tempat'}
+                  </strong></span>
+                </div>
                 {selectedTx.notes && (
                   <div className="text-[11px] text-slate-500 border-t border-slate-900 pt-1.5 mt-0.5 italic">
                     Catatan: &ldquo;{selectedTx.notes}&rdquo;
                   </div>
                 )}
               </div>
+
+              {selectedTx.fulfillmentType === 'delivery' && (
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-850 text-xs flex flex-col gap-1.5 animate-fade-in">
+                  <div className="text-[10px] font-mono text-emerald-450 font-bold uppercase tracking-wider border-b border-slate-900 pb-1 mb-0.5">
+                    Detail Pengiriman
+                  </div>
+                  <div className="text-slate-400">
+                    Penerima: <strong className="text-slate-200">{selectedTx.recipientName || '-'}</strong>
+                  </div>
+                  <div className="text-slate-400">
+                    WhatsApp: <strong className="text-slate-200">{selectedTx.deliveryPhone || '-'}</strong>
+                  </div>
+                  <div className="text-slate-400 flex flex-col">
+                    <span>Alamat:</span>
+                    <span className="text-slate-200 bg-slate-900 p-2 rounded border border-slate-850 mt-1 leading-normal font-sans text-[11px]">
+                      {selectedTx.deliveryAddress || '-'}
+                    </span>
+                  </div>
+                  {selectedTx.deliveryNotes && (
+                    <div className="text-slate-455 italic mt-0.5">
+                      Catatan: &ldquo;{selectedTx.deliveryNotes}&rdquo;
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Items List */}
               <div>
@@ -231,7 +274,8 @@ export default function AdminTransactionsPage() {
 
               {/* Receipt Total */}
               <div className="border-t border-slate-850 pt-4 bg-slate-950/20 p-3 rounded-xl flex flex-col gap-1.5">
-                {selectedTx.subtotal !== undefined && selectedTx.subtotal !== selectedTx.totalAmount && (
+                {(selectedTx.subtotal !== undefined && 
+                  (selectedTx.subtotal !== selectedTx.totalAmount || selectedTx.fulfillmentType === 'delivery')) && (
                   <>
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Subtotal:</span>
@@ -248,6 +292,24 @@ export default function AdminTransactionsPage() {
                         <span>Pajak:</span>
                         <span className="text-slate-300">{formatRupiah(selectedTx.taxAmount)}</span>
                       </div>
+                    )}
+                    {selectedTx.fulfillmentType === 'delivery' && (
+                      <>
+                        <div className="flex justify-between text-xs text-slate-400">
+                          <span>Ongkos Kirim:</span>
+                          {selectedTx.freeDeliveryApplied ? (
+                            <span className="text-emerald-450 font-bold">Gratis Ongkir</span>
+                          ) : (
+                            <span className="text-slate-300">{formatRupiah(selectedTx.deliveryFeeAmount ?? 0)}</span>
+                          )}
+                        </div>
+                        {selectedTx.deliveryAdminFeeAmount !== undefined && selectedTx.deliveryAdminFeeAmount > 0 && (
+                          <div className="flex justify-between text-xs text-slate-400">
+                            <span>Biaya Admin Delivery:</span>
+                            <span className="text-slate-300">{formatRupiah(selectedTx.deliveryAdminFeeAmount)}</span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </>
                 )}

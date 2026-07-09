@@ -1,5 +1,19 @@
 export type ProductCategory = 'Makanan' | 'Minuman' | 'Snack' | 'Paket Promo';
 
+export type FulfillmentType = 'dine_in' | 'pickup' | 'delivery';
+
+export interface DeliverySettings {
+  deliveryEnabled: boolean;
+  deliveryFeeEnabled: boolean;
+  deliveryFeeAmount: number;
+  freeDeliveryEnabled: boolean;
+  freeDeliveryMinimumAmount: number;
+  deliveryAdminFeeEnabled: boolean;
+  deliveryAdminFeeType: 'fixed' | 'percentage';
+  deliveryAdminFeeValue: number;
+  deliveryInstruction: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -44,6 +58,15 @@ export interface Order {
   paymentStatus: PaymentStatus;
   status: OrderStatus;
   createdAt: string;
+  // Delivery/fulfillment extensions
+  fulfillmentType?: FulfillmentType;
+  recipientName?: string;
+  deliveryPhone?: string;
+  deliveryAddress?: string;
+  deliveryNotes?: string;
+  deliveryFeeAmount?: number;
+  deliveryAdminFeeAmount?: number;
+  freeDeliveryApplied?: boolean;
 }
 
 export interface BusinessProfile {
@@ -60,6 +83,7 @@ export interface BusinessProfile {
   taxPercentage: number;
   serviceChargeEnabled: boolean;
   serviceChargePercentage: number;
+  deliverySettings?: DeliverySettings;
 }
 
 export interface SalesSummary {
@@ -79,3 +103,9 @@ export interface AIInsight {
     caption: string;
   };
 }
+
+export const FULFILLMENT_LABELS = {
+  dine_in: 'Makan di Tempat',
+  pickup: 'Ambil Sendiri',
+  delivery: 'Delivery',
+} as const;

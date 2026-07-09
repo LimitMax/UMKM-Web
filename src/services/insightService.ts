@@ -1,5 +1,6 @@
 import { Order, Product, AIInsight } from '../types';
 import { formatRupiah } from '../utils/format';
+import { businessService } from './businessService';
 
 export const insightService = {
   generateInsights(orders: Order[], products: Product[]): AIInsight {
@@ -122,6 +123,19 @@ export const insightService = {
     recommendations.push(
       `Manajemen Jam Sibuk: Transaksi meningkat pada pukul ${formatHourRange(peakHour)}. Siapkan staff ekstra atau persiapan bahan lebih awal sebelum jam tersebut untuk mempercepat pelayanan.`
     );
+
+    const deliveryOrders = activeOrders.filter((o) => o.fulfillmentType === 'delivery');
+    if (deliveryOrders.length > 0) {
+      recommendations.push(
+        "Sebagian pesanan hari ini menggunakan delivery. Pastikan alamat pelanggan dikonfirmasi sebelum pengiriman."
+      );
+      const profile = businessService.getProfile();
+      if (profile.deliverySettings?.freeDeliveryEnabled) {
+        recommendations.push(
+          "Gratis ongkir aktif. Pantau margin karena biaya pengiriman dapat memengaruhi keuntungan."
+        );
+      }
+    }
 
     // Suggested Promotion
     const promoTitle = `Paket Hemat ${bestSellerCategory === 'Minuman' ? 'Sore' : 'Kenyang'} Seru`;

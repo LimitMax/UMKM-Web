@@ -185,10 +185,26 @@ export default function ReceiptPage() {
             <span className="uppercase text-black font-semibold">{order.customerName}</span>
           </div>
           <div className="flex justify-between">
+            <span>LAYANAN:</span>
+            <span className="font-bold text-black uppercase">
+              {order.fulfillmentType === 'delivery' ? 'Delivery' : order.fulfillmentType === 'pickup' ? 'Ambil Sendiri' : 'Makan di Tempat'}
+            </span>
+          </div>
+          <div className="flex justify-between">
             <span>STATUS:</span>
             <span className="font-bold">{order.paymentStatus === 'Paid' ? 'LUNAS' : 'BELUM BAYAR'}</span>
           </div>
         </div>
+
+        {order.fulfillmentType === 'delivery' && (
+          <div className="flex flex-col gap-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[9px] text-slate-700 leading-normal">
+            <span className="font-bold text-black text-[10px] border-b border-dashed border-slate-300 pb-0.5 mb-1 uppercase font-mono">Detail Pengiriman</span>
+            <div>Penerima: <strong className="text-black">{order.recipientName || '-'}</strong></div>
+            <div>No. WA Penerima: <strong className="text-black">{order.deliveryPhone || '-'}</strong></div>
+            <div className="mt-0.5">Alamat: <strong className="text-black font-sans">{order.deliveryAddress || '-'}</strong></div>
+            {order.deliveryNotes && <div className="mt-0.5 italic">Catatan: &ldquo;{order.deliveryNotes}&rdquo;</div>}
+          </div>
+        )}
 
         {/* Itemized table */}
         <div className="flex flex-col gap-2 py-1">
@@ -233,6 +249,25 @@ export default function ReceiptPage() {
               <span>PAJAK (PPN {businessProfile.taxPercentage}%):</span>
               <span>{formatRupiah(order.taxAmount)}</span>
             </div>
+          )}
+
+          {order.fulfillmentType === 'delivery' && (
+            <>
+              <div className="flex justify-between">
+                <span>ONGKOS KIRIM:</span>
+                {order.freeDeliveryApplied ? (
+                  <span className="font-bold text-emerald-600">GRATIS ONGKIR</span>
+                ) : (
+                  <span>{formatRupiah(order.deliveryFeeAmount ?? 0)}</span>
+                )}
+              </div>
+              {order.deliveryAdminFeeAmount !== undefined && order.deliveryAdminFeeAmount > 0 && (
+                <div className="flex justify-between">
+                  <span>B. ADMIN DELIVERY:</span>
+                  <span>{formatRupiah(order.deliveryAdminFeeAmount)}</span>
+                </div>
+              )}
+            </>
           )}
 
           <div className="flex justify-between text-xs font-black text-black border-t border-dashed border-slate-300 pt-2.5 mt-1">

@@ -147,6 +147,13 @@ export function generateCSVReport(orders: Order[], businessProfile: BusinessProf
     'Catatan',
     'Nama Toko',
     'Kategori Toko',
+    'Fulfillment Type',
+    'Recipient Name',
+    'Delivery Phone',
+    'Delivery Address',
+    'Delivery Fee',
+    'Delivery Admin Fee',
+    'Free Delivery Applied'
   ];
 
   const rows = orders.map((order) => {
@@ -172,6 +179,13 @@ export function generateCSVReport(orders: Order[], businessProfile: BusinessProf
       escapeCsvValue(order.notes ?? ''),
       escapeCsvValue(businessProfile.businessName),
       escapeCsvValue(businessProfile.businessType),
+      escapeCsvValue(order.fulfillmentType || 'dine_in'),
+      escapeCsvValue(order.recipientName || ''),
+      escapeCsvValue(order.deliveryPhone || ''),
+      escapeCsvValue(order.deliveryAddress || ''),
+      escapeCsvValue(order.deliveryFeeAmount ?? 0),
+      escapeCsvValue(order.deliveryAdminFeeAmount ?? 0),
+      escapeCsvValue(order.freeDeliveryApplied ? 'true' : 'false')
     ];
   });
 

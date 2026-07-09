@@ -374,10 +374,23 @@ export default function CashierDashboard() {
                       </span>
                       
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <h4 className="font-bold text-sm text-white">{ord.customerName}</h4>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusBadgeColors[ord.status]}`}>
-                            {statusLabels[ord.status]}
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${statusBadgeColors[ord.status]}`}>
+                            {ord.status === 'Ready' && ord.fulfillmentType === 'delivery' ? 'Siap Dikirim' : statusLabels[ord.status]}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                            ord.fulfillmentType === 'delivery'
+                              ? 'bg-amber-550/15 text-amber-400 border border-amber-500/20'
+                              : ord.fulfillmentType === 'pickup'
+                                ? 'bg-blue-550/15 text-blue-450 border border-blue-500/20'
+                                : 'bg-slate-800/80 text-slate-455 border border-slate-700/50'
+                          }`}>
+                            {ord.fulfillmentType === 'delivery'
+                              ? 'Delivery'
+                              : ord.fulfillmentType === 'pickup'
+                                ? 'Ambil'
+                                : 'Meja'}
                           </span>
                         </div>
                         <p className="text-[10px] text-slate-500 mt-1">
@@ -427,12 +440,43 @@ export default function CashierDashboard() {
                     <CreditCard className="w-3.5 h-3.5 text-slate-500" />
                     <span>Metode: <strong className="text-white">{selectedOrder.paymentMethod}</strong></span>
                   </div>
+                  <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
+                    <ShoppingBag className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Layanan: <strong className="text-white">
+                      {selectedOrder.fulfillmentType === 'delivery' ? 'Delivery' : selectedOrder.fulfillmentType === 'pickup' ? 'Ambil Sendiri' : 'Makan di Tempat'}
+                    </strong></span>
+                  </div>
                   {selectedOrder.notes && (
                     <div className="text-[11px] text-amber-400 border-t border-slate-900 pt-1.5 mt-0.5 italic">
                       Catatan: &ldquo;{selectedOrder.notes}&rdquo;
                     </div>
                   )}
                 </div>
+
+                {selectedOrder.fulfillmentType === 'delivery' && (
+                  <div className="mt-3 p-2.5 bg-slate-950 rounded-xl border border-amber-500/20 text-xs flex flex-col gap-1.5 animate-fade-in">
+                    <div className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wider border-b border-slate-850 pb-1 mb-0.5">
+                      Detail Pengiriman
+                    </div>
+                    <div className="text-slate-400">
+                      Penerima: <strong className="text-slate-200">{selectedOrder.recipientName || '-'}</strong>
+                    </div>
+                    <div className="text-slate-400">
+                      WhatsApp: <strong className="text-slate-200">{selectedOrder.deliveryPhone || '-'}</strong>
+                    </div>
+                    <div className="text-slate-400 flex flex-col mt-0.5">
+                      <span>Alamat Pengantaran:</span>
+                      <span className="text-slate-200 bg-slate-900 p-2 rounded border border-slate-850 mt-1 leading-normal font-sans text-[11px]">
+                        {selectedOrder.deliveryAddress || '-'}
+                      </span>
+                    </div>
+                    {selectedOrder.deliveryNotes && (
+                      <div className="text-slate-450 italic mt-0.5">
+                        Catatan: &ldquo;{selectedOrder.deliveryNotes}&rdquo;
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Scrollable Middle Content (Items List) */}
@@ -455,7 +499,8 @@ export default function CashierDashboard() {
               <div className="border-t border-slate-800 pt-3 mt-auto flex-shrink-0 bg-slate-900 flex flex-col gap-3">
                 {/* Bill details */}
                 <div className="bg-slate-950/45 p-2.5 rounded-xl border border-slate-850/50 flex flex-col gap-1.5">
-                  {selectedOrder.subtotal !== undefined && selectedOrder.subtotal !== selectedOrder.totalAmount && (
+                  {(selectedOrder.subtotal !== undefined && 
+                    (selectedOrder.subtotal !== selectedOrder.totalAmount || selectedOrder.fulfillmentType === 'delivery')) && (
                     <>
                       <div className="flex justify-between text-[11px] text-slate-455">
                         <span>Subtotal:</span>
@@ -472,6 +517,24 @@ export default function CashierDashboard() {
                           <span>Pajak:</span>
                           <span className="text-slate-305">{formatRupiah(selectedOrder.taxAmount)}</span>
                         </div>
+                      )}
+                      {selectedOrder.fulfillmentType === 'delivery' && (
+                        <>
+                          <div className="flex justify-between text-[11px] text-slate-455">
+                            <span>Ongkos Kirim:</span>
+                            {selectedOrder.freeDeliveryApplied ? (
+                              <span className="text-emerald-450 font-bold text-[10px]">Gratis Ongkir</span>
+                            ) : (
+                              <span className="text-slate-305">{formatRupiah(selectedOrder.deliveryFeeAmount ?? 0)}</span>
+                            )}
+                          </div>
+                          {selectedOrder.deliveryAdminFeeAmount !== undefined && selectedOrder.deliveryAdminFeeAmount > 0 && (
+                            <div className="flex justify-between text-[11px] text-slate-455">
+                              <span>Biaya Admin:</span>
+                              <span className="text-slate-305">{formatRupiah(selectedOrder.deliveryAdminFeeAmount)}</span>
+                            </div>
+                          )}
+                        </>
                       )}
                     </>
                   )}
@@ -524,7 +587,7 @@ export default function CashierDashboard() {
                       className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-blue-500/10 cursor-pointer"
                     >
                       <CheckSquare className="w-4 h-4" />
-                      <span>Tandai Siap Saji</span>
+                      <span>{selectedOrder.fulfillmentType === 'delivery' ? 'Tandai Siap Dikirim' : 'Tandai Siap Saji'}</span>
                     </button>
                   )}
 
@@ -534,7 +597,7 @@ export default function CashierDashboard() {
                       className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/10 cursor-pointer"
                     >
                       <CheckSquare className="w-4 h-4 stroke-[2.5]" />
-                      <span>Selesaikan / Ambil</span>
+                      <span>{selectedOrder.fulfillmentType === 'delivery' ? 'Selesaikan Pengiriman' : 'Selesaikan / Ambil'}</span>
                     </button>
                   )}
 

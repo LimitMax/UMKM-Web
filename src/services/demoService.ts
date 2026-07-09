@@ -6,9 +6,10 @@
  * Designed to be called exclusively from the Admin Settings page.
  */
 
-import { Order, Product, PaymentMethod, OrderStatus, PaymentStatus } from '../types';
+import { Order, Product, PaymentMethod, OrderStatus, PaymentStatus, FulfillmentType } from '../types';
 import { getStorageItem, setStorageItem, STORAGE_KEYS, SEED_PRODUCTS } from './db';
 import { businessService } from './businessService';
+import { calculateOrderTotals } from '../utils/calculations';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -42,6 +43,11 @@ interface SampleOrderBlueprint {
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   hoursAgo: number;
+  fulfillmentType?: FulfillmentType;
+  recipientName?: string;
+  deliveryPhone?: string;
+  deliveryAddress?: string;
+  deliveryNotes?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,6 +68,7 @@ const SAMPLE_ORDER_BLUEPRINTS: SampleOrderBlueprint[] = [
     status: 'Completed',
     paymentStatus: 'Paid',
     hoursAgo: 5.5,
+    fulfillmentType: 'dine_in',
   },
   {
     queueNumber: 'A002',
@@ -75,6 +82,7 @@ const SAMPLE_ORDER_BLUEPRINTS: SampleOrderBlueprint[] = [
     status: 'Completed',
     paymentStatus: 'Paid',
     hoursAgo: 4.75,
+    fulfillmentType: 'dine_in',
   },
   {
     queueNumber: 'A003',
@@ -88,6 +96,7 @@ const SAMPLE_ORDER_BLUEPRINTS: SampleOrderBlueprint[] = [
     status: 'Completed',
     paymentStatus: 'Paid',
     hoursAgo: 4,
+    fulfillmentType: 'pickup',
   },
   {
     queueNumber: 'A004',
@@ -101,6 +110,11 @@ const SAMPLE_ORDER_BLUEPRINTS: SampleOrderBlueprint[] = [
     status: 'Paid',
     paymentStatus: 'Paid',
     hoursAgo: 2.5,
+    fulfillmentType: 'delivery',
+    recipientName: 'Dewi Kusuma',
+    deliveryPhone: '084567890123',
+    deliveryAddress: 'Jl. Kemang Raya No. 12, Mampang Prapatan, Jakarta Selatan',
+    deliveryNotes: 'Belakang bank Mandiri, pagar hitam',
   },
   {
     queueNumber: 'A005',
@@ -114,6 +128,11 @@ const SAMPLE_ORDER_BLUEPRINTS: SampleOrderBlueprint[] = [
     status: 'Processing',
     paymentStatus: 'Paid',
     hoursAgo: 1.5,
+    fulfillmentType: 'delivery',
+    recipientName: 'Rizky Pratama',
+    deliveryPhone: '085678901234',
+    deliveryAddress: 'Apartemen Kebagusan City, Tower C, Lt. 10 No. 5, Pasar Minggu',
+    deliveryNotes: 'Titip di lobby/resepsionis',
   },
   {
     queueNumber: 'A006',
@@ -127,6 +146,7 @@ const SAMPLE_ORDER_BLUEPRINTS: SampleOrderBlueprint[] = [
     status: 'Ready',
     paymentStatus: 'Paid',
     hoursAgo: 0.75,
+    fulfillmentType: 'dine_in',
   },
   {
     queueNumber: 'A007',
@@ -140,6 +160,7 @@ const SAMPLE_ORDER_BLUEPRINTS: SampleOrderBlueprint[] = [
     status: 'Waiting for Payment',
     paymentStatus: 'Waiting for Payment',
     hoursAgo: 0.25,
+    fulfillmentType: 'dine_in',
   },
   {
     queueNumber: 'A008',
@@ -152,6 +173,7 @@ const SAMPLE_ORDER_BLUEPRINTS: SampleOrderBlueprint[] = [
     status: 'Cancelled',
     paymentStatus: 'Waiting for Payment',
     hoursAgo: 3.5,
+    fulfillmentType: 'pickup',
   },
 ];
 
@@ -259,13 +281,15 @@ export const demoService = {
       );
 
       const profile = businessService.getProfile();
-      const serviceChargeAmount = profile.serviceChargeEnabled
-        ? Math.round(subtotal * (profile.serviceChargePercentage / 100))
-        : 0;
-      const taxAmount = profile.taxEnabled
-        ? Math.round(subtotal * (profile.taxPercentage / 100))
-        : 0;
-      const totalAmount = subtotal + serviceChargeAmount + taxAmount;
+      const totals = calculateOrderTotals({
+        subtotal,
+        fulfillmentType: blueprint.fulfillmentType || 'dine_in',
+        taxEnabled: profile.taxEnabled,
+        taxPercentage: profile.taxPercentage,
+        serviceChargeEnabled: profile.serviceChargeEnabled,
+        serviceChargePercentage: profile.serviceChargePercentage,
+        deliverySettings: profile.deliverySettings,
+      });
 
       return {
         id: `demo-order-${index + 1}-${now.getTime()}`,
@@ -274,10 +298,18 @@ export const demoService = {
         customerPhone: blueprint.customerPhone,
         notes: blueprint.notes,
         items: blueprint.items,
-        subtotal,
-        serviceChargeAmount,
-        taxAmount,
-        totalAmount,
+        subtotal: totals.subtotal,
+        serviceChargeAmount: totals.serviceChargeAmount,
+        taxAmount: totals.taxAmount,
+        deliveryFeeAmount: totals.deliveryFeeAmount,
+        deliveryAdminFeeAmount: totals.deliveryAdminFeeAmount,
+        freeDeliveryApplied: totals.freeDeliveryApplied,
+        totalAmount: totals.totalAmount,
+        fulfillmentType: blueprint.fulfillmentType || 'dine_in',
+        recipientName: blueprint.recipientName,
+        deliveryPhone: blueprint.deliveryPhone,
+        deliveryAddress: blueprint.deliveryAddress,
+        deliveryNotes: blueprint.deliveryNotes,
         paymentMethod: blueprint.paymentMethod,
         paymentStatus: blueprint.paymentStatus,
         status: blueprint.status,

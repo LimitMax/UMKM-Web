@@ -12,11 +12,12 @@ import {
   CreditCard, 
   AlertCircle,
   FileText,
-  Home
+  Home,
+  ShoppingBag
 } from 'lucide-react';
 import { orderService } from '@/services/orderService';
 import { businessService } from '@/services/businessService';
-import { Order } from '@/types';
+import { Order, BusinessProfile } from '@/types';
 import { formatRupiah, formatDate, formatOrderStatus, formatPaymentStatus } from '@/utils/format';
 
 // Timeline steps mapping
@@ -32,6 +33,9 @@ export default function OrderSuccessPage() {
   const { orderId } = useParams() as { orderId: string };
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [businessProfile] = useState<BusinessProfile | null>(() => {
+    return businessService.getProfile();
+  });
   const [whatsappNumber] = useState<string>(() => {
     return businessService.getProfile()?.whatsappNumber || '';
   });
@@ -148,18 +152,32 @@ export default function OrderSuccessPage() {
                     : `💡 Silakan transfer sebesar ${formatRupiah(order.totalAmount)} ke rekening bank toko dan tunjukkan tanda buktinya ke kasir.`
               )}
               {(order.status === 'Paid' || order.status === 'Processing') && (
-                '💡 Pesanan Anda telah divalidasi dan sedang dipersiapkan di dapur. Mohon menunggu nomor antrean Anda dipanggil.'
+                order.fulfillmentType === 'delivery'
+                  ? '💡 Pesanan Anda telah divalidasi dan sedang diproses. Mohon menunggu kurir toko menghubungi Anda.'
+                  : '💡 Pesanan Anda telah divalidasi dan sedang dipersiapkan di dapur. Mohon menunggu nomor antrean Anda dipanggil.'
               )}
               {order.status === 'Ready' && (
-                '🎉 Pesanan Anda sudah siap! Silakan ambil hidangan Anda di konter servis dengan menunjukkan nomor antrean ini.'
+                order.fulfillmentType === 'delivery'
+                  ? '🎉 Pesanan Anda sudah siap dikirim! Kurir kami sedang dalam perjalanan mengantarkan pesanan ke alamat Anda.'
+                  : order.fulfillmentType === 'pickup'
+                    ? '🎉 Pesanan Anda sudah siap diambil! Silakan ambil di konter pelayanan dengan menunjukkan nomor antrean ini.'
+                    : '🎉 Pesanan Anda sudah siap disajikan! Staff kami akan segera menyajikan hidangan ke meja Anda.'
               )}
               {order.status === 'Completed' && (
-                '✅ Pesanan telah selesai diambil. Terima kasih atas pesanan Anda, selamat menikmati!'
+                order.fulfillmentType === 'delivery'
+                  ? '✅ Pesanan telah sukses diantarkan dan diterima. Terima kasih atas pesanan Anda!'
+                  : '✅ Pesanan telah selesai diambil. Terima kasih atas pesanan Anda, selamat menikmati!'
               )}
               {isCancelled && (
                 '❌ Pesanan ini telah dibatalkan. Silakan lakukan pemesanan ulang atau hubungi admin.'
               )}
             </p>
+
+            {order.fulfillmentType === 'delivery' && businessProfile?.deliverySettings?.deliveryInstruction && (
+              <div className="mt-2 text-amber-400 font-sans text-[10px] border-t border-slate-850 pt-2 leading-relaxed">
+                💡 <strong>Catatan Toko:</strong> {businessProfile.deliverySettings.deliveryInstruction}
+              </div>
+            )}
           </div>
         </div>
 
@@ -176,6 +194,17 @@ export default function OrderSuccessPage() {
               {TIMELINE_STEPS.map((step, idx) => {
                 const isPassed = idx < activeStepIndex;
                 const isCurrent = idx === activeStepIndex;
+
+                let stepLabel = step.label;
+                if (step.key === 'Ready') {
+                  if (order.fulfillmentType === 'delivery') {
+                    stepLabel = 'Siap Dikirim';
+                  } else if (order.fulfillmentType === 'pickup') {
+                    stepLabel = 'Siap Diambil';
+                  } else {
+                    stepLabel = 'Siap Disajikan';
+                  }
+                }
 
                 return (
                   <div key={step.key} className="relative">
@@ -197,15 +226,21 @@ export default function OrderSuccessPage() {
                       <span className={`text-xs font-bold transition-colors ${
                         isPassed ? 'text-emerald-400/80' : isCurrent ? 'text-emerald-400 text-sm' : 'text-slate-500'
                       }`}>
-                        {step.label}
+                        {stepLabel}
                       </span>
                       {isCurrent && (
                         <span className="text-[10px] text-slate-400 mt-1 font-sans">
                           {idx === 0 && 'Menunggu pembayaran diselesaikan...'}
                           {idx === 1 && 'Pembayaran divalidasi. Menunggu antrean dapur...'}
                           {idx === 2 && 'Koki/Staff sedang mempersiapkan pesanan Anda...'}
-                          {idx === 3 && 'Pesanan selesai disiapkan! Silakan ambil di konter pelayanan.'}
-                          {idx === 4 && 'Pesanan telah diambil. Terima kasih atas kunjungan Anda!'}
+                          {idx === 3 && (
+                            order.fulfillmentType === 'delivery'
+                              ? 'Pesanan siap dikirim.'
+                              : order.fulfillmentType === 'pickup'
+                                ? 'Pesanan siap diambil.'
+                                : 'Pesanan akan disajikan.'
+                          )}
+                          {idx === 4 && 'Pesanan telah selesai diproses. Terima kasih!'}
                         </span>
                       )}
                     </div>
@@ -241,9 +276,37 @@ export default function OrderSuccessPage() {
               <Clock className="w-3.5 h-3.5 text-slate-500" />
               <span>Status Pesanan: <strong className="text-slate-200">{formatOrderStatus(order.status)}</strong></span>
             </div>
+            <div className="col-span-2 flex items-center gap-1.5 text-slate-400 border-t border-slate-900 pt-1.5">
+              <ShoppingBag className="w-3.5 h-3.5 text-slate-500" />
+              <span>Tipe Pelayanan: <strong className="text-slate-200">
+                {order.fulfillmentType === 'delivery' ? 'Delivery' : order.fulfillmentType === 'pickup' ? 'Ambil Sendiri' : 'Makan di Tempat'}
+              </strong></span>
+            </div>
             {order.notes && (
               <div className="col-span-2 text-[11px] text-amber-400/80 italic mt-0.5 pt-1.5 border-t border-slate-900">
                 Catatan: &ldquo;{order.notes}&rdquo;
+              </div>
+            )}
+            {order.fulfillmentType === 'delivery' && (
+              <div className="col-span-2 flex flex-col gap-1.5 border-t border-slate-900 pt-2.5 mt-1 text-[11px]">
+                <span className="font-mono text-emerald-450 font-bold uppercase tracking-wider text-[9px]">Detail Pengiriman:</span>
+                <div className="text-slate-400">
+                  Penerima: <strong className="text-slate-200">{order.recipientName || '-'}</strong>
+                </div>
+                <div className="text-slate-400">
+                  No. WhatsApp Penerima: <strong className="text-slate-200">{order.deliveryPhone || '-'}</strong>
+                </div>
+                <div className="text-slate-400 flex flex-col">
+                  <span>Alamat Lengkap:</span>
+                  <span className="text-slate-300 bg-slate-900/60 p-2 rounded border border-slate-905 mt-1 leading-normal font-sans text-xs">
+                    {order.deliveryAddress || '-'}
+                  </span>
+                </div>
+                {order.deliveryNotes && (
+                  <div className="text-slate-450 italic mt-0.5">
+                    Catatan Pengiriman: &ldquo;{order.deliveryNotes}&rdquo;
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -263,7 +326,7 @@ export default function OrderSuccessPage() {
             ))}
 
             {/* Breakdown Rows */}
-            {order.subtotal !== undefined && order.subtotal !== order.totalAmount && (
+            {(order.subtotal !== undefined && (order.subtotal !== order.totalAmount || order.fulfillmentType === 'delivery')) && (
               <div className="border-t border-slate-900 pt-3 mt-2 flex flex-col gap-1.5 text-xs text-slate-400">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
@@ -280,6 +343,24 @@ export default function OrderSuccessPage() {
                     <span>Pajak</span>
                     <span className="text-slate-350">{formatRupiah(order.taxAmount)}</span>
                   </div>
+                )}
+                {order.fulfillmentType === 'delivery' && (
+                  <>
+                    <div className="flex justify-between">
+                      <span>Ongkos Kirim</span>
+                      {order.freeDeliveryApplied ? (
+                        <span className="text-emerald-450 font-bold">Gratis Ongkir</span>
+                      ) : (
+                        <span className="text-slate-350">{formatRupiah(order.deliveryFeeAmount ?? 0)}</span>
+                      )}
+                    </div>
+                    {order.deliveryAdminFeeAmount !== undefined && order.deliveryAdminFeeAmount > 0 && (
+                      <div className="flex justify-between">
+                        <span>Biaya Admin Delivery</span>
+                        <span className="text-slate-350">{formatRupiah(order.deliveryAdminFeeAmount)}</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

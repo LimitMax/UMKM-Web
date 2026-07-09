@@ -26,8 +26,9 @@ import { productService } from '../../services/productService';
 import { orderService } from '../../services/orderService';
 import { businessService } from '../../services/businessService';
 import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
-import { Product, ProductCategory, OrderItem, PaymentMethod, BusinessProfile } from '../../types';
+import { Product, ProductCategory, OrderItem, PaymentMethod, BusinessProfile, FulfillmentType } from '../../types';
 import { formatRupiah } from '../../utils/format';
+import { calculateOrderTotals } from '../../utils/calculations';
 
 export default function CustomerOrderPage() {
   const router = useRouter();
@@ -46,6 +47,11 @@ export default function CustomerOrderPage() {
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [orderNotes, setOrderNotes] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('dine_in');
+  const [recipientName, setRecipientName] = useState<string>('');
+  const [deliveryPhone, setDeliveryPhone] = useState<string>('');
+  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [deliveryNotes, setDeliveryNotes] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -124,13 +130,23 @@ export default function CustomerOrderPage() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const serviceCharge = businessProfile?.serviceChargeEnabled
-    ? Math.round(subtotal * (businessProfile.serviceChargePercentage / 100))
-    : 0;
-  const tax = businessProfile?.taxEnabled
-    ? Math.round(subtotal * (businessProfile.taxPercentage / 100))
-    : 0;
-  const totalAmount = subtotal + serviceCharge + tax;
+  
+  const totals = calculateOrderTotals({
+    subtotal,
+    fulfillmentType,
+    taxEnabled: businessProfile?.taxEnabled ?? false,
+    taxPercentage: businessProfile?.taxPercentage ?? 10,
+    serviceChargeEnabled: businessProfile?.serviceChargeEnabled ?? false,
+    serviceChargePercentage: businessProfile?.serviceChargePercentage ?? 5,
+    deliverySettings: businessProfile?.deliverySettings,
+  });
+
+  const serviceCharge = totals.serviceChargeAmount;
+  const tax = totals.taxAmount;
+  const deliveryFee = totals.deliveryFeeAmount;
+  const deliveryAdminFee = totals.deliveryAdminFeeAmount;
+  const freeDeliveryApplied = totals.freeDeliveryApplied;
+  const totalAmount = totals.totalAmount;
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   // Handle Checkout submission
@@ -147,6 +163,27 @@ export default function CustomerOrderPage() {
       const cleanPhone = customerPhone.replace(/\D/g, '');
       if (cleanPhone.length < 9 || cleanPhone.length > 14) {
         setErrorMsg('Nomor WhatsApp harus berupa angka 9-14 digit.');
+        return;
+      }
+    }
+
+    // Delivery-specific validations
+    if (fulfillmentType === 'delivery') {
+      if (!recipientName.trim()) {
+        setErrorMsg('Nama penerima wajib diisi untuk pengiriman.');
+        return;
+      }
+      if (!deliveryPhone.trim()) {
+        setErrorMsg('Nomor WhatsApp penerima wajib diisi.');
+        return;
+      }
+      const cleanDelivPhone = deliveryPhone.replace(/\D/g, '');
+      if (cleanDelivPhone.length < 9 || cleanDelivPhone.length > 14) {
+        setErrorMsg('Nomor WhatsApp penerima harus berupa angka 9-14 digit.');
+        return;
+      }
+      if (!deliveryAddress.trim()) {
+        setErrorMsg('Alamat lengkap pengiriman wajib diisi.');
         return;
       }
     }
@@ -174,6 +211,11 @@ export default function CustomerOrderPage() {
         notes: orderNotes,
         items,
         paymentMethod,
+        fulfillmentType,
+        recipientName: fulfillmentType === 'delivery' ? recipientName : undefined,
+        deliveryPhone: fulfillmentType === 'delivery' ? deliveryPhone : undefined,
+        deliveryAddress: fulfillmentType === 'delivery' ? deliveryAddress : undefined,
+        deliveryNotes: fulfillmentType === 'delivery' ? deliveryNotes : undefined,
       });
 
       // Clear cart
@@ -485,6 +527,90 @@ export default function CustomerOrderPage() {
                     />
                   </div>
                   
+                  {/* Metode Fulfillment */}
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-405 uppercase mb-2">Metode Pelayanan *</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'dine_in', label: 'Makan di Tempat', icon: Clock },
+                        { id: 'pickup', label: 'Ambil Sendiri', icon: ShoppingBag },
+                        ...(businessProfile?.deliverySettings?.deliveryEnabled ?? true
+                          ? [{ id: 'delivery', label: 'Delivery', icon: MapPin }]
+                          : [])
+                      ].map((method) => {
+                        const Icon = method.icon;
+                        const isSelected = fulfillmentType === method.id;
+                        return (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => setFulfillmentType(method.id as FulfillmentType)}
+                            className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4 mb-1" />
+                            <span className="text-[10px]">{method.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Delivery Form (Conditional) */}
+                  {fulfillmentType === 'delivery' && (
+                    <div className="flex flex-col gap-3 p-3 bg-slate-950/50 border border-slate-850 rounded-xl animate-fade-in">
+                      <div className="border-b border-slate-850 pb-1.5 mb-1">
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">Detail Pengiriman</span>
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-mono text-slate-400 uppercase mb-1">Nama Penerima *</label>
+                        <input
+                          type="text"
+                          required
+                          value={recipientName}
+                          onChange={(e) => setRecipientName(e.target.value)}
+                          placeholder="Nama penerima..."
+                          className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-mono text-slate-400 uppercase mb-1">No. WhatsApp Penerima *</label>
+                        <input
+                          type="tel"
+                          required
+                          value={deliveryPhone}
+                          onChange={(e) => setDeliveryPhone(e.target.value)}
+                          placeholder="Contoh: 08123456789"
+                          className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-mono text-slate-400 uppercase mb-1">Alamat Lengkap *</label>
+                        <textarea
+                          required
+                          value={deliveryAddress}
+                          onChange={(e) => setDeliveryAddress(e.target.value)}
+                          placeholder="Jalan, RT/RW, kelurahan..."
+                          rows={2}
+                          className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 resize-none font-sans"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-mono text-slate-400 uppercase mb-1">Catatan Pengantaran (Opsional)</label>
+                        <input
+                          type="text"
+                          value={deliveryNotes}
+                          onChange={(e) => setDeliveryNotes(e.target.value)}
+                          placeholder="Contoh: Pagar warna hitam"
+                          className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Payment Method */}
                   <div>
                     <label className="block text-[10px] font-mono text-slate-400 uppercase mb-2">Metode Pembayaran *</label>
@@ -501,7 +627,7 @@ export default function CustomerOrderPage() {
                             key={method.id}
                             type="button"
                             onClick={() => setPaymentMethod(method.id as PaymentMethod)}
-                            className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all ${
+                            className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all cursor-pointer ${
                               isSelected
                                 ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
                                 : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
@@ -540,6 +666,27 @@ export default function CustomerOrderPage() {
                       <span>Pajak ({businessProfile.taxPercentage}%):</span>
                       <span className="text-slate-300">{formatRupiah(tax)}</span>
                     </div>
+                  )}
+                  {fulfillmentType === 'delivery' && (
+                    <>
+                      <div className="flex justify-between text-xs text-slate-450">
+                        <span>Ongkos Kirim:</span>
+                        {freeDeliveryApplied ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-500 line-through text-[11px]">{formatRupiah(businessProfile?.deliverySettings?.deliveryFeeAmount ?? 0)}</span>
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold border border-emerald-500/20">Gratis Ongkir</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-300">{formatRupiah(deliveryFee)}</span>
+                        )}
+                      </div>
+                      {deliveryAdminFee > 0 && (
+                        <div className="flex justify-between text-xs text-slate-450">
+                          <span>Biaya Admin Delivery:</span>
+                          <span className="text-slate-300">{formatRupiah(deliveryAdminFee)}</span>
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="flex justify-between font-bold text-sm text-white border-t border-slate-850 pt-2 mt-1">
                     <span>Total Bayar:</span>
@@ -700,6 +847,90 @@ export default function CustomerOrderPage() {
                       />
                     </div>
 
+                    {/* Metode Fulfillment */}
+                    <div>
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-2">Metode Pelayanan *</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: 'dine_in', label: 'Makan di Tempat', icon: Clock },
+                          { id: 'pickup', label: 'Ambil Sendiri', icon: ShoppingBag },
+                          ...(businessProfile?.deliverySettings?.deliveryEnabled ?? true
+                            ? [{ id: 'delivery', label: 'Delivery', icon: MapPin }]
+                            : [])
+                        ].map((method) => {
+                          const Icon = method.icon;
+                          const isSelected = fulfillmentType === method.id;
+                          return (
+                            <button
+                              key={method.id}
+                              type="button"
+                              onClick={() => setFulfillmentType(method.id as FulfillmentType)}
+                              className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              <Icon className="w-4 h-4 mb-1" />
+                              <span className="text-[10px]">{method.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Delivery Form (Conditional) */}
+                    {fulfillmentType === 'delivery' && (
+                      <div className="flex flex-col gap-3 p-3 bg-slate-950/50 border border-slate-850 rounded-xl animate-fade-in">
+                        <div className="border-b border-slate-850 pb-1.5 mb-1">
+                          <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">Detail Pengiriman</span>
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-mono text-slate-400 uppercase mb-1">Nama Penerima *</label>
+                          <input
+                            type="text"
+                            required
+                            value={recipientName}
+                            onChange={(e) => setRecipientName(e.target.value)}
+                            placeholder="Nama penerima..."
+                            className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-mono text-slate-400 uppercase mb-1">No. WhatsApp Penerima *</label>
+                          <input
+                            type="tel"
+                            required
+                            value={deliveryPhone}
+                            onChange={(e) => setDeliveryPhone(e.target.value)}
+                            placeholder="Contoh: 08123456789"
+                            className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-mono text-slate-400 uppercase mb-1">Alamat Lengkap *</label>
+                          <textarea
+                            required
+                            value={deliveryAddress}
+                            onChange={(e) => setDeliveryAddress(e.target.value)}
+                            placeholder="Jalan, RT/RW, kelurahan..."
+                            rows={2}
+                            className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 resize-none font-sans"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-mono text-slate-400 uppercase mb-1">Catatan Pengantaran (Opsional)</label>
+                          <input
+                            type="text"
+                            value={deliveryNotes}
+                            onChange={(e) => setDeliveryNotes(e.target.value)}
+                            placeholder="Contoh: Pagar warna hitam"
+                            className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <label className="block text-[10px] font-mono text-slate-400 uppercase mb-2">Metode Pembayaran *</label>
                       <div className="grid grid-cols-3 gap-2">
@@ -754,6 +985,27 @@ export default function CustomerOrderPage() {
                         <span>Pajak ({businessProfile.taxPercentage}%):</span>
                         <span className="text-slate-300">{formatRupiah(tax)}</span>
                       </div>
+                    )}
+                    {fulfillmentType === 'delivery' && (
+                      <>
+                        <div className="flex justify-between text-xs text-slate-450">
+                          <span>Ongkos Kirim:</span>
+                          {freeDeliveryApplied ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-slate-500 line-through text-[11px]">{formatRupiah(businessProfile?.deliverySettings?.deliveryFeeAmount ?? 0)}</span>
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold border border-emerald-500/20">Gratis Ongkir</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-300">{formatRupiah(deliveryFee)}</span>
+                          )}
+                        </div>
+                        {deliveryAdminFee > 0 && (
+                          <div className="flex justify-between text-xs text-slate-450">
+                            <span>Biaya Admin Delivery:</span>
+                            <span className="text-slate-300">{formatRupiah(deliveryAdminFee)}</span>
+                          </div>
+                        )}
+                      </>
                     )}
                     <div className="flex justify-between font-bold text-sm text-white border-t border-slate-850 pt-2 mt-1">
                       <span>Total Bayar:</span>

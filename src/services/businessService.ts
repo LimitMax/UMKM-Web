@@ -3,6 +3,18 @@ import { getStorageItem, setStorageItem } from './db';
 
 export const BUSINESS_PROFILE_KEY = 'umkm_pilot_business_profile';
 
+export const DEFAULT_DELIVERY_SETTINGS = {
+  deliveryEnabled: true,
+  deliveryFeeEnabled: true,
+  deliveryFeeAmount: 10000,
+  freeDeliveryEnabled: false,
+  freeDeliveryMinimumAmount: 50000,
+  deliveryAdminFeeEnabled: false,
+  deliveryAdminFeeType: 'fixed' as const,
+  deliveryAdminFeeValue: 0,
+  deliveryInstruction: 'Pesanan delivery akan dikonfirmasi oleh kasir sebelum dikirim.',
+};
+
 export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
   businessName: 'Warung Kopi Nusantara',
   businessType: 'Kedai Kopi & Makanan',
@@ -17,6 +29,7 @@ export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
   taxPercentage: 10,
   serviceChargeEnabled: false,
   serviceChargePercentage: 5,
+  deliverySettings: DEFAULT_DELIVERY_SETTINGS,
 };
 
 export const businessService = {
@@ -26,6 +39,10 @@ export const businessService = {
     return {
       ...DEFAULT_BUSINESS_PROFILE,
       ...profile,
+      deliverySettings: {
+        ...DEFAULT_DELIVERY_SETTINGS,
+        ...(profile?.deliverySettings || {}),
+      }
     };
   },
 
