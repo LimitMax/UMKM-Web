@@ -2,6 +2,10 @@ export type ProductCategory = 'Makanan' | 'Minuman' | 'Snack' | 'Paket Promo';
 
 export type FulfillmentType = 'dine_in' | 'pickup' | 'delivery';
 
+export type DeliveryFeeCalculationType = 'fixed' | 'distance_based';
+export type DistanceRoundingMode = 'ceil' | 'round' | 'floor';
+export type DistanceCalculationMode = 'manual' | 'mock' | 'maps_api_later';
+
 export interface DeliverySettings {
   deliveryEnabled: boolean;
   deliveryFeeEnabled: boolean;
@@ -12,6 +16,14 @@ export interface DeliverySettings {
   deliveryAdminFeeType: 'fixed' | 'percentage';
   deliveryAdminFeeValue: number;
   deliveryInstruction: string;
+  // Phase 6.6B extensions
+  deliveryFeeCalculationType?: DeliveryFeeCalculationType;
+  baseDeliveryFee?: number;
+  baseDeliveryDistanceKm?: number;
+  deliveryFeePerKm?: number;
+  maxDeliveryDistanceKm?: number;
+  distanceRoundingMode?: DistanceRoundingMode;
+  distanceCalculationMode?: DistanceCalculationMode;
 }
 
 export interface Product {
@@ -33,6 +45,7 @@ export type OrderStatus =
   | 'Paid'
   | 'Processing'
   | 'Ready'
+  | 'delivering'
   | 'Completed'
   | 'Cancelled';
 
@@ -67,6 +80,10 @@ export interface Order {
   deliveryFeeAmount?: number;
   deliveryAdminFeeAmount?: number;
   freeDeliveryApplied?: boolean;
+  // Phase 6.6B extensions
+  deliveryDistanceKm?: number;
+  deliveryDistanceSource?: string;
+  deliveryFeeCalculationType?: DeliveryFeeCalculationType;
 }
 
 export interface BusinessProfile {

@@ -20,14 +20,7 @@ import { businessService } from '@/services/businessService';
 import { Order, BusinessProfile } from '@/types';
 import { formatRupiah, formatDate, formatOrderStatus, formatPaymentStatus } from '@/utils/format';
 
-// Timeline steps mapping
-const TIMELINE_STEPS = [
-  { key: 'Waiting for Payment', label: 'Menunggu Pembayaran' },
-  { key: 'Paid', label: 'Sudah Dibayar' },
-  { key: 'Processing', label: 'Sedang Diproses' },
-  { key: 'Ready', label: 'Siap Diambil' },
-  { key: 'Completed', label: 'Selesai' }
-];
+
 
 export default function OrderSuccessPage() {
   const { orderId } = useParams() as { orderId: string };
@@ -91,8 +84,37 @@ export default function OrderSuccessPage() {
     );
   }
 
-  // Get active step index on the timeline
-  let activeStepIndex = TIMELINE_STEPS.findIndex((step) => step.key === order.status);
+  const getTimelineSteps = () => {
+    if (order?.fulfillmentType === 'delivery') {
+      return [
+        { key: 'Waiting for Payment', label: 'Menunggu Pembayaran' },
+        { key: 'Paid', label: 'Sudah Dibayar' },
+        { key: 'Processing', label: 'Sedang Diproses' },
+        { key: 'Ready', label: 'Siap Dikirim' },
+        { key: 'delivering', label: 'Sedang Dikirim' },
+        { key: 'Completed', label: 'Selesai' }
+      ];
+    } else if (order?.fulfillmentType === 'pickup') {
+      return [
+        { key: 'Waiting for Payment', label: 'Menunggu Pembayaran' },
+        { key: 'Paid', label: 'Sudah Dibayar' },
+        { key: 'Processing', label: 'Sedang Diproses' },
+        { key: 'Ready', label: 'Siap Diambil' },
+        { key: 'Completed', label: 'Selesai' }
+      ];
+    } else {
+      return [
+        { key: 'Waiting for Payment', label: 'Menunggu Pembayaran' },
+        { key: 'Paid', label: 'Sudah Dibayar' },
+        { key: 'Processing', label: 'Sedang Diproses' },
+        { key: 'Ready', label: 'Siap Disajikan' },
+        { key: 'Completed', label: 'Selesai' }
+      ];
+    }
+  };
+
+  const timelineSteps = getTimelineSteps();
+  let activeStepIndex = timelineSteps.findIndex((step) => step.key === order.status);
   
   // If payment status is Paid and status is still "Waiting for Payment", boost index to Paid
   if (order.status === 'Waiting for Payment' && order.paymentStatus === 'Paid') {
@@ -143,7 +165,7 @@ export default function OrderSuccessPage() {
               <span>Instruksi Langkah Berikutnya</span>
             </div>
             
-            <p className="text-slate-350 leading-relaxed font-sans">
+            <div className="text-slate-350 leading-relaxed font-sans">
               {order.status === 'Waiting for Payment' && (
                 order.paymentMethod === 'Cash' 
                   ? '💡 Lakukan pembayaran tunai ke kasir dengan menunjukkan nomor antrean ini.' 
@@ -163,6 +185,9 @@ export default function OrderSuccessPage() {
                     ? '🎉 Pesanan Anda sudah siap diambil! Silakan ambil di konter pelayanan dengan menunjukkan nomor antrean ini.'
                     : '🎉 Pesanan Anda sudah siap disajikan! Staff kami akan segera menyajikan hidangan ke meja Anda.'
               )}
+              {order.status === 'delivering' && (
+                '🚚 Pesanan Anda sedang dalam perjalanan oleh kurir kami ke alamat Anda. Mohon bersiap menerima kiriman.'
+              )}
               {order.status === 'Completed' && (
                 order.fulfillmentType === 'delivery'
                   ? '✅ Pesanan telah sukses diantarkan dan diterima. Terima kasih atas pesanan Anda!'
@@ -171,7 +196,7 @@ export default function OrderSuccessPage() {
               {isCancelled && (
                 '❌ Pesanan ini telah dibatalkan. Silakan lakukan pemesanan ulang atau hubungi admin.'
               )}
-            </p>
+            </div>
 
             {order.fulfillmentType === 'delivery' && businessProfile?.deliverySettings?.deliveryInstruction && (
               <div className="mt-2 text-amber-400 font-sans text-[10px] border-t border-slate-850 pt-2 leading-relaxed">
@@ -191,20 +216,9 @@ export default function OrderSuccessPage() {
 
             {/* Vertical/Horizontal Timeline */}
             <div className="relative pl-6 border-l border-slate-800 space-y-6">
-              {TIMELINE_STEPS.map((step, idx) => {
+              {timelineSteps.map((step, idx) => {
                 const isPassed = idx < activeStepIndex;
                 const isCurrent = idx === activeStepIndex;
-
-                let stepLabel = step.label;
-                if (step.key === 'Ready') {
-                  if (order.fulfillmentType === 'delivery') {
-                    stepLabel = 'Siap Dikirim';
-                  } else if (order.fulfillmentType === 'pickup') {
-                    stepLabel = 'Siap Diambil';
-                  } else {
-                    stepLabel = 'Siap Disajikan';
-                  }
-                }
 
                 return (
                   <div key={step.key} className="relative">
@@ -226,21 +240,22 @@ export default function OrderSuccessPage() {
                       <span className={`text-xs font-bold transition-colors ${
                         isPassed ? 'text-emerald-400/80' : isCurrent ? 'text-emerald-400 text-sm' : 'text-slate-500'
                       }`}>
-                        {stepLabel}
+                        {step.label}
                       </span>
                       {isCurrent && (
                         <span className="text-[10px] text-slate-400 mt-1 font-sans">
-                          {idx === 0 && 'Menunggu pembayaran diselesaikan...'}
-                          {idx === 1 && 'Pembayaran divalidasi. Menunggu antrean dapur...'}
-                          {idx === 2 && 'Koki/Staff sedang mempersiapkan pesanan Anda...'}
-                          {idx === 3 && (
+                          {step.key === 'Waiting for Payment' && 'Menunggu pembayaran diselesaikan...'}
+                          {step.key === 'Paid' && 'Pembayaran divalidasi. Menunggu antrean dapur...'}
+                          {step.key === 'Processing' && 'Koki/Staff sedang mempersiapkan pesanan Anda...'}
+                          {step.key === 'Ready' && (
                             order.fulfillmentType === 'delivery'
                               ? 'Pesanan siap dikirim.'
                               : order.fulfillmentType === 'pickup'
                                 ? 'Pesanan siap diambil.'
                                 : 'Pesanan akan disajikan.'
                           )}
-                          {idx === 4 && 'Pesanan telah selesai diproses. Terima kasih!'}
+                          {step.key === 'delivering' && 'Kurir sedang mengantarkan pesanan ke alamat Anda...'}
+                          {step.key === 'Completed' && 'Pesanan telah selesai diproses. Terima kasih!'}
                         </span>
                       )}
                     </div>
@@ -307,6 +322,26 @@ export default function OrderSuccessPage() {
                     Catatan Pengiriman: &ldquo;{order.deliveryNotes}&rdquo;
                   </div>
                 )}
+                {order.deliveryDistanceKm !== undefined && order.deliveryDistanceKm > 0 && (
+                  <div className="text-slate-400 mt-0.5">
+                    Jarak Pengiriman: <strong className="text-slate-200">{order.deliveryDistanceKm} KM</strong>
+                  </div>
+                )}
+                {order.deliveryFeeCalculationType && (
+                  <div className="text-slate-400">
+                    Tipe Ongkir: <strong className="text-slate-200">
+                      {order.deliveryFeeCalculationType === 'distance_based' ? 'Berdasarkan Jarak' : 'Tarif Flat'}
+                    </strong>
+                  </div>
+                )}
+                <div className="text-slate-400 flex items-center gap-1.5">
+                  <span>Ongkos Kirim:</span>
+                  {order.freeDeliveryApplied ? (
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold border border-emerald-500/20">Gratis Ongkir</span>
+                  ) : (
+                    <strong className="text-slate-200">{formatRupiah(order.deliveryFeeAmount ?? 0)}</strong>
+                  )}
+                </div>
               </div>
             )}
           </div>

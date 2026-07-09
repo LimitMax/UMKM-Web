@@ -1,8 +1,39 @@
-import { DeliverySettings } from '../types';
+import { DeliverySettings, DistanceRoundingMode } from '../types';
+
+export function calculateDeliveryDistance(
+  distance: number,
+  roundingMode: DistanceRoundingMode
+): number {
+  if (roundingMode === 'ceil') {
+    return Math.ceil(distance);
+  } else if (roundingMode === 'floor') {
+    return Math.floor(distance);
+  } else {
+    return Math.round(distance);
+  }
+}
+
+export function calculateDistanceBasedDeliveryFee(
+  distance: number,
+  settings: DeliverySettings
+): number {
+  const roundingMode = settings.distanceRoundingMode || 'ceil';
+  const roundedDistance = calculateDeliveryDistance(distance, roundingMode);
+  
+  const baseDist = settings.baseDeliveryDistanceKm ?? 2;
+  const baseFee = settings.baseDeliveryFee ?? 8000;
+  const feePerKm = settings.deliveryFeePerKm ?? 2500;
+  
+  if (roundedDistance <= baseDist) {
+    return baseFee;
+  }
+  return baseFee + (roundedDistance - baseDist) * feePerKm;
+}
 
 export function calculateDeliveryFee(
   subtotal: number,
-  settings: DeliverySettings
+  settings: DeliverySettings,
+  distanceKm?: number
 ): { fee: number; freeApplied: boolean } {
   if (!settings.deliveryEnabled) {
     return { fee: 0, freeApplied: false };
@@ -13,6 +44,14 @@ export function calculateDeliveryFee(
   if (settings.freeDeliveryEnabled && subtotal >= settings.freeDeliveryMinimumAmount) {
     return { fee: 0, freeApplied: true };
   }
+
+  const calcType = settings.deliveryFeeCalculationType || 'fixed';
+  if (calcType === 'distance_based') {
+    const distance = distanceKm !== undefined ? distanceKm : 0;
+    const fee = calculateDistanceBasedDeliveryFee(distance, settings);
+    return { fee, freeApplied: false };
+  }
+  
   return { fee: settings.deliveryFeeAmount, freeApplied: false };
 }
 
@@ -39,6 +78,7 @@ export interface CalculateOrderTotalsParams {
   serviceChargeEnabled: boolean;
   serviceChargePercentage: number;
   deliverySettings?: DeliverySettings;
+  deliveryDistanceKm?: number;
 }
 
 export function calculateOrderTotals(params: CalculateOrderTotalsParams): {
@@ -58,6 +98,7 @@ export function calculateOrderTotals(params: CalculateOrderTotalsParams): {
     serviceChargeEnabled,
     serviceChargePercentage,
     deliverySettings,
+    deliveryDistanceKm,
   } = params;
 
   const serviceChargeAmount = serviceChargeEnabled
@@ -73,7 +114,7 @@ export function calculateOrderTotals(params: CalculateOrderTotalsParams): {
   let freeDeliveryApplied = false;
 
   if (fulfillmentType === 'delivery' && deliverySettings) {
-    const feeResult = calculateDeliveryFee(subtotal, deliverySettings);
+    const feeResult = calculateDeliveryFee(subtotal, deliverySettings, deliveryDistanceKm);
     deliveryFeeAmount = feeResult.fee;
     freeDeliveryApplied = feeResult.freeApplied;
     deliveryAdminFeeAmount = calculateDeliveryAdminFee(subtotal, deliverySettings);

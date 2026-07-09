@@ -29,6 +29,8 @@ export function formatOrderStatus(status: string): string {
       return 'Sedang Diproses';
     case 'Ready':
       return 'Siap Diambil';
+    case 'delivering':
+      return 'Sedang Dikirim';
     case 'Completed':
       return 'Selesai';
     case 'Cancelled':

@@ -13,6 +13,14 @@ export const DEFAULT_DELIVERY_SETTINGS = {
   deliveryAdminFeeType: 'fixed' as const,
   deliveryAdminFeeValue: 0,
   deliveryInstruction: 'Pesanan delivery akan dikonfirmasi oleh kasir sebelum dikirim.',
+  // Phase 6.6B extensions
+  deliveryFeeCalculationType: 'fixed' as const,
+  baseDeliveryFee: 8000,
+  baseDeliveryDistanceKm: 2,
+  deliveryFeePerKm: 2500,
+  maxDeliveryDistanceKm: 10,
+  distanceRoundingMode: 'ceil' as const,
+  distanceCalculationMode: 'manual' as const,
 };
 
 export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {

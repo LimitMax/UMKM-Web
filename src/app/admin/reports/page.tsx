@@ -250,7 +250,8 @@ export default function ReportsPage() {
               <option value="Waiting for Payment">Menunggu Pembayaran</option>
               <option value="Paid">Lunas (Antrean Dapur)</option>
               <option value="Processing">Sedang Diproses</option>
-              <option value="Ready">Siap Disajikan</option>
+              <option value="Ready">Siap Disajikan / Dikirim / Diambil</option>
+              <option value="delivering">Sedang Dikirim</option>
               <option value="Completed">Selesai</option>
               <option value="Cancelled">Dibatalkan</option>
             </select>

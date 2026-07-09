@@ -147,6 +147,14 @@ CREATE TABLE orders (
   payment_method VARCHAR(50) CHECK (payment_method IN ('Cash', 'QRIS', 'Bank Transfer')) NOT NULL,
   payment_status VARCHAR(50) CHECK (payment_status IN ('Waiting for Payment', 'Paid', 'Failed')) DEFAULT 'Waiting for Payment' NOT NULL,
   status VARCHAR(50) CHECK (status IN ('Waiting for Payment', 'Paid', 'Processing', 'Ready', 'Completed', 'Cancelled')) DEFAULT 'Waiting for Payment' NOT NULL,
+  fulfillment_type VARCHAR(50) CHECK (fulfillment_type IN ('dine_in', 'pickup', 'delivery')) DEFAULT 'dine_in' NOT NULL,
+  recipient_name VARCHAR(255),
+  delivery_phone VARCHAR(50),
+  delivery_address TEXT,
+  delivery_notes TEXT,
+  delivery_distance_km NUMERIC(5, 2),
+  delivery_distance_source VARCHAR(50) CHECK (delivery_distance_source IN ('manual', 'mock', 'maps_api')),
+  delivery_fee_calculation_type VARCHAR(50) CHECK (delivery_fee_calculation_type IN ('fixed', 'distance_based')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -367,10 +375,28 @@ UMKM Pilot menyertakan fitur pemesanan mandiri digital (`/order`) yang dirancang
 
 ---
 
+## 🚚 Pengaturan Delivery & Ongkir Berdasarkan Jarak (Phase 6.6 & 6.6B)
 
+Aplikasi UMKM Pilot mendukung perhitungan ongkos kirim fleksibel dengan dua tipe perhitungan:
+1. **Flat / Tetap**: Tarif ongkir flat seragam untuk semua pengiriman.
+2. **Berdasarkan Jarak KM**: Perhitungan dinamis dengan rumus:
+   `Biaya Dasar + ((Jarak Pembulatan - Jarak Biaya Dasar) * Tarif per KM)`
 
+### Parameter Konfigurasi:
+- **Biaya Dasar**: Tarif minimal untuk pengiriman jarak awal (misal: Rp 8.000).
+- **Jarak Dasar**: Jarak maksimum yang dicover biaya dasar (misal: 2 KM).
+- **Tarif per KM**: Tarif tambahan per KM berikutnya (misal: Rp 2.500/KM).
+- **Batas Jarak Maksimum**: Batas jangkauan maksimal pengiriman dari toko (misal: 10 KM).
+- **Aturan Pembulatan**: Pilihan aturan pembulatan jarak desimal:
+  - *Ceil (Ke atas)*: Jarak 2.1 KM dibulatkan menjadi 3 KM.
+  - *Round (Terdekat)*: Jarak 2.4 KM dibulatkan menjadi 2 KM.
+  - *Floor (Ke bawah)*: Jarak 2.9 KM dibulatkan menjadi 2 KM.
+- **Mode Hitung Jarak**:
+  - *Manual*: Pelanggan memasukkan estimasi jarak sendiri di checkout untuk demo.
+  - *Simulasi / Mock*: Tombol simulasi jarak acak di halaman checkout.
+  - *Maps API*: Rencana integrasi Google Maps API setelah backend siap.
 
-
+---
 
 ## 🛣️ Remaining Technical Debt
 

@@ -22,6 +22,7 @@ import {
   Printer
 } from 'lucide-react';
 import { orderService } from '../../services/orderService';
+import { businessService } from '../../services/businessService';
 import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
 import { authService, UserProfile } from '../../services/authService';
@@ -32,6 +33,7 @@ export default function CashierDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const businessProfile = businessService.getProfile();
   const [isLoading, setIsLoading] = useState(true);
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -148,7 +150,7 @@ export default function CashierDashboard() {
     } else if (statusFilter === 'Menunggu Pembayaran') {
       return o.status === 'Waiting for Payment';
     } else if (statusFilter === 'Diproses') {
-      return o.status === 'Paid' || o.status === 'Processing';
+      return o.status === 'Paid' || o.status === 'Processing' || o.status === 'delivering';
     } else if (statusFilter === 'Siap') {
       return o.status === 'Ready';
     } else if (statusFilter === 'Selesai') {
@@ -344,6 +346,7 @@ export default function CashierDashboard() {
                   'Paid': 'Lunas',
                   'Processing': 'Diproses',
                   'Ready': 'Siap',
+                  'delivering': 'Sedang Dikirim',
                   'Completed': 'Selesai',
                   'Cancelled': 'Batal',
                 };
@@ -353,8 +356,18 @@ export default function CashierDashboard() {
                   'Paid': 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/10',
                   'Processing': 'bg-blue-500/10 text-blue-400 border border-blue-500/10',
                   'Ready': 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10',
+                  'delivering': 'bg-amber-500/10 text-amber-400 border border-amber-500/10',
                   'Completed': 'bg-slate-800 text-slate-400 border border-slate-700',
                   'Cancelled': 'bg-rose-500/10 text-rose-400 border border-rose-500/10',
+                };
+
+                const getOrderBadgeLabel = (status: string, fulfillment?: string) => {
+                  if (status === 'Ready') {
+                    if (fulfillment === 'delivery') return 'Siap Dikirim';
+                    if (fulfillment === 'pickup') return 'Siap Diambil';
+                    return 'Siap Disajikan';
+                  }
+                  return statusLabels[status] || status;
                 };
 
                 return (
@@ -377,7 +390,7 @@ export default function CashierDashboard() {
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h4 className="font-bold text-sm text-white">{ord.customerName}</h4>
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${statusBadgeColors[ord.status]}`}>
-                            {ord.status === 'Ready' && ord.fulfillmentType === 'delivery' ? 'Siap Dikirim' : statusLabels[ord.status]}
+                            {getOrderBadgeLabel(ord.status, ord.fulfillmentType)}
                           </span>
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
                             ord.fulfillmentType === 'delivery'
@@ -425,23 +438,26 @@ export default function CashierDashboard() {
                     ID: {selectedOrder.id.slice(6, 14).toUpperCase()}
                   </span>
                 </div>
-                
+              </div>
+
+              {/* Scrollable Middle Content (Customer info, delivery details, items, totals) */}
+              <div className="flex-1 overflow-y-auto py-3 pr-1 min-h-0 scrollbar-thin flex flex-col gap-4">
                 {/* Customer Meta */}
-                <div className="flex flex-col gap-1.5 mt-3 p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                <div className="flex flex-col gap-1.5 p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-xs">
                   <div className="flex items-center gap-2 text-slate-400">
-                    <User className="w-3.5 h-3.5 text-slate-500" />
+                    <User className="w-3.5 h-3.5 text-slate-505" />
                     <span>Nama: <strong className="text-white">{selectedOrder.customerName}</strong></span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-400">
-                    <Phone className="w-3.5 h-3.5 text-slate-500" />
+                    <Phone className="w-3.5 h-3.5 text-slate-550" />
                     <span>Telepon: <strong className="text-white">{selectedOrder.customerPhone || '-'}</strong></span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
-                    <CreditCard className="w-3.5 h-3.5 text-slate-500" />
+                    <CreditCard className="w-3.5 h-3.5 text-slate-550" />
                     <span>Metode: <strong className="text-white">{selectedOrder.paymentMethod}</strong></span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
-                    <ShoppingBag className="w-3.5 h-3.5 text-slate-500" />
+                    <ShoppingBag className="w-3.5 h-3.5 text-slate-550" />
                     <span>Layanan: <strong className="text-white">
                       {selectedOrder.fulfillmentType === 'delivery' ? 'Delivery' : selectedOrder.fulfillmentType === 'pickup' ? 'Ambil Sendiri' : 'Makan di Tempat'}
                     </strong></span>
@@ -453,8 +469,9 @@ export default function CashierDashboard() {
                   )}
                 </div>
 
+                {/* Delivery details if fulfillment is delivery */}
                 {selectedOrder.fulfillmentType === 'delivery' && (
-                  <div className="mt-3 p-2.5 bg-slate-950 rounded-xl border border-amber-500/20 text-xs flex flex-col gap-1.5 animate-fade-in">
+                  <div className="p-2.5 bg-slate-950 rounded-xl border border-amber-500/20 text-xs flex flex-col gap-1.5 animate-fade-in">
                     <div className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wider border-b border-slate-850 pb-1 mb-0.5">
                       Detail Pengiriman
                     </div>
@@ -475,28 +492,44 @@ export default function CashierDashboard() {
                         Catatan: &ldquo;{selectedOrder.deliveryNotes}&rdquo;
                       </div>
                     )}
+                    {selectedOrder.deliveryDistanceKm !== undefined && selectedOrder.deliveryDistanceKm > 0 && (
+                      <div className="text-slate-400">
+                        Jarak: <strong className="text-slate-200">{selectedOrder.deliveryDistanceKm} KM</strong>
+                        {selectedOrder.deliveryDistanceSource === 'mock' && <span className="text-[9px] text-slate-500 ml-1">(Simulasi)</span>}
+                      </div>
+                    )}
+                    {selectedOrder.deliveryFeeCalculationType && (
+                      <div className="text-slate-400">
+                        Tipe Tarif: <strong className="text-slate-200">
+                          {selectedOrder.deliveryFeeCalculationType === 'distance_based' ? 'Berdasarkan Jarak' : 'Flat'}
+                        </strong>
+                      </div>
+                    )}
+                    {selectedOrder.deliveryDistanceKm !== undefined && 
+                     selectedOrder.deliveryDistanceKm > (businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10) && (
+                      <div className="mt-1.5 p-1.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-450 text-[10px] leading-normal font-mono">
+                        ⚠️ Jarak melebihi batas maks ({businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10} KM)
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
 
-              {/* Scrollable Middle Content (Items List) */}
-              <div className="flex-1 overflow-y-auto py-3 pr-1 min-h-0 scrollbar-thin">
-                <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2.5">Pesanan Pelanggan</h4>
-                <div className="flex flex-col gap-2.5">
-                  {selectedOrder.items.map((item) => (
-                    <div key={item.productId} className="flex justify-between items-center text-xs text-slate-350">
-                      <div>
-                        <p className="font-semibold text-slate-200">{item.name}</p>
-                        <p className="text-[10px] text-slate-500">{item.quantity} x {formatRupiah(item.price)}</p>
+                {/* Items List */}
+                <div>
+                  <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">Pesanan Pelanggan</h4>
+                  <div className="flex flex-col gap-2">
+                    {selectedOrder.items.map((item) => (
+                      <div key={item.productId} className="flex justify-between items-center text-xs text-slate-350 bg-slate-950/35 p-2.5 rounded-xl border border-slate-850/50">
+                        <div>
+                          <p className="font-semibold text-slate-200">{item.name}</p>
+                          <p className="text-[10px] text-slate-500">{item.quantity} x {formatRupiah(item.price)}</p>
+                        </div>
+                        <span className="font-bold text-slate-300">{formatRupiah(item.price * item.quantity)}</span>
                       </div>
-                      <span className="font-bold text-slate-300">{formatRupiah(item.price * item.quantity)}</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Sticky bottom footer for totals and workflow buttons */}
-              <div className="border-t border-slate-800 pt-3 mt-auto flex-shrink-0 bg-slate-900 flex flex-col gap-3">
                 {/* Bill details */}
                 <div className="bg-slate-950/45 p-2.5 rounded-xl border border-slate-850/50 flex flex-col gap-1.5">
                   {(selectedOrder.subtotal !== undefined && 
@@ -549,12 +582,16 @@ export default function CashierDashboard() {
                     <span className="text-emerald-400 text-sm">{formatRupiah(selectedOrder.totalAmount)}</span>
                   </div>
                 </div>
+              </div>
 
+              {/* Sticky bottom footer for workflow buttons and receipt links (fixed) */}
+              <div className="border-t border-slate-800 pt-3 mt-auto flex-shrink-0 bg-slate-900 flex flex-col gap-3">
                 {/* State-Machine buttons */}
                 <div className="flex flex-col gap-2">
                   {selectedOrder.status === 'Waiting for Payment' && (
                     <div className="flex flex-col gap-1.5">
                       <button
+                        type="button"
                         onClick={() => handleUpdateStatus(selectedOrder.id, 'Paid')}
                         className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
                       >
@@ -562,6 +599,7 @@ export default function CashierDashboard() {
                         <span>Konfirmasi Pembayaran Lunas</span>
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleUpdateStatus(selectedOrder.id, 'Cancelled')}
                         className="w-full py-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 hover:text-rose-450 text-slate-400 border border-slate-750 hover:border-rose-500/20 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
                       >
@@ -573,31 +611,61 @@ export default function CashierDashboard() {
 
                   {selectedOrder.status === 'Paid' && (
                     <button
+                      type="button"
                       onClick={() => handleUpdateStatus(selectedOrder.id, 'Processing')}
                       className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-500/10 cursor-pointer"
                     >
                       <Play className="w-4 h-4" />
-                      <span>Mulai Proses / Kirim Dapur</span>
+                      <span>Mulai Proses</span>
                     </button>
                   )}
 
                   {selectedOrder.status === 'Processing' && (
                     <button
+                      type="button"
                       onClick={() => handleUpdateStatus(selectedOrder.id, 'Ready')}
                       className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-blue-500/10 cursor-pointer"
                     >
                       <CheckSquare className="w-4 h-4" />
-                      <span>{selectedOrder.fulfillmentType === 'delivery' ? 'Tandai Siap Dikirim' : 'Tandai Siap Saji'}</span>
+                      <span>
+                        {selectedOrder.fulfillmentType === 'delivery' 
+                          ? 'Tandai Siap Dikirim' 
+                          : selectedOrder.fulfillmentType === 'pickup' 
+                            ? 'Tandai Siap Saji' 
+                            : 'Tandai Siap Disajikan'}
+                      </span>
                     </button>
                   )}
 
                   {selectedOrder.status === 'Ready' && (
                     <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedOrder.fulfillmentType === 'delivery') {
+                          handleUpdateStatus(selectedOrder.id, 'delivering');
+                        } else {
+                          handleUpdateStatus(selectedOrder.id, 'Completed');
+                        }
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/10 cursor-pointer"
+                    >
+                      <CheckSquare className="w-4 h-4 stroke-[2.5]" />
+                      <span>
+                        {selectedOrder.fulfillmentType === 'delivery' 
+                          ? 'Mulai Pengiriman' 
+                          : 'Selesaikan / Ambil'}
+                      </span>
+                    </button>
+                  )}
+
+                  {selectedOrder.status === 'delivering' && (
+                    <button
+                      type="button"
                       onClick={() => handleUpdateStatus(selectedOrder.id, 'Completed')}
                       className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/10 cursor-pointer"
                     >
                       <CheckSquare className="w-4 h-4 stroke-[2.5]" />
-                      <span>{selectedOrder.fulfillmentType === 'delivery' ? 'Selesaikan Pengiriman' : 'Selesaikan / Ambil'}</span>
+                      <span>Selesaikan Pesanan</span>
                     </button>
                   )}
 
@@ -619,6 +687,7 @@ export default function CashierDashboard() {
                 {/* Receipt links */}
                 <div className="flex gap-2 border-t border-slate-800 pt-2.5">
                   <button
+                    type="button"
                     onClick={() => window.open(`/receipt/${selectedOrder.id}`, '_blank')}
                     className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-750 text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
@@ -626,6 +695,7 @@ export default function CashierDashboard() {
                     <span>Lihat Struk</span>
                   </button>
                   <button
+                    type="button"
                     onClick={() => window.open(`/receipt/${selectedOrder.id}?print=true`, '_blank')}
                     className="flex-1 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >

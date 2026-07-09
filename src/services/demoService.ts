@@ -6,7 +6,7 @@
  * Designed to be called exclusively from the Admin Settings page.
  */
 
-import { Order, Product, PaymentMethod, OrderStatus, PaymentStatus, FulfillmentType } from '../types';
+import { Order, Product, PaymentMethod, OrderStatus, PaymentStatus, FulfillmentType, DeliveryFeeCalculationType } from '../types';
 import { getStorageItem, setStorageItem, STORAGE_KEYS, SEED_PRODUCTS } from './db';
 import { businessService } from './businessService';
 import { calculateOrderTotals } from '../utils/calculations';
@@ -48,6 +48,9 @@ interface SampleOrderBlueprint {
   deliveryPhone?: string;
   deliveryAddress?: string;
   deliveryNotes?: string;
+  deliveryDistanceKm?: number;
+  deliveryDistanceSource?: string;
+  deliveryFeeCalculationType?: DeliveryFeeCalculationType;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,6 +118,9 @@ const SAMPLE_ORDER_BLUEPRINTS: SampleOrderBlueprint[] = [
     deliveryPhone: '084567890123',
     deliveryAddress: 'Jl. Kemang Raya No. 12, Mampang Prapatan, Jakarta Selatan',
     deliveryNotes: 'Belakang bank Mandiri, pagar hitam',
+    deliveryDistanceKm: 3.5,
+    deliveryDistanceSource: 'mock',
+    deliveryFeeCalculationType: 'distance_based',
   },
   {
     queueNumber: 'A005',
@@ -133,6 +139,9 @@ const SAMPLE_ORDER_BLUEPRINTS: SampleOrderBlueprint[] = [
     deliveryPhone: '085678901234',
     deliveryAddress: 'Apartemen Kebagusan City, Tower C, Lt. 10 No. 5, Pasar Minggu',
     deliveryNotes: 'Titip di lobby/resepsionis',
+    deliveryDistanceKm: 7.2,
+    deliveryDistanceSource: 'mock',
+    deliveryFeeCalculationType: 'distance_based',
   },
   {
     queueNumber: 'A006',
@@ -289,6 +298,7 @@ export const demoService = {
         serviceChargeEnabled: profile.serviceChargeEnabled,
         serviceChargePercentage: profile.serviceChargePercentage,
         deliverySettings: profile.deliverySettings,
+        deliveryDistanceKm: blueprint.deliveryDistanceKm,
       });
 
       return {
@@ -314,6 +324,9 @@ export const demoService = {
         paymentStatus: blueprint.paymentStatus,
         status: blueprint.status,
         createdAt,
+        deliveryDistanceKm: blueprint.deliveryDistanceKm,
+        deliveryDistanceSource: blueprint.deliveryDistanceSource,
+        deliveryFeeCalculationType: blueprint.deliveryFeeCalculationType || 'fixed',
       };
     });
 

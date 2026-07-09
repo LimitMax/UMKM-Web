@@ -153,7 +153,9 @@ export function generateCSVReport(orders: Order[], businessProfile: BusinessProf
     'Delivery Address',
     'Delivery Fee',
     'Delivery Admin Fee',
-    'Free Delivery Applied'
+    'Free Delivery Applied',
+    'Delivery Distance KM',
+    'Delivery Fee Calculation Type'
   ];
 
   const rows = orders.map((order) => {
@@ -185,7 +187,9 @@ export function generateCSVReport(orders: Order[], businessProfile: BusinessProf
       escapeCsvValue(order.deliveryAddress || ''),
       escapeCsvValue(order.deliveryFeeAmount ?? 0),
       escapeCsvValue(order.deliveryAdminFeeAmount ?? 0),
-      escapeCsvValue(order.freeDeliveryApplied ? 'true' : 'false')
+      escapeCsvValue(order.freeDeliveryApplied ? 'true' : 'false'),
+      escapeCsvValue(order.deliveryDistanceKm !== undefined ? order.deliveryDistanceKm : ''),
+      escapeCsvValue(order.deliveryFeeCalculationType || 'fixed')
     ];
   });
 

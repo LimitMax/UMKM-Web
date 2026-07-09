@@ -80,6 +80,9 @@ export const orderService = {
     deliveryPhone?: string;
     deliveryAddress?: string;
     deliveryNotes?: string;
+    deliveryDistanceKm?: number;
+    deliveryDistanceSource?: string;
+    deliveryFeeCalculationType?: Order['deliveryFeeCalculationType'];
   }): Promise<Order> {
     // 1. Validate customer name
     if (!orderData.customerName.trim()) {
@@ -117,6 +120,7 @@ export const orderService = {
       serviceChargeEnabled: profile.serviceChargeEnabled,
       serviceChargePercentage: profile.serviceChargePercentage,
       deliverySettings: profile.deliverySettings,
+      deliveryDistanceKm: orderData.deliveryDistanceKm,
     });
 
     // 4. Generate queue number and order ID
@@ -200,7 +204,10 @@ export const orderService = {
         paymentMethod: order.payment_method,
         paymentStatus: order.payment_status,
         status: order.status,
-        createdAt: order.created_at
+        createdAt: order.created_at,
+        deliveryDistanceKm: order.delivery_distance_km,
+        deliveryDistanceSource: order.delivery_distance_source,
+        deliveryFeeCalculationType: order.delivery_fee_calculation_type,
       };
     }
 
@@ -230,6 +237,9 @@ export const orderService = {
       paymentStatus: 'Waiting for Payment',
       status: 'Waiting for Payment',
       createdAt: new Date().toISOString(),
+      deliveryDistanceKm: orderData.deliveryDistanceKm,
+      deliveryDistanceSource: orderData.deliveryDistanceSource,
+      deliveryFeeCalculationType: orderData.deliveryFeeCalculationType,
     };
 
     orders.push(newOrder);
@@ -271,7 +281,7 @@ export const orderService = {
       }
 
       let derivedPaymentStatus = paymentStatus || currentOrder.paymentStatus;
-      if ((status === 'Paid' || status === 'Processing' || status === 'Ready' || status === 'Completed') && derivedPaymentStatus === 'Waiting for Payment') {
+      if ((status === 'Paid' || status === 'Processing' || status === 'Ready' || status === 'delivering' || status === 'Completed') && derivedPaymentStatus === 'Waiting for Payment') {
         derivedPaymentStatus = 'Paid';
       }
 
@@ -351,8 +361,8 @@ export const orderService = {
       paymentStatus: paymentStatus || currentOrder.paymentStatus,
     };
 
-    // Auto-update payment status to Paid if the status becomes Completed or Paid
-    if ((status === 'Paid' || status === 'Processing' || status === 'Ready' || status === 'Completed') && updatedOrder.paymentStatus === 'Waiting for Payment') {
+    // Auto-update payment status to Paid if the status becomes Completed, Paid, or delivering
+    if ((status === 'Paid' || status === 'Processing' || status === 'Ready' || status === 'delivering' || status === 'Completed') && updatedOrder.paymentStatus === 'Waiting for Payment') {
       updatedOrder.paymentStatus = 'Paid';
     }
 

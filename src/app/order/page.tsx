@@ -52,6 +52,8 @@ export default function CustomerOrderPage() {
   const [deliveryPhone, setDeliveryPhone] = useState<string>('');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [deliveryNotes, setDeliveryNotes] = useState<string>('');
+  const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number>(0);
+  const [deliveryDistanceSource, setDeliveryDistanceSource] = useState<string>('manual');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -139,6 +141,7 @@ export default function CustomerOrderPage() {
     serviceChargeEnabled: businessProfile?.serviceChargeEnabled ?? false,
     serviceChargePercentage: businessProfile?.serviceChargePercentage ?? 5,
     deliverySettings: businessProfile?.deliverySettings,
+    deliveryDistanceKm: fulfillmentType === 'delivery' ? deliveryDistanceKm : undefined,
   });
 
   const serviceCharge = totals.serviceChargeAmount;
@@ -186,6 +189,20 @@ export default function CustomerOrderPage() {
         setErrorMsg('Alamat lengkap pengiriman wajib diisi.');
         return;
       }
+
+      // Distance-based calculation validations
+      const calcType = businessProfile?.deliverySettings?.deliveryFeeCalculationType || 'fixed';
+      if (calcType === 'distance_based') {
+        if (deliveryDistanceKm <= 0 || isNaN(deliveryDistanceKm)) {
+          setErrorMsg('Jarak pengiriman wajib ditentukan.');
+          return;
+        }
+        const maxDist = businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10;
+        if (deliveryDistanceKm > maxDist) {
+          setErrorMsg(`Jarak pengiriman (${deliveryDistanceKm} KM) melebihi batas maksimal (${maxDist} KM).`);
+          return;
+        }
+      }
     }
 
     if (cart.length === 0) {
@@ -216,6 +233,9 @@ export default function CustomerOrderPage() {
         deliveryPhone: fulfillmentType === 'delivery' ? deliveryPhone : undefined,
         deliveryAddress: fulfillmentType === 'delivery' ? deliveryAddress : undefined,
         deliveryNotes: fulfillmentType === 'delivery' ? deliveryNotes : undefined,
+        deliveryDistanceKm: fulfillmentType === 'delivery' ? deliveryDistanceKm : undefined,
+        deliveryDistanceSource: fulfillmentType === 'delivery' ? deliveryDistanceSource : undefined,
+        deliveryFeeCalculationType: fulfillmentType === 'delivery' ? (businessProfile?.deliverySettings?.deliveryFeeCalculationType || 'fixed') : undefined,
       });
 
       // Clear cart
@@ -229,6 +249,95 @@ export default function CustomerOrderPage() {
       setIsLoading(false);
     }
   };
+
+  const renderDistanceWidget = () => {
+    const calcType = businessProfile?.deliverySettings?.deliveryFeeCalculationType || 'fixed';
+    if (calcType !== 'distance_based') return null;
+
+    const maxDist = businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10;
+    const calcMode = businessProfile?.deliverySettings?.distanceCalculationMode || 'manual';
+
+    const handleSimulateDistance = () => {
+      // simulate distance between 1 and maxDist
+      const randomDist = Number((Math.random() * (maxDist - 1) + 1).toFixed(1));
+      setDeliveryDistanceKm(randomDist);
+      setDeliveryDistanceSource('mock');
+    };
+
+    return (
+      <div className="flex flex-col gap-2 p-2.5 bg-slate-900 border border-slate-800 rounded-lg mt-2 font-mono">
+        <div className="flex justify-between items-center">
+          <label className="block text-[9px] font-mono text-slate-400 uppercase">
+            Estimasi Jarak dari Toko (KM) *
+          </label>
+          <span className="text-[9px] font-mono text-emerald-450 font-bold uppercase">
+            Maks: {maxDist} KM
+          </span>
+        </div>
+
+        {calcMode === 'manual' ? (
+          <div className="flex flex-col gap-1">
+            <input
+              type="number"
+              min="0.1"
+              step="0.1"
+              required
+              value={deliveryDistanceKm || ''}
+              onChange={(e) => {
+                setDeliveryDistanceKm(Number(e.target.value));
+                setDeliveryDistanceSource('manual');
+              }}
+              placeholder="Masukkan jarak dalam KM (contoh: 3.5)..."
+              className="w-full p-2 bg-slate-950 border border-slate-850 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 text-center"
+            />
+            <span className="text-[9px] text-slate-500 italic block leading-normal font-sans">
+              💡 Jarak diisi manual untuk keperluan demo.
+            </span>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                disabled
+                value={deliveryDistanceKm > 0 ? `${deliveryDistanceKm} KM` : 'Belum dihitung'}
+                className="flex-1 p-2 bg-slate-950 border border-slate-850 rounded-lg text-xs text-slate-400 text-center font-bold"
+              />
+              <button
+                type="button"
+                onClick={handleSimulateDistance}
+                className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg text-xs transition-all cursor-pointer"
+              >
+                Simulasikan Jarak
+              </button>
+            </div>
+            <span className="text-[9px] text-slate-500 italic block leading-normal font-sans">
+              💡 Klik button di atas untuk menyimulasikan jarak secara acak.
+            </span>
+          </div>
+        )}
+
+        {deliveryDistanceKm > maxDist && (
+          <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[9px] leading-relaxed font-sans">
+            ⚠️ Jarak pengiriman melebihi batas maksimal ({maxDist} KM).
+          </div>
+        )}
+
+        {deliveryDistanceKm > 0 && deliveryDistanceKm <= maxDist && (
+          <div className="flex justify-between items-center text-[10px] text-emerald-400 font-mono mt-1 pt-1 border-t border-slate-800">
+            <span>Estimasi Ongkir:</span>
+            <strong>{freeDeliveryApplied ? 'Gratis Ongkir' : formatRupiah(deliveryFee)}</strong>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const isDistanceInvalid = fulfillmentType === 'delivery' && 
+    (businessProfile?.deliverySettings?.deliveryFeeCalculationType === 'distance_based') && 
+    (deliveryDistanceKm <= 0 || deliveryDistanceKm > (businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10) || isNaN(deliveryDistanceKm));
+
+  const isCheckoutDisabled = isLoading || isDistanceInvalid;
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">
@@ -438,10 +547,9 @@ export default function CustomerOrderPage() {
             </div>
           )}
         </div>
-
         {/* Right Side: Desktop Checkout sidebar (visible on desktop) */}
-        <div className="hidden md:flex w-96 bg-slate-900 border border-slate-800 rounded-2xl p-5 h-[calc(100vh-130px)] sticky top-24 flex-col min-h-0">
-          <h2 className="font-bold text-base text-white flex items-center gap-2 mb-3 flex-shrink-0">
+        <div className="hidden md:flex w-96 bg-slate-900 border border-slate-800 rounded-2xl p-4 h-[calc(100vh-100px)] sticky top-20 flex-col min-h-0">
+          <h2 className="font-bold text-base text-white flex items-center gap-2 mb-2.5 flex-shrink-0">
             <ShoppingBag className="w-5 h-5 text-emerald-400" />
             <span>Keranjang Belanja</span>
           </h2>
@@ -453,24 +561,24 @@ export default function CustomerOrderPage() {
           ) : (
             <form onSubmit={handleCheckout} className="flex-1 flex flex-col min-h-0">
               {/* Scrollable middle container (Cart list and inputs) */}
-              <div className="flex-1 overflow-y-auto pr-1 pb-3 flex flex-col gap-4 min-h-0 scrollbar-thin">
+              <div className="flex-1 overflow-y-auto pr-1 pb-3 flex flex-col gap-3 min-h-0 scrollbar-thin">
                 {/* Cart List */}
-                <div className="flex flex-col gap-2.5">
+                <div className="flex flex-col gap-2">
                   {cart.map((item) => (
-                    <div key={item.product.id} className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800/50">
+                    <div key={item.product.id} className="flex justify-between items-center bg-slate-950 p-2 rounded-xl border border-slate-800/50">
                       <div className="flex-1 pr-2">
                         <p className="text-xs font-semibold text-white line-clamp-1">{item.product.name}</p>
                         <p className="text-[10px] text-emerald-400 font-bold mt-0.5">{formatRupiah(item.product.price)}</p>
                       </div>
                       
                       {/* Controls */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <button 
                           type="button"
                           onClick={() => updateQuantity(item.product.id, -1)}
                           className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
                         >
-                          <Minus className="w-3.5 h-3.5" />
+                          <Minus className="w-3 h-3" />
                         </button>
                         <span className="text-xs font-bold text-white w-4 text-center">{item.quantity}</span>
                         <button 
@@ -478,15 +586,15 @@ export default function CustomerOrderPage() {
                           onClick={() => updateQuantity(item.product.id, 1)}
                           className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
                         >
-                          <Plus className="w-3.5 h-3.5" />
+                          <Plus className="w-3 h-3" />
                         </button>
                         
                         <button 
                           type="button"
                           onClick={() => removeFromCart(item.product.id)}
-                          className="p-1 ml-1 text-slate-500 hover:text-rose-400"
+                          className="p-1 ml-1 text-slate-550 hover:text-rose-400"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
@@ -494,7 +602,7 @@ export default function CustomerOrderPage() {
                 </div>
 
                 {/* Checkout Fields */}
-                <div className="flex flex-col gap-3.5 border-t border-slate-850 pt-3.5 mt-1">
+                <div className="flex flex-col gap-3 border-t border-slate-850 pt-3 mt-1">
                   <div>
                     <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Nama Lengkap *</label>
                     <input
@@ -503,7 +611,7 @@ export default function CustomerOrderPage() {
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       placeholder="Contoh: Budi Santoso"
-                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                   <div>
@@ -513,7 +621,7 @@ export default function CustomerOrderPage() {
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       placeholder="Contoh: 08123456789"
-                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                   <div>
@@ -523,14 +631,14 @@ export default function CustomerOrderPage() {
                       onChange={(e) => setOrderNotes(e.target.value)}
                       placeholder="Contoh: Level 5, tidak pakai sayur, es batu dipisah"
                       rows={2}
-                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 resize-none"
+                      className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 resize-none font-sans"
                     />
                   </div>
                   
                   {/* Metode Fulfillment */}
                   <div>
-                    <label className="block text-[10px] font-mono text-slate-405 uppercase mb-2">Metode Pelayanan *</label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1.5">Metode Pelayanan *</label>
+                    <div className="grid grid-cols-3 gap-1.5">
                       {[
                         { id: 'dine_in', label: 'Makan di Tempat', icon: Clock },
                         { id: 'pickup', label: 'Ambil Sendiri', icon: ShoppingBag },
@@ -545,14 +653,14 @@ export default function CustomerOrderPage() {
                             key={method.id}
                             type="button"
                             onClick={() => setFulfillmentType(method.id as FulfillmentType)}
-                            className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                            className={`flex flex-col items-center justify-center p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
                               isSelected
                                 ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
                                 : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                             }`}
                           >
-                            <Icon className="w-4 h-4 mb-1" />
-                            <span className="text-[10px]">{method.label}</span>
+                            <Icon className="w-3.5 h-3.5 mb-1" />
+                            <span className="text-[9px]">{method.label}</span>
                           </button>
                         );
                       })}
@@ -561,8 +669,8 @@ export default function CustomerOrderPage() {
 
                   {/* Delivery Form (Conditional) */}
                   {fulfillmentType === 'delivery' && (
-                    <div className="flex flex-col gap-3 p-3 bg-slate-950/50 border border-slate-850 rounded-xl animate-fade-in">
-                      <div className="border-b border-slate-850 pb-1.5 mb-1">
+                    <div className="flex flex-col gap-2.5 p-2.5 bg-slate-950/50 border border-slate-850 rounded-xl animate-fade-in">
+                      <div className="border-b border-slate-850 pb-1 mb-0.5">
                         <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">Detail Pengiriman</span>
                       </div>
                       <div>
@@ -608,13 +716,14 @@ export default function CustomerOrderPage() {
                           className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
                         />
                       </div>
+                      {renderDistanceWidget()}
                     </div>
                   )}
 
                   {/* Payment Method */}
                   <div>
-                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-2">Metode Pembayaran *</label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1.5">Metode Pembayaran *</label>
+                    <div className="grid grid-cols-3 gap-1.5">
                       {[
                         { id: 'Cash', label: 'Tunai', icon: DollarSign },
                         { id: 'QRIS', label: 'QRIS', icon: Wallet },
@@ -627,19 +736,19 @@ export default function CustomerOrderPage() {
                             key={method.id}
                             type="button"
                             onClick={() => setPaymentMethod(method.id as PaymentMethod)}
-                            className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                            className={`flex flex-col items-center justify-center p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
                               isSelected
                                 ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
                                 : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                             }`}
                           >
-                            <Icon className="w-4 h-4 mb-1" />
-                            <span className="text-[10px]">{method.label}</span>
+                            <Icon className="w-3.5 h-3.5 mb-1" />
+                            <span className="text-[9px]">{method.label}</span>
                           </button>
                         );
                       })}
                     </div>
-                    <p className="text-[10px] text-slate-450 font-sans mt-2.5 italic leading-relaxed">
+                    <p className="text-[9px] text-slate-450 font-sans mt-2 italic leading-relaxed">
                       {paymentMethod === 'Cash' && '💡 Tunai: Bayar di kasir saat pesanan diambil'}
                       {paymentMethod === 'QRIS' && '💡 QRIS: Scan QRIS di kasir setelah checkout'}
                       {paymentMethod === 'Bank Transfer' && '💡 Transfer: Konfirmasi pembayaran ke kasir'}
@@ -649,62 +758,62 @@ export default function CustomerOrderPage() {
               </div>
 
               {/* Sticky bottom totals and checkout trigger inside form */}
-              <div className="border-t border-slate-800 pt-3 mt-auto bg-slate-900 flex-shrink-0">
-                <div className="flex flex-col gap-1.5 mb-3">
+              <div className="border-t border-slate-800 pt-2.5 mt-auto bg-slate-900 flex-shrink-0">
+                <div className="flex flex-col gap-1 mb-2.5">
                   <div className="flex justify-between text-xs text-slate-450">
                     <span>Subtotal:</span>
                     <span className="text-slate-300">{formatRupiah(subtotal)}</span>
                   </div>
                   {businessProfile?.serviceChargeEnabled && (
-                    <div className="flex justify-between text-xs text-slate-450">
+                    <div className="flex justify-between text-xs text-slate-455">
                       <span>Biaya Layanan ({businessProfile.serviceChargePercentage}%):</span>
                       <span className="text-slate-300">{formatRupiah(serviceCharge)}</span>
                     </div>
                   )}
                   {businessProfile?.taxEnabled && (
-                    <div className="flex justify-between text-xs text-slate-450">
+                    <div className="flex justify-between text-xs text-slate-455">
                       <span>Pajak ({businessProfile.taxPercentage}%):</span>
                       <span className="text-slate-300">{formatRupiah(tax)}</span>
                     </div>
                   )}
                   {fulfillmentType === 'delivery' && (
                     <>
-                      <div className="flex justify-between text-xs text-slate-450">
+                      <div className="flex justify-between text-xs text-slate-455">
                         <span>Ongkos Kirim:</span>
                         {freeDeliveryApplied ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-slate-500 line-through text-[11px]">{formatRupiah(businessProfile?.deliverySettings?.deliveryFeeAmount ?? 0)}</span>
-                            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold border border-emerald-500/20">Gratis Ongkir</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-slate-500 line-through text-[10px]">{formatRupiah(businessProfile?.deliverySettings?.deliveryFeeAmount ?? 0)}</span>
+                            <span className="px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400 text-[8px] font-bold border border-emerald-500/20">Gratis Ongkir</span>
                           </div>
                         ) : (
                           <span className="text-slate-300">{formatRupiah(deliveryFee)}</span>
                         )}
                       </div>
                       {deliveryAdminFee > 0 && (
-                        <div className="flex justify-between text-xs text-slate-450">
+                        <div className="flex justify-between text-xs text-slate-455">
                           <span>Biaya Admin Delivery:</span>
                           <span className="text-slate-300">{formatRupiah(deliveryAdminFee)}</span>
                         </div>
                       )}
                     </>
                   )}
-                  <div className="flex justify-between font-bold text-sm text-white border-t border-slate-850 pt-2 mt-1">
+                  <div className="flex justify-between font-bold text-xs text-white border-t border-slate-850 pt-2 mt-1">
                     <span>Total Bayar:</span>
-                    <span className="text-emerald-400 text-base">{formatRupiah(totalAmount)}</span>
+                    <span className="text-emerald-400 text-sm">{formatRupiah(totalAmount)}</span>
                   </div>
                 </div>
 
                 {errorMsg && (
-                  <div className="p-2 mb-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-450 text-[10px] flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <div className="p-2 mb-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-450 text-[10px] flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
                     <span>{errorMsg}</span>
                   </div>
                 )}
 
                 <button
                   type="submit"
-                  disabled={isLoading}
-                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-500 text-slate-950 font-black rounded-xl transition-all shadow-lg hover:shadow-emerald-500/20 text-xs uppercase tracking-wider"
+                  disabled={isCheckoutDisabled}
+                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-500 text-slate-950 font-black rounded-xl transition-all shadow-lg hover:shadow-emerald-500/20 text-xs uppercase tracking-wider cursor-pointer"
                 >
                   {isLoading ? 'Memproses...' : 'Konfirmasi & Bayar'}
                 </button>
@@ -758,7 +867,7 @@ export default function CustomerOrderPage() {
               </h2>
               <button 
                 onClick={() => setIsCartOpen(false)}
-                className="text-slate-400 hover:text-white text-xs font-bold px-2.5 py-1.5 rounded-lg bg-slate-800"
+                className="text-slate-400 hover:text-white text-xs font-bold px-2.5 py-1.5 rounded-lg bg-slate-800 cursor-pointer"
               >
                 Tutup
               </button>
@@ -772,39 +881,39 @@ export default function CustomerOrderPage() {
             ) : (
               <form onSubmit={handleCheckout} className="flex-1 flex flex-col min-h-0">
                 {/* Scrollable middle container */}
-                <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 min-h-0 scrollbar-thin">
+                <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 min-h-0 scrollbar-thin">
                   {/* Cart List */}
-                  <div className="flex flex-col gap-2.5">
+                  <div className="flex flex-col gap-2">
                     {cart.map((item) => (
-                      <div key={item.product.id} className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800/50">
+                      <div key={item.product.id} className="flex justify-between items-center bg-slate-950 p-2 rounded-xl border border-slate-800/50">
                         <div className="flex-1 pr-2">
                           <p className="text-xs font-semibold text-white line-clamp-1">{item.product.name}</p>
                           <p className="text-[10px] text-emerald-400 font-bold mt-0.5">{formatRupiah(item.product.price)}</p>
                         </div>
                         
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <button 
                             type="button"
                             onClick={() => updateQuantity(item.product.id, -1)}
-                            className="p-1 rounded bg-slate-800 text-slate-300"
+                            className="p-1 rounded bg-slate-800 text-slate-300 cursor-pointer"
                           >
-                            <Minus className="w-3.5 h-3.5" />
+                            <Minus className="w-3 h-3" />
                           </button>
                           <span className="text-xs font-bold text-white w-4 text-center">{item.quantity}</span>
                           <button 
                             type="button"
                             onClick={() => updateQuantity(item.product.id, 1)}
-                            className="p-1 rounded bg-slate-800 text-slate-300"
+                            className="p-1 rounded bg-slate-800 text-slate-300 cursor-pointer"
                           >
-                            <Plus className="w-3.5 h-3.5" />
+                            <Plus className="w-3 h-3" />
                           </button>
                           
                           <button 
                             type="button"
                             onClick={() => removeFromCart(item.product.id)}
-                            className="p-1 text-slate-500"
+                            className="p-1 text-slate-500 hover:text-rose-450 cursor-pointer"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -812,7 +921,7 @@ export default function CustomerOrderPage() {
                   </div>
 
                   {/* Form fields */}
-                  <div className="flex flex-col gap-3.5 border-t border-slate-850 pt-3.5 mt-1">
+                  <div className="flex flex-col gap-3 border-t border-slate-850 pt-3 mt-1">
                     <div>
                       <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Nama Lengkap *</label>
                       <input
@@ -821,7 +930,7 @@ export default function CustomerOrderPage() {
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
                         placeholder="Budi Santoso"
-                        className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                     
@@ -832,7 +941,7 @@ export default function CustomerOrderPage() {
                         value={customerPhone}
                         onChange={(e) => setCustomerPhone(e.target.value)}
                         placeholder="08123456789"
-                        className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                     
@@ -843,14 +952,14 @@ export default function CustomerOrderPage() {
                         onChange={(e) => setOrderNotes(e.target.value)}
                         placeholder="Rasa pedas sedang, es teh manis jumbo"
                         rows={2}
-                        className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 resize-none"
+                        className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 resize-none font-sans"
                       />
                     </div>
 
                     {/* Metode Fulfillment */}
                     <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-2">Metode Pelayanan *</label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1.5">Metode Pelayanan *</label>
+                      <div className="grid grid-cols-3 gap-1.5">
                         {[
                           { id: 'dine_in', label: 'Makan di Tempat', icon: Clock },
                           { id: 'pickup', label: 'Ambil Sendiri', icon: ShoppingBag },
@@ -865,14 +974,14 @@ export default function CustomerOrderPage() {
                               key={method.id}
                               type="button"
                               onClick={() => setFulfillmentType(method.id as FulfillmentType)}
-                              className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                              className={`flex flex-col items-center justify-center p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
                                 isSelected
                                   ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
-                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                  : 'bg-slate-955 border-slate-800 text-slate-400 hover:text-white'
                               }`}
                             >
-                              <Icon className="w-4 h-4 mb-1" />
-                              <span className="text-[10px]">{method.label}</span>
+                              <Icon className="w-3.5 h-3.5 mb-1" />
+                              <span className="text-[9px]">{method.label}</span>
                             </button>
                           );
                         })}
@@ -881,8 +990,8 @@ export default function CustomerOrderPage() {
 
                     {/* Delivery Form (Conditional) */}
                     {fulfillmentType === 'delivery' && (
-                      <div className="flex flex-col gap-3 p-3 bg-slate-950/50 border border-slate-850 rounded-xl animate-fade-in">
-                        <div className="border-b border-slate-850 pb-1.5 mb-1">
+                      <div className="flex flex-col gap-2.5 p-2.5 bg-slate-950/50 border border-slate-850 rounded-xl animate-fade-in">
+                        <div className="border-b border-slate-850 pb-1 mb-0.5">
                           <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">Detail Pengiriman</span>
                         </div>
                         <div>
@@ -928,12 +1037,13 @@ export default function CustomerOrderPage() {
                             className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
                           />
                         </div>
+                        {renderDistanceWidget()}
                       </div>
                     )}
 
                     <div>
-                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-2">Metode Pembayaran *</label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1.5">Metode Pembayaran *</label>
+                      <div className="grid grid-cols-3 gap-1.5">
                         {[
                           { id: 'Cash', label: 'Tunai', icon: DollarSign },
                           { id: 'QRIS', label: 'QRIS', icon: Wallet },
@@ -946,19 +1056,19 @@ export default function CustomerOrderPage() {
                               key={method.id}
                               type="button"
                               onClick={() => setPaymentMethod(method.id as PaymentMethod)}
-                              className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all ${
+                              className={`flex flex-col items-center justify-center p-1.5 rounded-lg border text-center transition-all cursor-pointer ${
                                 isSelected
                                   ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
                                   : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                               }`}
                             >
-                              <Icon className="w-4 h-4 mb-1" />
-                              <span className="text-[10px]">{method.label}</span>
+                              <Icon className="w-3.5 h-3.5 mb-1" />
+                              <span className="text-[9px]">{method.label}</span>
                             </button>
                           );
                         })}
                       </div>
-                      <p className="text-[10px] text-slate-450 font-sans mt-2.5 italic leading-relaxed">
+                      <p className="text-[9px] text-slate-455 font-sans mt-2 italic leading-relaxed">
                         {paymentMethod === 'Cash' && '💡 Tunai: Bayar di kasir saat pesanan diambil'}
                         {paymentMethod === 'QRIS' && '💡 QRIS: Scan QRIS di kasir setelah checkout'}
                         {paymentMethod === 'Bank Transfer' && '💡 Transfer: Konfirmasi pembayaran ke kasir'}
@@ -969,61 +1079,61 @@ export default function CustomerOrderPage() {
 
                 {/* Sticky Bottom Footer for totals and pay CTA inside form */}
                 <div className="p-4 bg-slate-950 border-t border-slate-850 flex-shrink-0">
-                  <div className="flex flex-col gap-1.5 mb-3">
+                  <div className="flex flex-col gap-1 mb-2.5">
                     <div className="flex justify-between text-xs text-slate-450">
                       <span>Subtotal:</span>
                       <span className="text-slate-300">{formatRupiah(subtotal)}</span>
                     </div>
                     {businessProfile?.serviceChargeEnabled && (
-                      <div className="flex justify-between text-xs text-slate-450">
+                      <div className="flex justify-between text-xs text-slate-455">
                         <span>Biaya Layanan ({businessProfile.serviceChargePercentage}%):</span>
                         <span className="text-slate-300">{formatRupiah(serviceCharge)}</span>
                       </div>
                     )}
                     {businessProfile?.taxEnabled && (
-                      <div className="flex justify-between text-xs text-slate-450">
+                      <div className="flex justify-between text-xs text-slate-455">
                         <span>Pajak ({businessProfile.taxPercentage}%):</span>
                         <span className="text-slate-300">{formatRupiah(tax)}</span>
                       </div>
                     )}
                     {fulfillmentType === 'delivery' && (
                       <>
-                        <div className="flex justify-between text-xs text-slate-450">
+                        <div className="flex justify-between text-xs text-slate-455">
                           <span>Ongkos Kirim:</span>
                           {freeDeliveryApplied ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-slate-500 line-through text-[11px]">{formatRupiah(businessProfile?.deliverySettings?.deliveryFeeAmount ?? 0)}</span>
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold border border-emerald-500/20">Gratis Ongkir</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-500 line-through text-[10px]">{formatRupiah(businessProfile?.deliverySettings?.deliveryFeeAmount ?? 0)}</span>
+                              <span className="px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400 text-[8px] font-bold border border-emerald-500/20">Gratis Ongkir</span>
                             </div>
                           ) : (
                             <span className="text-slate-300">{formatRupiah(deliveryFee)}</span>
                           )}
                         </div>
                         {deliveryAdminFee > 0 && (
-                          <div className="flex justify-between text-xs text-slate-450">
+                          <div className="flex justify-between text-xs text-slate-455">
                             <span>Biaya Admin Delivery:</span>
                             <span className="text-slate-300">{formatRupiah(deliveryAdminFee)}</span>
                           </div>
                         )}
                       </>
                     )}
-                    <div className="flex justify-between font-bold text-sm text-white border-t border-slate-850 pt-2 mt-1">
+                    <div className="flex justify-between font-bold text-xs text-white border-t border-slate-850 pt-2 mt-1">
                       <span>Total Bayar:</span>
-                      <span className="text-emerald-400 text-base">{formatRupiah(totalAmount)}</span>
+                      <span className="text-emerald-400 text-sm">{formatRupiah(totalAmount)}</span>
                     </div>
                   </div>
 
                   {errorMsg && (
-                    <div className="p-2 mb-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-450 text-[10px] flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <div className="p-2 mb-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-450 text-[10px] flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
                       <span>{errorMsg}</span>
                     </div>
                   )}
 
                   <button
                     type="submit"
-                    disabled={isLoading}
-                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-550 text-slate-950 font-bold rounded-xl transition-all shadow-lg text-xs uppercase tracking-wider"
+                    disabled={isCheckoutDisabled}
+                    className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-500 text-slate-950 font-black rounded-xl transition-all shadow-lg text-xs uppercase tracking-wider cursor-pointer"
                   >
                     {isLoading ? 'Memproses...' : 'Konfirmasi & Bayar'}
                   </button>

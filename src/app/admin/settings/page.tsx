@@ -129,6 +129,34 @@ export default function AdminSettingsPage() {
     if (typeof window === 'undefined') return '';
     return businessService.getProfile().deliverySettings?.deliveryInstruction ?? '';
   });
+  const [deliveryFeeCalculationType, setDeliveryFeeCalculationType] = useState<'fixed' | 'distance_based'>(() => {
+    if (typeof window === 'undefined') return 'fixed';
+    return businessService.getProfile().deliverySettings?.deliveryFeeCalculationType ?? 'fixed';
+  });
+  const [baseDeliveryFee, setBaseDeliveryFee] = useState(() => {
+    if (typeof window === 'undefined') return 8000;
+    return businessService.getProfile().deliverySettings?.baseDeliveryFee ?? 8000;
+  });
+  const [baseDeliveryDistanceKm, setBaseDeliveryDistanceKm] = useState(() => {
+    if (typeof window === 'undefined') return 2;
+    return businessService.getProfile().deliverySettings?.baseDeliveryDistanceKm ?? 2;
+  });
+  const [deliveryFeePerKm, setDeliveryFeePerKm] = useState(() => {
+    if (typeof window === 'undefined') return 2500;
+    return businessService.getProfile().deliverySettings?.deliveryFeePerKm ?? 2500;
+  });
+  const [maxDeliveryDistanceKm, setMaxDeliveryDistanceKm] = useState(() => {
+    if (typeof window === 'undefined') return 10;
+    return businessService.getProfile().deliverySettings?.maxDeliveryDistanceKm ?? 10;
+  });
+  const [distanceRoundingMode, setDistanceRoundingMode] = useState<'ceil' | 'round' | 'floor'>(() => {
+    if (typeof window === 'undefined') return 'ceil';
+    return businessService.getProfile().deliverySettings?.distanceRoundingMode ?? 'ceil';
+  });
+  const [distanceCalculationMode, setDistanceCalculationMode] = useState<'manual' | 'mock' | 'maps_api_later'>(() => {
+    if (typeof window === 'undefined') return 'manual';
+    return businessService.getProfile().deliverySettings?.distanceCalculationMode ?? 'manual';
+  });
 
   // Dynamic order link state
   const [orderLink, setOrderLink] = useState('');
@@ -221,6 +249,13 @@ export default function AdminSettingsPage() {
           deliveryAdminFeeType,
           deliveryAdminFeeValue: Number(deliveryAdminFeeValue),
           deliveryInstruction,
+          deliveryFeeCalculationType,
+          baseDeliveryFee: Number(baseDeliveryFee),
+          baseDeliveryDistanceKm: Number(baseDeliveryDistanceKm),
+          deliveryFeePerKm: Number(deliveryFeePerKm),
+          maxDeliveryDistanceKm: Number(maxDeliveryDistanceKm),
+          distanceRoundingMode,
+          distanceCalculationMode,
         }
       });
 
@@ -289,6 +324,13 @@ export default function AdminSettingsPage() {
           setDeliveryAdminFeeType(defaults.deliverySettings?.deliveryAdminFeeType ?? 'fixed');
           setDeliveryAdminFeeValue(defaults.deliverySettings?.deliveryAdminFeeValue ?? 0);
           setDeliveryInstruction(defaults.deliverySettings?.deliveryInstruction ?? '');
+          setDeliveryFeeCalculationType(defaults.deliverySettings?.deliveryFeeCalculationType ?? 'fixed');
+          setBaseDeliveryFee(defaults.deliverySettings?.baseDeliveryFee ?? 8000);
+          setBaseDeliveryDistanceKm(defaults.deliverySettings?.baseDeliveryDistanceKm ?? 2);
+          setDeliveryFeePerKm(defaults.deliverySettings?.deliveryFeePerKm ?? 2500);
+          setMaxDeliveryDistanceKm(defaults.deliverySettings?.maxDeliveryDistanceKm ?? 10);
+          setDistanceRoundingMode(defaults.deliverySettings?.distanceRoundingMode ?? 'ceil');
+          setDistanceCalculationMode(defaults.deliverySettings?.distanceCalculationMode ?? 'manual');
 
           // Reset user session businessName
           const sessionKey = 'umkm_pilot_user_session';
@@ -762,73 +804,235 @@ export default function AdminSettingsPage() {
                 {deliveryEnabled && (
                   <div className="flex flex-col gap-5 pt-3 border-t border-slate-850/50">
                     
-                    {/* Delivery Fee Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h5 className="text-[11px] font-bold text-slate-300">Biaya Ongkos Kirim (Ongkir)</h5>
-                            <p className="text-[9px] text-slate-550">Terapkan tarif flat untuk setiap pengiriman.</p>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer scale-90">
-                            <input
-                              type="checkbox"
-                              checked={deliveryFeeEnabled}
-                              onChange={(e) => setDeliveryFeeEnabled(e.target.checked)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
-                          </label>
-                        </div>
-                        {deliveryFeeEnabled && (
-                          <div className="mt-1">
-                            <input
-                              type="number"
-                              min="0"
-                              value={deliveryFeeAmount}
-                              onChange={(e) => setDeliveryFeeAmount(Number(e.target.value))}
-                              placeholder="10000"
-                              className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
-                            />
-                            <span className="text-[10px] text-slate-500 block mt-1">Nominal ongkir flat dalam Rupiah (Rp).</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Free Delivery Section */}
-                      <div className="flex flex-col gap-2 border-t md:border-t-0 md:border-l border-slate-850/60 pt-4 md:pt-0 md:pl-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h5 className="text-[11px] font-bold text-slate-300">Gratis Ongkir</h5>
-                            <p className="text-[9px] text-slate-550">Gratiskan ongkir dengan minimal pembelian tertentu.</p>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer scale-90">
-                            <input
-                              type="checkbox"
-                              checked={freeDeliveryEnabled}
-                              onChange={(e) => setFreeDeliveryEnabled(e.target.checked)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
-                          </label>
-                        </div>
-                        {freeDeliveryEnabled && (
-                          <div className="mt-1 flex flex-col gap-1.5">
-                            <input
-                              type="number"
-                              min="0"
-                              value={freeDeliveryMinimumAmount}
-                              onChange={(e) => setFreeDeliveryMinimumAmount(Number(e.target.value))}
-                              placeholder="50000"
-                              className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
-                            />
-                            <p className="text-[9px] text-amber-400 italic">
-                              💡 Gratis ongkir akan otomatis diterapkan apabila subtotal belanja pelanggan &ge; {formatRupiah(freeDeliveryMinimumAmount)}.
-                            </p>
-                          </div>
-                        )}
+                    {/* Tipe Ongkir Picker */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Tipe Perhitungan Ongkos Kirim</label>
+                      <div className="flex gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryFeeCalculationType('fixed')}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            deliveryFeeCalculationType === 'fixed'
+                              ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Flat / Tetap
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryFeeCalculationType('distance_based')}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            deliveryFeeCalculationType === 'distance_based'
+                              ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Berdasarkan Jarak KM
+                        </button>
                       </div>
                     </div>
+
+                    {deliveryFeeCalculationType === 'fixed' ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-850/50 pt-4">
+                        {/* Delivery Fee Section */}
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h5 className="text-[11px] font-bold text-slate-300">Biaya Ongkos Kirim (Ongkir)</h5>
+                              <p className="text-[9px] text-slate-550">Terapkan tarif flat untuk setiap pengiriman.</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer scale-90">
+                              <input
+                                type="checkbox"
+                                checked={deliveryFeeEnabled}
+                                onChange={(e) => setDeliveryFeeEnabled(e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
+                            </label>
+                          </div>
+                          {deliveryFeeEnabled && (
+                            <div className="mt-1">
+                              <input
+                                type="number"
+                                min="0"
+                                value={deliveryFeeAmount}
+                                onChange={(e) => setDeliveryFeeAmount(Number(e.target.value))}
+                                placeholder="10000"
+                                className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
+                              />
+                              <span className="text-[10px] text-slate-500 block mt-1">Nominal ongkir flat dalam Rupiah (Rp).</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Free Delivery Section */}
+                        <div className="flex flex-col gap-2 border-t md:border-t-0 md:border-l border-slate-850/60 pt-4 md:pt-0 md:pl-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h5 className="text-[11px] font-bold text-slate-300">Gratis Ongkir</h5>
+                              <p className="text-[9px] text-slate-550">Gratiskan ongkir dengan minimal pembelian tertentu.</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer scale-90">
+                              <input
+                                type="checkbox"
+                                checked={freeDeliveryEnabled}
+                                onChange={(e) => setFreeDeliveryEnabled(e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
+                            </label>
+                          </div>
+                          {freeDeliveryEnabled && (
+                            <div className="mt-1 flex flex-col gap-1.5">
+                              <input
+                                type="number"
+                                min="0"
+                                value={freeDeliveryMinimumAmount}
+                                onChange={(e) => setFreeDeliveryMinimumAmount(Number(e.target.value))}
+                                placeholder="50000"
+                                className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
+                              />
+                              <p className="text-[9px] text-amber-400 italic">
+                                💡 Gratis ongkir akan otomatis diterapkan apabila subtotal belanja pelanggan &ge; {formatRupiah(freeDeliveryMinimumAmount)}.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-4 border-t border-slate-850/50 pt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Biaya Dasar Ongkir */}
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-300">Biaya Dasar Ongkir (Rp)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={baseDeliveryFee}
+                              onChange={(e) => setBaseDeliveryFee(Number(e.target.value))}
+                              className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
+                            />
+                            <span className="text-[10px] text-slate-500 block">Biaya dasar minimum untuk jarak awal.</span>
+                          </div>
+
+                          {/* Jarak Termasuk Biaya Dasar */}
+                          <div className="flex flex-col gap-1 border-t md:border-t-0 md:border-l border-slate-850/60 pt-4 md:pt-0 md:pl-4">
+                            <label className="text-[11px] font-bold text-slate-300">Jarak Termasuk Biaya Dasar (KM)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={baseDeliveryDistanceKm}
+                              onChange={(e) => setBaseDeliveryDistanceKm(Number(e.target.value))}
+                              className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
+                            />
+                            <span className="text-[10px] text-slate-500 block">Jarak awal (KM) yang dicover biaya dasar.</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-850/50 pt-4">
+                          {/* Biaya per KM Tambahan */}
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-300">Biaya per KM Tambahan (Rp)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={deliveryFeePerKm}
+                              onChange={(e) => setDeliveryFeePerKm(Number(e.target.value))}
+                              className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
+                            />
+                            <span className="text-[10px] text-slate-500 block">Biaya tambahan per KM setelah jarak dasar terlampaui.</span>
+                          </div>
+
+                          {/* Maksimal Jarak Delivery */}
+                          <div className="flex flex-col gap-1 border-t md:border-t-0 md:border-l border-slate-850/60 pt-4 md:pt-0 md:pl-4">
+                            <label className="text-[11px] font-bold text-slate-300">Maksimal Jarak Delivery (KM)</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={maxDeliveryDistanceKm}
+                              onChange={(e) => setMaxDeliveryDistanceKm(Number(e.target.value))}
+                              className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
+                            />
+                            <span className="text-[10px] text-slate-500 block">Batas jarak maksimal pengiriman dari toko.</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-850/50 pt-4">
+                          {/* Pembulatan Jarak */}
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-300">Pembulatan Jarak</label>
+                            <select
+                              value={distanceRoundingMode}
+                              onChange={(e) => setDistanceRoundingMode(e.target.value as 'ceil' | 'round' | 'floor')}
+                              className="w-full max-w-[200px] px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 font-sans"
+                            >
+                              <option value="ceil">Ke atas (Ceil)</option>
+                              <option value="round">Terdekat (Round)</option>
+                              <option value="floor">Ke bawah (Floor)</option>
+                            </select>
+                            <span className="text-[10px] text-slate-500 block">Aturan pembulatan jarak desimal ke KM terdekat.</span>
+                          </div>
+
+                          {/* Mode Hitung Jarak */}
+                          <div className="flex flex-col gap-1 border-t md:border-t-0 md:border-l border-slate-850/60 pt-4 md:pt-0 md:pl-4">
+                            <label className="text-[11px] font-bold text-slate-300">Mode Hitung Jarak</label>
+                            <select
+                              value={distanceCalculationMode}
+                              onChange={(e) => setDistanceCalculationMode(e.target.value as 'manual' | 'mock' | 'maps_api_later')}
+                              className="w-full max-w-[200px] px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 font-sans"
+                            >
+                              <option value="manual">Manual untuk Demo</option>
+                              <option value="mock">Simulasi / Mock</option>
+                              <option value="maps_api_later">Maps API Nanti</option>
+                            </select>
+                            <span className="text-[10px] text-slate-500 block">Bagaimana jarak dihitung di halaman checkout.</span>
+                          </div>
+                        </div>
+
+                        {/* Free Delivery Section for Distance-based */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-850/50 pt-4">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h5 className="text-[11px] font-bold text-slate-300">Gratis Ongkir</h5>
+                                <p className="text-[9px] text-slate-550">Gratiskan ongkir dengan minimal pembelian tertentu.</p>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer scale-90">
+                                <input
+                                  type="checkbox"
+                                  checked={freeDeliveryEnabled}
+                                  onChange={(e) => setFreeDeliveryEnabled(e.target.checked)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-emerald-500"></div>
+                              </label>
+                            </div>
+                            {freeDeliveryEnabled && (
+                              <div className="mt-1 flex flex-col gap-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={freeDeliveryMinimumAmount}
+                                  onChange={(e) => setFreeDeliveryMinimumAmount(Number(e.target.value))}
+                                  placeholder="50000"
+                                  className="w-full max-w-[200px] px-3.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500"
+                                />
+                                <p className="text-[9px] text-amber-400 italic">
+                                  💡 Gratis ongkir akan otomatis diterapkan apabila subtotal belanja pelanggan &ge; {formatRupiah(freeDeliveryMinimumAmount)}.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex flex-col justify-center border-t md:border-t-0 md:border-l border-slate-850/60 pt-4 md:pt-0 md:pl-4 text-[10px] text-slate-450 italic font-sans leading-relaxed">
+                            📢 <strong>Informasi:</strong> Saat ini jarak masih dihitung manual/simulasi. Integrasi Maps API akan dilakukan setelah database dan backend siap.
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Delivery Admin Fee Section */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-850/50 pt-4">

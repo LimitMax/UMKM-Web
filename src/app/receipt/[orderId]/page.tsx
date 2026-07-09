@@ -6,7 +6,7 @@ import { Printer, ArrowLeft, Phone, AlertTriangle } from 'lucide-react';
 import { orderService } from '../../../services/orderService';
 import { businessService } from '../../../services/businessService';
 import { Order, BusinessProfile } from '../../../types';
-import { formatRupiah, formatDate } from '../../../utils/format';
+import { formatRupiah, formatDate, formatOrderStatus } from '../../../utils/format';
 
 export default function ReceiptPage() {
   const { orderId } = useParams() as { orderId: string };
@@ -194,6 +194,10 @@ export default function ReceiptPage() {
             <span>STATUS:</span>
             <span className="font-bold">{order.paymentStatus === 'Paid' ? 'LUNAS' : 'BELUM BAYAR'}</span>
           </div>
+          <div className="flex justify-between">
+            <span>STATUS PESANAN:</span>
+            <span className="font-bold uppercase text-black">{formatOrderStatus(order.status)}</span>
+          </div>
         </div>
 
         {order.fulfillmentType === 'delivery' && (
@@ -203,6 +207,12 @@ export default function ReceiptPage() {
             <div>No. WA Penerima: <strong className="text-black">{order.deliveryPhone || '-'}</strong></div>
             <div className="mt-0.5">Alamat: <strong className="text-black font-sans">{order.deliveryAddress || '-'}</strong></div>
             {order.deliveryNotes && <div className="mt-0.5 italic">Catatan: &ldquo;{order.deliveryNotes}&rdquo;</div>}
+            {order.deliveryDistanceKm !== undefined && order.deliveryDistanceKm > 0 && (
+              <div className="mt-0.5 border-t border-dashed border-slate-300 pt-0.5">Jarak: <strong className="text-black">{order.deliveryDistanceKm} KM</strong></div>
+            )}
+            {order.deliveryFeeCalculationType && (
+              <div>Tipe Tarif: <strong className="text-black">{order.deliveryFeeCalculationType === 'distance_based' ? 'Jarak' : 'Flat'}</strong></div>
+            )}
           </div>
         )}
 

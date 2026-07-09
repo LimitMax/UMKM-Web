@@ -126,13 +126,20 @@ export const insightService = {
 
     const deliveryOrders = activeOrders.filter((o) => o.fulfillmentType === 'delivery');
     if (deliveryOrders.length > 0) {
-      recommendations.push(
-        "Sebagian pesanan hari ini menggunakan delivery. Pastikan alamat pelanggan dikonfirmasi sebelum pengiriman."
-      );
-      const profile = businessService.getProfile();
-      if (profile.deliverySettings?.freeDeliveryEnabled) {
+      if (deliveryOrders.length >= 2) {
         recommendations.push(
-          "Gratis ongkir aktif. Pantau margin karena biaya pengiriman dapat memengaruhi keuntungan."
+          "Pesanan delivery cukup aktif. Evaluasi biaya ongkir per KM agar margin tetap aman."
+        );
+      } else {
+        recommendations.push(
+          "Sebagian pesanan hari ini menggunakan delivery. Pastikan alamat pelanggan dikonfirmasi sebelum pengiriman."
+        );
+      }
+      const profile = businessService.getProfile();
+      const freeDeliveryCount = deliveryOrders.filter((o) => o.freeDeliveryApplied).length;
+      if (freeDeliveryCount > 0 || profile.deliverySettings?.freeDeliveryEnabled) {
+        recommendations.push(
+          "Gratis ongkir banyak digunakan. Pastikan minimum belanja sudah menutup biaya operasional pengiriman."
         );
       }
     }

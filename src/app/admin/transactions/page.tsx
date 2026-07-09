@@ -253,6 +253,18 @@ export default function AdminTransactionsPage() {
                       Catatan: &ldquo;{selectedTx.deliveryNotes}&rdquo;
                     </div>
                   )}
+                  {selectedTx.deliveryDistanceKm !== undefined && selectedTx.deliveryDistanceKm > 0 && (
+                    <div className="text-slate-400">
+                      Jarak: <strong className="text-slate-200">{selectedTx.deliveryDistanceKm} KM</strong>
+                    </div>
+                  )}
+                  {selectedTx.deliveryFeeCalculationType && (
+                    <div className="text-slate-400">
+                      Tipe Tarif: <strong className="text-slate-200">
+                        {selectedTx.deliveryFeeCalculationType === 'distance_based' ? 'Berdasarkan Jarak' : 'Flat'}
+                      </strong>
+                    </div>
+                  )}
                 </div>
               )}
 
