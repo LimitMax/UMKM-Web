@@ -155,7 +155,13 @@ export function generateCSVReport(orders: Order[], businessProfile: BusinessProf
     'Delivery Admin Fee',
     'Free Delivery Applied',
     'Delivery Distance KM',
-    'Delivery Fee Calculation Type'
+    'Delivery Fee Calculation Type',
+    'ETA Label',
+    'Estimasi Total Menit',
+    'Estimasi Siap',
+    'Estimasi Sampai',
+    'Disesuaikan Manual',
+    'Alasan Penyesuaian',
   ];
 
   const rows = orders.map((order) => {
@@ -189,7 +195,14 @@ export function generateCSVReport(orders: Order[], businessProfile: BusinessProf
       escapeCsvValue(order.deliveryAdminFeeAmount ?? 0),
       escapeCsvValue(order.freeDeliveryApplied ? 'true' : 'false'),
       escapeCsvValue(order.deliveryDistanceKm !== undefined ? order.deliveryDistanceKm : ''),
-      escapeCsvValue(order.deliveryFeeCalculationType || 'fixed')
+      escapeCsvValue(order.deliveryFeeCalculationType || 'fixed'),
+      // Phase 6.8 ETA columns
+      escapeCsvValue(order.etaLabel || ''),
+      escapeCsvValue(order.estimatedTotalMinutes !== undefined ? order.estimatedTotalMinutes : ''),
+      escapeCsvValue(order.estimatedReadyAt || ''),
+      escapeCsvValue(order.estimatedArrivalAt || ''),
+      escapeCsvValue(order.etaManuallyAdjusted ? 'true' : 'false'),
+      escapeCsvValue(order.etaAdjustmentReason || ''),
     ];
   });
 

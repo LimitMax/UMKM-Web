@@ -29,6 +29,7 @@ import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
 import { Product, ProductCategory, OrderItem, PaymentMethod, BusinessProfile, FulfillmentType } from '../../types';
 import { formatRupiah } from '../../utils/format';
 import { calculateOrderTotals } from '../../utils/calculations';
+import { previewOrderEta, getEtaLabel, formatEtaDisplay } from '../../utils/etaHelpers';
 
 export default function CustomerOrderPage() {
   const router = useRouter();
@@ -802,6 +803,29 @@ export default function CustomerOrderPage() {
                     <span className="text-emerald-400 text-sm">{formatRupiah(totalAmount)}</span>
                   </div>
                 </div>
+
+                {/* ETA Preview Badge — Phase 6.8 */}
+                {businessProfile?.etaSettings?.etaEnabled && cart.length > 0 && (() => {
+                  const settings = businessProfile.etaSettings!;
+                  const distKm = fulfillmentType === 'delivery' && deliveryDistanceKm > 0 ? deliveryDistanceKm : undefined;
+                  const eta = previewOrderEta(fulfillmentType, settings, distKm);
+                  const label = getEtaLabel(fulfillmentType);
+                  const displayStr = formatEtaDisplay(eta.totalMinutes, eta.estimatedAtIso, settings.etaDisplayMode);
+                  return (
+                    <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl bg-amber-500/8 border border-amber-500/20">
+                      <Clock className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-amber-400/70">{label}</span>
+                        <span className="text-[10px] font-bold text-amber-300">
+                          {displayStr}
+                          {eta.distanceMissing && fulfillmentType === 'delivery' && (
+                            <span className="ml-1 text-amber-400/50 font-normal">(jarak belum diisi)</span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {errorMsg && (
                   <div className="p-2 mb-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-450 text-[10px] flex items-center gap-1">

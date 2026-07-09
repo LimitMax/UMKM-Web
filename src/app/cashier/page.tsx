@@ -28,6 +28,8 @@ import RoleGuardBanner from '../../components/RoleGuardBanner';
 import { authService, UserProfile } from '../../services/authService';
 import { Order, OrderStatus } from '../../types';
 import { formatRupiah } from '../../utils/format';
+import { formatEtaMinutes, formatEstimatedTime } from '../../utils/etaHelpers';
+import { Clock } from 'lucide-react';
 
 export default function CashierDashboard() {
   const router = useRouter();
@@ -40,6 +42,12 @@ export default function CashierDashboard() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('Antrean Aktif');
+
+  // ETA adjustment state (Phase 6.8)
+  const [etaAdjustDelta, setEtaAdjustDelta] = useState<number>(0);
+  const [etaAdjustReason, setEtaAdjustReason] = useState<string>('');
+  const [etaAdjustLoading, setEtaAdjustLoading] = useState<boolean>(false);
+  const [etaAdjustSuccess, setEtaAdjustSuccess] = useState<boolean>(false);
   
   // Track previous order count to play notification chime on new order
   const prevOrdersCountRef = useRef<number | null>(null);
@@ -406,9 +414,19 @@ export default function CashierDashboard() {
                                 : 'Meja'}
                           </span>
                         </div>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          {ord.items.length} Item &bull; {formatRupiah(ord.totalAmount)} &bull; {ord.paymentMethod}
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        {ord.items.length} Item &bull; {formatRupiah(ord.totalAmount)} &bull; {ord.paymentMethod}
+                      </p>
+                      {/* ETA compact badge (Phase 6.8) */}
+                      {businessProfile?.etaSettings?.etaEnabled && ord.estimatedTotalMinutes !== undefined && (
+                        <p className="text-[9px] text-amber-400/70 mt-0.5 flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" />
+                          {formatEtaMinutes(ord.estimatedTotalMinutes)}
+                          {ord.estimatedArrivalAt && (
+                            <span className="text-amber-400/50">&bull; {formatEstimatedTime(ord.estimatedArrivalAt)}</span>
+                          )}
                         </p>
+                      )}
                       </div>
                     </div>
 
@@ -583,6 +601,94 @@ export default function CashierDashboard() {
                   </div>
                 </div>
               </div>
+
+              {/* ETA Section (Phase 6.8) */}
+              {businessProfile?.etaSettings?.etaEnabled && selectedOrder.estimatedTotalMinutes !== undefined && (
+                <div className="border border-amber-500/15 rounded-xl p-3 bg-amber-500/4 flex flex-col gap-2.5 mx-0.5 mb-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-mono uppercase tracking-wider text-amber-400/70 flex items-center gap-1.5">
+                      <Clock className="w-3 h-3" /> Estimasi Waktu
+                    </h4>
+                    {selectedOrder.etaManuallyAdjusted && (
+                      <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">Disesuaikan</span>
+                    )}
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-400">Total ETA</span>
+                    <span className="font-bold text-amber-300">{formatEtaMinutes(selectedOrder.estimatedTotalMinutes)}</span>
+                  </div>
+                  {selectedOrder.estimatedReadyAt && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">Perkiraan Siap</span>
+                      <span className="font-bold text-white">{formatEstimatedTime(selectedOrder.estimatedReadyAt)}</span>
+                    </div>
+                  )}
+                  {selectedOrder.estimatedArrivalAt && selectedOrder.fulfillmentType === 'delivery' && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">Perkiraan Sampai</span>
+                      <span className="font-bold text-white">{formatEstimatedTime(selectedOrder.estimatedArrivalAt)}</span>
+                    </div>
+                  )}
+                  {selectedOrder.etaAdjustmentReason && (
+                    <div className="text-[9px] text-amber-400/60 italic border-t border-amber-500/10 pt-1.5">
+                      Alasan: {selectedOrder.etaAdjustmentReason}
+                    </div>
+                  )}
+
+                  {/* Manual Adjustment Form */}
+                  <div className="border-t border-amber-500/10 pt-2.5 flex flex-col gap-2">
+                    <p className="text-[9px] font-mono uppercase tracking-wider text-slate-500">Ubah Estimasi (kasir)</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEtaAdjustDelta((d) => d - 5)}
+                          className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center cursor-pointer transition-all"
+                        >-5</button>
+                        <span className="w-10 text-center text-xs font-bold text-white">{etaAdjustDelta > 0 ? `+${etaAdjustDelta}` : etaAdjustDelta} mnt</span>
+                        <button
+                          type="button"
+                          onClick={() => setEtaAdjustDelta((d) => d + 5)}
+                          className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center cursor-pointer transition-all"
+                        >+5</button>
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      value={etaAdjustReason}
+                      onChange={(e) => setEtaAdjustReason(e.target.value)}
+                      placeholder="Alasan (mis: antrean panjang, bahan habis...)"
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-[10px] text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="button"
+                      disabled={etaAdjustDelta === 0 || !etaAdjustReason.trim() || etaAdjustLoading}
+                      onClick={async () => {
+                        if (!etaAdjustReason.trim() || etaAdjustDelta === 0) return;
+                        setEtaAdjustLoading(true);
+                        try {
+                          await orderService.updateOrderEta(selectedOrder.id, etaAdjustDelta, etaAdjustReason);
+                          setEtaAdjustDelta(0);
+                          setEtaAdjustReason('');
+                          setEtaAdjustSuccess(true);
+                          // Instantly refresh local state
+                          const allOrders = await orderService.getOrders();
+                          setOrders(allOrders);
+                          setTimeout(() => setEtaAdjustSuccess(false), 2000);
+                        } catch (err) {
+                          alert(err instanceof Error ? err.message : 'Gagal mengubah ETA.');
+                        } finally {
+                          setEtaAdjustLoading(false);
+                        }
+                      }}
+                      className="w-full py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 font-bold text-[10px] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <Clock className="w-3 h-3" />
+                      {etaAdjustLoading ? 'Menyimpan...' : etaAdjustSuccess ? '✓ Tersimpan' : 'Simpan Perubahan ETA'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Sticky bottom footer for workflow buttons and receipt links (fixed) */}
               <div className="border-t border-slate-800 pt-3 mt-auto flex-shrink-0 bg-slate-900 flex flex-col gap-3">

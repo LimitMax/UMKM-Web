@@ -5,6 +5,19 @@ export type FulfillmentType = 'dine_in' | 'pickup' | 'delivery';
 export type DeliveryFeeCalculationType = 'fixed' | 'distance_based';
 export type DistanceRoundingMode = 'ceil' | 'round' | 'floor';
 export type DistanceCalculationMode = 'manual' | 'mock' | 'maps_api_later';
+export type EtaDisplayMode = 'minutes_only' | 'estimated_time' | 'both';
+
+// Phase 6.8 — ETA Settings
+export interface OrderEtaSettings {
+  etaEnabled: boolean;
+  defaultPreparationMinutes: number;
+  rushHourBufferMinutes: number;
+  dineInServingBufferMinutes: number;
+  pickupBufferMinutes: number;
+  deliveryBaseMinutes: number;
+  deliveryMinutesPerKm: number;
+  etaDisplayMode: EtaDisplayMode;
+}
 
 export interface DeliverySettings {
   deliveryEnabled: boolean;
@@ -84,6 +97,16 @@ export interface Order {
   deliveryDistanceKm?: number;
   deliveryDistanceSource?: string;
   deliveryFeeCalculationType?: DeliveryFeeCalculationType;
+  // Phase 6.8 — ETA fields (all optional for backward compat)
+  estimatedPreparationMinutes?: number;
+  estimatedDeliveryMinutes?: number;
+  estimatedTotalMinutes?: number;
+  estimatedReadyAt?: string;     // ISO string
+  estimatedArrivalAt?: string;   // ISO string (delivery only)
+  etaLabel?: string;
+  etaUpdatedAt?: string;         // ISO string
+  etaManuallyAdjusted?: boolean;
+  etaAdjustmentReason?: string;
 }
 
 export interface BusinessProfile {
@@ -101,6 +124,7 @@ export interface BusinessProfile {
   serviceChargeEnabled: boolean;
   serviceChargePercentage: number;
   deliverySettings?: DeliverySettings;
+  etaSettings?: OrderEtaSettings;
 }
 
 export interface SalesSummary {

@@ -22,11 +22,13 @@ import {
   ListOrdered,
   ChevronRight,
   Sparkles,
+  Clock,
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { demoService, DemoStats, GenerateResult } from '../../../services/demoService';
-import { businessService } from '../../../services/businessService';
+import { businessService, DEFAULT_ETA_SETTINGS } from '../../../services/businessService';
 import { formatRupiah } from '../../../utils/format';
+import type { EtaDisplayMode } from '../../../types';
 
 interface ConfirmConfig {
   title: string;
@@ -158,6 +160,40 @@ export default function AdminSettingsPage() {
     return businessService.getProfile().deliverySettings?.distanceCalculationMode ?? 'manual';
   });
 
+  // ETA Settings states (Phase 6.8)
+  const [etaEnabled, setEtaEnabled] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return businessService.getProfile().etaSettings?.etaEnabled ?? true;
+  });
+  const [defaultPreparationMinutes, setDefaultPreparationMinutes] = useState(() => {
+    if (typeof window === 'undefined') return 15;
+    return businessService.getProfile().etaSettings?.defaultPreparationMinutes ?? 15;
+  });
+  const [rushHourBufferMinutes, setRushHourBufferMinutes] = useState(() => {
+    if (typeof window === 'undefined') return 5;
+    return businessService.getProfile().etaSettings?.rushHourBufferMinutes ?? 5;
+  });
+  const [dineInServingBufferMinutes, setDineInServingBufferMinutes] = useState(() => {
+    if (typeof window === 'undefined') return 3;
+    return businessService.getProfile().etaSettings?.dineInServingBufferMinutes ?? 3;
+  });
+  const [pickupBufferMinutes, setPickupBufferMinutes] = useState(() => {
+    if (typeof window === 'undefined') return 5;
+    return businessService.getProfile().etaSettings?.pickupBufferMinutes ?? 5;
+  });
+  const [deliveryBaseMinutes, setDeliveryBaseMinutes] = useState(() => {
+    if (typeof window === 'undefined') return 5;
+    return businessService.getProfile().etaSettings?.deliveryBaseMinutes ?? 5;
+  });
+  const [deliveryMinutesPerKm, setDeliveryMinutesPerKm] = useState(() => {
+    if (typeof window === 'undefined') return 4;
+    return businessService.getProfile().etaSettings?.deliveryMinutesPerKm ?? 4;
+  });
+  const [etaDisplayMode, setEtaDisplayMode] = useState<EtaDisplayMode>(() => {
+    if (typeof window === 'undefined') return 'both';
+    return businessService.getProfile().etaSettings?.etaDisplayMode ?? 'both';
+  });
+
   // Dynamic order link state
   const [orderLink, setOrderLink] = useState('');
 
@@ -256,7 +292,17 @@ export default function AdminSettingsPage() {
           maxDeliveryDistanceKm: Number(maxDeliveryDistanceKm),
           distanceRoundingMode,
           distanceCalculationMode,
-        }
+        },
+        etaSettings: {
+          etaEnabled,
+          defaultPreparationMinutes: Number(defaultPreparationMinutes),
+          rushHourBufferMinutes: Number(rushHourBufferMinutes),
+          dineInServingBufferMinutes: Number(dineInServingBufferMinutes),
+          pickupBufferMinutes: Number(pickupBufferMinutes),
+          deliveryBaseMinutes: Number(deliveryBaseMinutes),
+          deliveryMinutesPerKm: Number(deliveryMinutesPerKm),
+          etaDisplayMode,
+        },
       });
 
       // Sync user session businessName
@@ -331,6 +377,16 @@ export default function AdminSettingsPage() {
           setMaxDeliveryDistanceKm(defaults.deliverySettings?.maxDeliveryDistanceKm ?? 10);
           setDistanceRoundingMode(defaults.deliverySettings?.distanceRoundingMode ?? 'ceil');
           setDistanceCalculationMode(defaults.deliverySettings?.distanceCalculationMode ?? 'manual');
+
+          // Reset ETA settings states (Phase 6.8)
+          setEtaEnabled(DEFAULT_ETA_SETTINGS.etaEnabled);
+          setDefaultPreparationMinutes(DEFAULT_ETA_SETTINGS.defaultPreparationMinutes);
+          setRushHourBufferMinutes(DEFAULT_ETA_SETTINGS.rushHourBufferMinutes);
+          setDineInServingBufferMinutes(DEFAULT_ETA_SETTINGS.dineInServingBufferMinutes);
+          setPickupBufferMinutes(DEFAULT_ETA_SETTINGS.pickupBufferMinutes);
+          setDeliveryBaseMinutes(DEFAULT_ETA_SETTINGS.deliveryBaseMinutes);
+          setDeliveryMinutesPerKm(DEFAULT_ETA_SETTINGS.deliveryMinutesPerKm);
+          setEtaDisplayMode(DEFAULT_ETA_SETTINGS.etaDisplayMode);
 
           // Reset user session businessName
           const sessionKey = 'umkm_pilot_user_session';
@@ -1114,7 +1170,162 @@ export default function AdminSettingsPage() {
                 )}
               </div>
 
+              {/* ── ETA Settings Section ─────────────────────────────────── */}
+              <div className="border-b border-slate-800 pb-3 pt-2">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  <span>Estimasi Waktu Pesanan (ETA)</span>
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Tampilkan perkiraan waktu siap/sampai kepada pelanggan berdasarkan aturan waktu sederhana.</p>
+              </div>
+
+              <div className="flex flex-col gap-5 bg-slate-950/40 p-4 rounded-xl border border-slate-850">
+                {/* ETA Enable Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200">Aktifkan Estimasi Waktu</h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Tampilkan ETA kepada pelanggan di halaman order, sukses, dan struk digital.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={etaEnabled}
+                      onChange={(e) => setEtaEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:after:bg-slate-950 peer-checked:after:border-amber-500"></div>
+                  </label>
+                </div>
+
+                {etaEnabled && (
+                  <div className="flex flex-col gap-4 pt-3 border-t border-slate-850/50">
+                    {/* Display Mode */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Tampilan ETA</label>
+                      <div className="flex gap-2">
+                        {([
+                          { value: 'minutes_only', label: 'Menit Saja' },
+                          { value: 'estimated_time', label: 'Jam Perkiraan' },
+                          { value: 'both', label: 'Keduanya' },
+                        ] as { value: EtaDisplayMode; label: string }[]).map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setEtaDisplayMode(opt.value)}
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all cursor-pointer ${
+                              etaDisplayMode === opt.value
+                                ? 'bg-amber-500/10 border-amber-500 text-amber-400'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Numeric Inputs Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Waktu Persiapan (mnt)</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number" min="1" max="120"
+                            value={defaultPreparationMinutes}
+                            onChange={(e) => setDefaultPreparationMinutes(Number(e.target.value))}
+                            className="w-20 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white text-center focus:outline-none focus:border-amber-500"
+                          />
+                          <span className="text-[10px] text-slate-500">menit</span>
+                        </div>
+                        <span className="text-[9px] text-slate-600">Waktu dasar penyiapan semua order</span>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Buffer Jam Sibuk (mnt)</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number" min="0" max="60"
+                            value={rushHourBufferMinutes}
+                            onChange={(e) => setRushHourBufferMinutes(Number(e.target.value))}
+                            className="w-20 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white text-center focus:outline-none focus:border-amber-500"
+                          />
+                          <span className="text-[10px] text-slate-500">menit</span>
+                        </div>
+                        <span className="text-[9px] text-slate-600">Ditambahkan ke semua tipe order</span>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Buffer Dine-in (mnt)</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number" min="0" max="30"
+                            value={dineInServingBufferMinutes}
+                            onChange={(e) => setDineInServingBufferMinutes(Number(e.target.value))}
+                            className="w-20 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white text-center focus:outline-none focus:border-amber-500"
+                          />
+                          <span className="text-[10px] text-slate-500">menit</span>
+                        </div>
+                        <span className="text-[9px] text-slate-600">Waktu antar ke meja (dine-in)</span>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Buffer Pickup (mnt)</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number" min="0" max="30"
+                            value={pickupBufferMinutes}
+                            onChange={(e) => setPickupBufferMinutes(Number(e.target.value))}
+                            className="w-20 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white text-center focus:outline-none focus:border-amber-500"
+                          />
+                          <span className="text-[10px] text-slate-500">menit</span>
+                        </div>
+                        <span className="text-[9px] text-slate-600">Waktu tambahan untuk ambil di toko</span>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Waktu Antar Awal (mnt)</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number" min="1" max="60"
+                            value={deliveryBaseMinutes}
+                            onChange={(e) => setDeliveryBaseMinutes(Number(e.target.value))}
+                            className="w-20 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white text-center focus:outline-none focus:border-amber-500"
+                          />
+                          <span className="text-[10px] text-slate-500">menit</span>
+                        </div>
+                        <span className="text-[9px] text-slate-600">Waktu minimum pengiriman delivery</span>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Waktu / KM (mnt)</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number" min="1" max="30"
+                            value={deliveryMinutesPerKm}
+                            onChange={(e) => setDeliveryMinutesPerKm(Number(e.target.value))}
+                            className="w-20 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white text-center focus:outline-none focus:border-amber-500"
+                          />
+                          <span className="text-[10px] text-slate-500">mnt/km</span>
+                        </div>
+                        <span className="text-[9px] text-slate-600">Tambahan waktu per kilometer</span>
+                      </div>
+                    </div>
+
+                    {/* Formula Preview */}
+                    <div className="bg-slate-950 border border-amber-500/10 rounded-xl p-3 flex flex-col gap-1.5">
+                      <p className="text-[9px] font-mono text-amber-400/60 uppercase tracking-wider">Pratinjau Formula</p>
+                      <div className="flex flex-col gap-1 text-[10px] text-slate-400 font-mono">
+                        <span>Dine-in: {defaultPreparationMinutes} + {rushHourBufferMinutes} + {dineInServingBufferMinutes} = <span className="text-amber-400 font-bold">{defaultPreparationMinutes + rushHourBufferMinutes + dineInServingBufferMinutes} mnt</span></span>
+                        <span>Pickup: {defaultPreparationMinutes} + {rushHourBufferMinutes} + {pickupBufferMinutes} = <span className="text-amber-400 font-bold">{defaultPreparationMinutes + rushHourBufferMinutes + pickupBufferMinutes} mnt</span></span>
+                        <span>Delivery (2km): {defaultPreparationMinutes} + {rushHourBufferMinutes} + ({deliveryBaseMinutes} + 2×{deliveryMinutesPerKm}) = <span className="text-amber-400 font-bold">{defaultPreparationMinutes + rushHourBufferMinutes + deliveryBaseMinutes + 2 * deliveryMinutesPerKm} mnt</span></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Form Action Buttons */}
+
               <div className="flex gap-3 pt-2 border-t border-slate-800">
                 <button
                   type="button"

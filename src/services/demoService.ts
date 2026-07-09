@@ -10,6 +10,7 @@ import { Order, Product, PaymentMethod, OrderStatus, PaymentStatus, FulfillmentT
 import { getStorageItem, setStorageItem, STORAGE_KEYS, SEED_PRODUCTS } from './db';
 import { businessService } from './businessService';
 import { calculateOrderTotals } from '../utils/calculations';
+import { calculateOrderEta } from '../utils/etaHelpers';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -327,6 +328,25 @@ export const demoService = {
         deliveryDistanceKm: blueprint.deliveryDistanceKm,
         deliveryDistanceSource: blueprint.deliveryDistanceSource,
         deliveryFeeCalculationType: blueprint.deliveryFeeCalculationType || 'fixed',
+        // Phase 6.8 — ETA injection
+        ...(profile.etaSettings?.etaEnabled ? (() => {
+          const etaResult = calculateOrderEta(
+            blueprint.fulfillmentType || 'dine_in',
+            createdAt,
+            profile.etaSettings!,
+            blueprint.deliveryDistanceKm
+          );
+          return {
+            estimatedPreparationMinutes: etaResult.estimatedPreparationMinutes,
+            estimatedDeliveryMinutes: etaResult.estimatedDeliveryMinutes,
+            estimatedTotalMinutes: etaResult.estimatedTotalMinutes,
+            estimatedReadyAt: etaResult.estimatedReadyAt,
+            estimatedArrivalAt: etaResult.estimatedArrivalAt,
+            etaLabel: etaResult.etaLabel,
+            etaUpdatedAt: etaResult.etaUpdatedAt,
+            etaManuallyAdjusted: false,
+          };
+        })() : {}),
       };
     });
 

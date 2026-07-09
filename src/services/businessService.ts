@@ -1,4 +1,4 @@
-import { BusinessProfile } from '../types';
+import { BusinessProfile, OrderEtaSettings } from '../types';
 import { getStorageItem, setStorageItem } from './db';
 
 export const BUSINESS_PROFILE_KEY = 'umkm_pilot_business_profile';
@@ -23,6 +23,18 @@ export const DEFAULT_DELIVERY_SETTINGS = {
   distanceCalculationMode: 'manual' as const,
 };
 
+// Phase 6.8 — ETA default settings
+export const DEFAULT_ETA_SETTINGS: OrderEtaSettings = {
+  etaEnabled: true,
+  defaultPreparationMinutes: 15,
+  rushHourBufferMinutes: 5,
+  dineInServingBufferMinutes: 3,
+  pickupBufferMinutes: 5,
+  deliveryBaseMinutes: 5,
+  deliveryMinutesPerKm: 4,
+  etaDisplayMode: 'both',
+};
+
 export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
   businessName: 'Warung Kopi Nusantara',
   businessType: 'Kedai Kopi & Makanan',
@@ -38,6 +50,7 @@ export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
   serviceChargeEnabled: false,
   serviceChargePercentage: 5,
   deliverySettings: DEFAULT_DELIVERY_SETTINGS,
+  etaSettings: DEFAULT_ETA_SETTINGS,
 };
 
 export const businessService = {
@@ -50,7 +63,11 @@ export const businessService = {
       deliverySettings: {
         ...DEFAULT_DELIVERY_SETTINGS,
         ...(profile?.deliverySettings || {}),
-      }
+      },
+      etaSettings: {
+        ...DEFAULT_ETA_SETTINGS,
+        ...(profile?.etaSettings || {}),
+      },
     };
   },
 

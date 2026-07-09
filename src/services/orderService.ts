@@ -5,6 +5,97 @@ import { USE_SUPABASE } from '../config/dbConfig';
 import { supabase } from '../lib/supabase';
 import { businessService } from './businessService';
 import { calculateOrderTotals } from '../utils/calculations';
+import { calculateOrderEta, applyEtaAdjustment } from '../utils/etaHelpers';
+
+interface DbOrderItem {
+  product_id: string;
+  name: string;
+  price: string | number;
+  quantity: number;
+}
+
+interface DbOrder {
+  id: string;
+  queue_number: string;
+  customer_name: string;
+  customer_phone: string;
+  notes?: string | null;
+  subtotal?: string | number | null;
+  service_charge_amount?: string | number | null;
+  tax_amount?: string | number | null;
+  total_amount: string | number;
+  payment_method: string;
+  payment_status: string;
+  status: string;
+  created_at: string;
+  fulfillment_type?: string | null;
+  recipient_name?: string | null;
+  delivery_phone?: string | null;
+  delivery_address?: string | null;
+  delivery_notes?: string | null;
+  delivery_fee_amount?: string | number | null;
+  delivery_admin_fee_amount?: string | number | null;
+  free_delivery_applied?: boolean | null;
+  delivery_distance_km?: string | number | null;
+  delivery_distance_source?: string | null;
+  delivery_fee_calculation_type?: string | null;
+  estimated_preparation_minutes?: number | null;
+  estimated_delivery_minutes?: number | null;
+  estimated_total_minutes?: number | null;
+  estimated_ready_at?: string | null;
+  estimated_arrival_at?: string | null;
+  eta_label?: string | null;
+  eta_updated_at?: string | null;
+  eta_manually_adjusted?: boolean | null;
+  eta_adjustment_reason?: string | null;
+  items?: DbOrderItem[] | null;
+}
+
+function mapDbOrderToOrder(dbOrder: DbOrder): Order {
+  if (!dbOrder) return dbOrder;
+  return {
+    id: dbOrder.id,
+    queueNumber: dbOrder.queue_number,
+    customerName: dbOrder.customer_name,
+    customerPhone: dbOrder.customer_phone,
+    notes: dbOrder.notes || undefined,
+    subtotal: dbOrder.subtotal !== null && dbOrder.subtotal !== undefined ? Number(dbOrder.subtotal) : undefined,
+    serviceChargeAmount: dbOrder.service_charge_amount !== null && dbOrder.service_charge_amount !== undefined ? Number(dbOrder.service_charge_amount) : undefined,
+    taxAmount: dbOrder.tax_amount !== null && dbOrder.tax_amount !== undefined ? Number(dbOrder.tax_amount) : undefined,
+    totalAmount: Number(dbOrder.total_amount),
+    paymentMethod: dbOrder.payment_method as Order['paymentMethod'],
+    paymentStatus: dbOrder.payment_status as Order['paymentStatus'],
+    status: dbOrder.status as Order['status'],
+    createdAt: dbOrder.created_at,
+    fulfillmentType: (dbOrder.fulfillment_type || 'dine_in') as Order['fulfillmentType'],
+    recipientName: dbOrder.recipient_name || undefined,
+    deliveryPhone: dbOrder.delivery_phone || undefined,
+    deliveryAddress: dbOrder.delivery_address || undefined,
+    deliveryNotes: dbOrder.delivery_notes || undefined,
+    deliveryFeeAmount: dbOrder.delivery_fee_amount !== null && dbOrder.delivery_fee_amount !== undefined ? Number(dbOrder.delivery_fee_amount) : undefined,
+    deliveryAdminFeeAmount: dbOrder.delivery_admin_fee_amount !== null && dbOrder.delivery_admin_fee_amount !== undefined ? Number(dbOrder.delivery_admin_fee_amount) : undefined,
+    freeDeliveryApplied: dbOrder.free_delivery_applied !== null && dbOrder.free_delivery_applied !== undefined ? dbOrder.free_delivery_applied : undefined,
+    deliveryDistanceKm: dbOrder.delivery_distance_km !== null && dbOrder.delivery_distance_km !== undefined ? Number(dbOrder.delivery_distance_km) : undefined,
+    deliveryDistanceSource: dbOrder.delivery_distance_source || undefined,
+    deliveryFeeCalculationType: (dbOrder.delivery_fee_calculation_type || undefined) as Order['deliveryFeeCalculationType'],
+    // Phase 6.8 ETA fields
+    estimatedPreparationMinutes: dbOrder.estimated_preparation_minutes !== null && dbOrder.estimated_preparation_minutes !== undefined ? dbOrder.estimated_preparation_minutes : undefined,
+    estimatedDeliveryMinutes: dbOrder.estimated_delivery_minutes !== null && dbOrder.estimated_delivery_minutes !== undefined ? dbOrder.estimated_delivery_minutes : undefined,
+    estimatedTotalMinutes: dbOrder.estimated_total_minutes !== null && dbOrder.estimated_total_minutes !== undefined ? dbOrder.estimated_total_minutes : undefined,
+    estimatedReadyAt: dbOrder.estimated_ready_at || undefined,
+    estimatedArrivalAt: dbOrder.estimated_arrival_at || undefined,
+    etaLabel: dbOrder.eta_label || undefined,
+    etaUpdatedAt: dbOrder.eta_updated_at || undefined,
+    etaManuallyAdjusted: dbOrder.eta_manually_adjusted !== null && dbOrder.eta_manually_adjusted !== undefined ? dbOrder.eta_manually_adjusted : false,
+    etaAdjustmentReason: dbOrder.eta_adjustment_reason || undefined,
+    items: (dbOrder.items || []).map((item: DbOrderItem) => ({
+      productId: item.product_id,
+      name: item.name,
+      price: Number(item.price),
+      quantity: item.quantity
+    }))
+  };
+}
 
 export const orderService = {
   async getOrders(): Promise<Order[]> {
@@ -20,7 +111,7 @@ export const orderService = {
         console.error('Supabase getOrders error:', error.message);
         throw error;
       }
-      return data || [];
+      return (data || []).map(mapDbOrderToOrder);
     }
 
     return getStorageItem<Order[]>(STORAGE_KEYS.ORDERS, []);
@@ -40,7 +131,7 @@ export const orderService = {
         console.error('Supabase getOrderById error:', error.message);
         return undefined;
       }
-      return data;
+      return data ? mapDbOrderToOrder(data) : undefined;
     }
 
     return (await this.getOrders()).find((o) => o.id === id);
@@ -131,7 +222,20 @@ export const orderService = {
       await productService.adjustStock(item.productId, -item.quantity);
     }
 
+    const createdAt = new Date().toISOString();
+
     if (USE_SUPABASE) {
+      // Calculate ETA if enabled
+      const etaSettings = profile.etaSettings;
+      const etaResult = etaSettings?.etaEnabled
+        ? calculateOrderEta(
+            orderData.fulfillmentType || 'dine_in',
+            createdAt,
+            etaSettings,
+            orderData.deliveryDistanceKm
+          )
+        : null;
+
       // Insert order into Supabase
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -154,7 +258,19 @@ export const orderService = {
           total_amount: totals.totalAmount,
           payment_method: orderData.paymentMethod,
           payment_status: 'Waiting for Payment',
-          status: 'Waiting for Payment'
+          status: 'Waiting for Payment',
+          created_at: createdAt,
+          // Phase 6.8 — ETA fields
+          ...(etaResult ? {
+            estimated_preparation_minutes: etaResult.estimatedPreparationMinutes,
+            estimated_delivery_minutes: etaResult.estimatedDeliveryMinutes,
+            estimated_total_minutes: etaResult.estimatedTotalMinutes,
+            estimated_ready_at: etaResult.estimatedReadyAt,
+            estimated_arrival_at: etaResult.estimatedArrivalAt,
+            eta_label: etaResult.etaLabel,
+            eta_updated_at: etaResult.etaUpdatedAt,
+            eta_manually_adjusted: false,
+          } : {}),
         }])
         .select()
         .single();
@@ -182,38 +298,28 @@ export const orderService = {
         throw itemsError;
       }
 
-      return {
-        id: order.id,
-        queueNumber: order.queue_number,
-        customerName: order.customer_name,
-        customerPhone: order.customer_phone,
-        notes: order.notes,
-        items: orderData.items,
-        subtotal: order.subtotal,
-        serviceChargeAmount: order.service_charge_amount,
-        taxAmount: order.tax_amount,
-        deliveryFeeAmount: order.delivery_fee_amount,
-        deliveryAdminFeeAmount: order.delivery_admin_fee_amount,
-        freeDeliveryApplied: order.free_delivery_applied,
-        fulfillmentType: order.fulfillment_type || 'dine_in',
-        recipientName: order.recipient_name,
-        deliveryPhone: order.delivery_phone,
-        deliveryAddress: order.delivery_address,
-        deliveryNotes: order.delivery_notes,
-        totalAmount: order.total_amount,
-        paymentMethod: order.payment_method,
-        paymentStatus: order.payment_status,
-        status: order.status,
-        createdAt: order.created_at,
-        deliveryDistanceKm: order.delivery_distance_km,
-        deliveryDistanceSource: order.delivery_distance_source,
-        deliveryFeeCalculationType: order.delivery_fee_calculation_type,
-      };
+      return mapDbOrderToOrder({
+        ...(order as unknown as DbOrder),
+        items: dbItems
+      });
     }
 
     // Local Storage driver branch
     const orderId = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const orders = await this.getOrders();
+
+
+    // Calculate ETA if enabled
+    const etaSettings = profile.etaSettings;
+    const etaResult = etaSettings?.etaEnabled
+      ? calculateOrderEta(
+          orderData.fulfillmentType || 'dine_in',
+          createdAt,
+          etaSettings,
+          orderData.deliveryDistanceKm
+        )
+      : null;
+
     const newOrder: Order = {
       id: orderId,
       queueNumber,
@@ -236,10 +342,21 @@ export const orderService = {
       paymentMethod: orderData.paymentMethod,
       paymentStatus: 'Waiting for Payment',
       status: 'Waiting for Payment',
-      createdAt: new Date().toISOString(),
+      createdAt,
       deliveryDistanceKm: orderData.deliveryDistanceKm,
       deliveryDistanceSource: orderData.deliveryDistanceSource,
       deliveryFeeCalculationType: orderData.deliveryFeeCalculationType,
+      // Phase 6.8 — ETA fields
+      ...(etaResult ? {
+        estimatedPreparationMinutes: etaResult.estimatedPreparationMinutes,
+        estimatedDeliveryMinutes: etaResult.estimatedDeliveryMinutes,
+        estimatedTotalMinutes: etaResult.estimatedTotalMinutes,
+        estimatedReadyAt: etaResult.estimatedReadyAt,
+        estimatedArrivalAt: etaResult.estimatedArrivalAt,
+        etaLabel: etaResult.etaLabel,
+        etaUpdatedAt: etaResult.etaUpdatedAt,
+        etaManuallyAdjusted: false,
+      } : {}),
     };
 
     orders.push(newOrder);
@@ -376,5 +493,54 @@ export const orderService = {
     return orders.filter(
       (o) => o.status === 'Completed' || o.paymentStatus === 'Paid'
     );
+  },
+
+  /**
+   * Phase 6.8 — Apply manual ETA adjustment by cashier.
+   * Writes updated ETA fields back to localStorage or Supabase.
+   */
+  async updateOrderEta(id: string, deltaMins: number, reason: string): Promise<Order> {
+    if (USE_SUPABASE) {
+      const currentOrder = await this.getOrderById(id);
+      if (!currentOrder) throw new Error(`Order with ID ${id} not found.`);
+
+      const etaUpdates = applyEtaAdjustment(currentOrder, deltaMins, reason);
+      
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          estimated_preparation_minutes: etaUpdates.estimatedPreparationMinutes,
+          estimated_delivery_minutes: etaUpdates.estimatedDeliveryMinutes,
+          estimated_total_minutes: etaUpdates.estimatedTotalMinutes,
+          estimated_ready_at: etaUpdates.estimatedReadyAt,
+          estimated_arrival_at: etaUpdates.estimatedArrivalAt,
+          eta_label: etaUpdates.etaLabel,
+          eta_updated_at: etaUpdates.etaUpdatedAt,
+          eta_manually_adjusted: etaUpdates.etaManuallyAdjusted,
+          eta_adjustment_reason: etaUpdates.etaAdjustmentReason
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Supabase updateOrderEta error:', error.message);
+        throw error;
+      }
+
+      return {
+        ...currentOrder,
+        ...etaUpdates
+      };
+    }
+
+    const orders = await this.getOrders();
+    const index = orders.findIndex((o) => o.id === id);
+    if (index === -1) throw new Error(`Order ${id} not found.`);
+
+    const currentOrder = orders[index];
+    const etaUpdates = applyEtaAdjustment(currentOrder, deltaMins, reason);
+    const updatedOrder: Order = { ...currentOrder, ...etaUpdates };
+    orders[index] = updatedOrder;
+    setStorageItem(STORAGE_KEYS.ORDERS, orders);
+    return updatedOrder;
   },
 };

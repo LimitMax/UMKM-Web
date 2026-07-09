@@ -19,6 +19,7 @@ import { orderService } from '@/services/orderService';
 import { businessService } from '@/services/businessService';
 import { Order, BusinessProfile } from '@/types';
 import { formatRupiah, formatDate, formatOrderStatus, formatPaymentStatus } from '@/utils/format';
+import { getEtaLabel, formatEstimatedTime, formatEtaDisplay } from '@/utils/etaHelpers';
 
 
 
@@ -205,6 +206,46 @@ export default function OrderSuccessPage() {
             )}
           </div>
         </div>
+
+        {/* ETA Card — Phase 6.8 */}
+        {!isCancelled && businessProfile?.etaSettings?.etaEnabled && order.estimatedTotalMinutes !== undefined && (
+          <div className="glass rounded-3xl p-5 border border-amber-500/20 bg-amber-500/4">
+            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span>{getEtaLabel(order.fulfillmentType)}</span>
+            </h3>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Estimasi Total</span>
+                <span className="text-sm font-black text-amber-400">
+                  {formatEtaDisplay(
+                    order.estimatedTotalMinutes,
+                    order.fulfillmentType === 'delivery' ? order.estimatedArrivalAt : order.estimatedReadyAt,
+                    businessProfile.etaSettings!.etaDisplayMode
+                  )}
+                </span>
+              </div>
+              {order.estimatedReadyAt && order.fulfillmentType !== 'delivery' && (
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Perkiraan Siap</span>
+                  <span className="text-xs font-bold text-white">{formatEstimatedTime(order.estimatedReadyAt)}</span>
+                </div>
+              )}
+              {order.estimatedArrivalAt && order.fulfillmentType === 'delivery' && (
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Perkiraan Sampai</span>
+                  <span className="text-xs font-bold text-white">{formatEstimatedTime(order.estimatedArrivalAt)}</span>
+                </div>
+              )}
+              {order.etaManuallyAdjusted && order.etaAdjustmentReason && (
+                <div className="flex items-start gap-1.5 mt-1 pt-2 border-t border-amber-500/15">
+                  <span className="text-[10px] text-amber-400/60">Disesuaikan kasir:</span>
+                  <span className="text-[10px] text-amber-300/80 italic">{order.etaAdjustmentReason}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Card: Real-time Status Timeline (Only show if not cancelled) */}
         {!isCancelled && (

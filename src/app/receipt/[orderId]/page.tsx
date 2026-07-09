@@ -7,6 +7,7 @@ import { orderService } from '../../../services/orderService';
 import { businessService } from '../../../services/businessService';
 import { Order, BusinessProfile } from '../../../types';
 import { formatRupiah, formatDate, formatOrderStatus } from '../../../utils/format';
+import { formatEtaMinutes, formatEstimatedTime, getEtaLabel } from '../../../utils/etaHelpers';
 
 export default function ReceiptPage() {
   const { orderId } = useParams() as { orderId: string };
@@ -198,6 +199,33 @@ export default function ReceiptPage() {
             <span>STATUS PESANAN:</span>
             <span className="font-bold uppercase text-black">{formatOrderStatus(order.status)}</span>
           </div>
+          {/* ETA rows (Phase 6.8) */}
+          {businessProfile?.etaSettings?.etaEnabled && order.estimatedTotalMinutes !== undefined && (
+            <>
+              <div className="flex justify-between border-t border-dashed border-slate-200 pt-1 mt-0.5">
+                <span>{getEtaLabel(order.fulfillmentType).toUpperCase()}:</span>
+                <span className="font-bold text-black">{formatEtaMinutes(order.estimatedTotalMinutes)}</span>
+              </div>
+              {order.estimatedReadyAt && order.fulfillmentType !== 'delivery' && (
+                <div className="flex justify-between">
+                  <span>PERKIRAAN SIAP:</span>
+                  <span className="font-bold text-black">{formatEstimatedTime(order.estimatedReadyAt)}</span>
+                </div>
+              )}
+              {order.estimatedArrivalAt && order.fulfillmentType === 'delivery' && (
+                <div className="flex justify-between">
+                  <span>PERKIRAAN SAMPAI:</span>
+                  <span className="font-bold text-black">{formatEstimatedTime(order.estimatedArrivalAt)}</span>
+                </div>
+              )}
+              {order.etaManuallyAdjusted && order.etaAdjustmentReason && (
+                <div className="flex justify-between">
+                  <span>CATATAN ETA:</span>
+                  <span className="text-right max-w-[60%] italic">{order.etaAdjustmentReason}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {order.fulfillmentType === 'delivery' && (
