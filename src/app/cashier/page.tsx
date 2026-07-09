@@ -19,7 +19,8 @@ import {
   FileText,
   CheckCircle2,
   LogOut,
-  Printer
+  Printer,
+  X
 } from 'lucide-react';
 import { orderService } from '../../services/orderService';
 import { businessService } from '../../services/businessService';
@@ -103,6 +104,17 @@ export default function CashierDashboard() {
     }
   }, [router]);
 
+  // Listen for Escape key to close drawer (Phase 6.9)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedOrderId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleLogout = () => {
     authService.logout();
     router.push('/login');
@@ -170,7 +182,7 @@ export default function CashierDashboard() {
   }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // Newest first
 
   // Selected order details
-  const selectedOrder = filteredOrders.find((o) => o.id === selectedOrderId) || (filteredOrders.length > 0 ? filteredOrders[0] : null);
+  const selectedOrder = selectedOrderId ? orders.find((o) => o.id === selectedOrderId) || null : null;
 
   // Filters calculation
   const todayOrders = orders.filter((o) => {
@@ -262,10 +274,10 @@ export default function CashierDashboard() {
       {/* Main Workspace Layout */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-6 flex flex-col gap-6">
         <RoleGuardBanner allowedRoles={['admin', 'cashier']} currentPageName="Dashboard Kasir" />
-        <div className="flex flex-col lg:flex-row gap-6 w-full">
+        <div className="w-full flex flex-col gap-6">
         
         {/* Left Section: Order Lists */}
-        <div className="flex-1 flex flex-col gap-4">
+        <div className="w-full flex flex-col gap-4">
           {/* Active queue codes row */}
           {activeQueues.length > 0 && (
             <div className="glass rounded-xl p-3 border border-slate-800 flex items-center gap-2 overflow-x-auto">
@@ -345,7 +357,7 @@ export default function CashierDashboard() {
               <p className="text-slate-500 text-xs">Tidak ada pesanan.</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-3 max-h-[550px] overflow-y-auto pr-1">
+            <div className="flex flex-col gap-3 max-h-[650px] overflow-y-auto pr-1">
               {filteredOrders.map((ord) => {
                 const isSelected = selectedOrder?.id === ord.id;
                 
@@ -397,14 +409,21 @@ export default function CashierDashboard() {
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h4 className="font-bold text-sm text-white">{ord.customerName}</h4>
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                            ord.paymentStatus === 'Paid'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10'
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/10'
+                          }`}>
+                            {ord.paymentStatus === 'Paid' ? 'Lunas' : 'Belum Bayar'}
+                          </span>
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${statusBadgeColors[ord.status]}`}>
                             {getOrderBadgeLabel(ord.status, ord.fulfillmentType)}
                           </span>
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
                             ord.fulfillmentType === 'delivery'
-                              ? 'bg-amber-550/15 text-amber-400 border border-amber-500/20'
+                              ? 'bg-amber-555/15 text-amber-450 border border-amber-500/20'
                               : ord.fulfillmentType === 'pickup'
-                                ? 'bg-blue-550/15 text-blue-450 border border-blue-500/20'
+                                ? 'bg-blue-555/15 text-blue-450 border border-blue-500/20'
                                 : 'bg-slate-800/80 text-slate-455 border border-slate-700/50'
                           }`}>
                             {ord.fulfillmentType === 'delivery'
@@ -414,25 +433,18 @@ export default function CashierDashboard() {
                                 : 'Meja'}
                           </span>
                         </div>
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        {ord.items.length} Item &bull; {formatRupiah(ord.totalAmount)} &bull; {ord.paymentMethod}
-                      </p>
-                      {/* ETA compact badge (Phase 6.8) */}
-                      {businessProfile?.etaSettings?.etaEnabled && ord.estimatedTotalMinutes !== undefined && (
-                        <p className="text-[9px] text-amber-400/70 mt-0.5 flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5" />
-                          {formatEtaMinutes(ord.estimatedTotalMinutes)}
-                          {ord.estimatedArrivalAt && (
-                            <span className="text-amber-400/50">&bull; {formatEstimatedTime(ord.estimatedArrivalAt)}</span>
-                          )}
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          {ord.items.length} Item &bull; <span className="text-slate-300 font-semibold">{formatRupiah(ord.totalAmount)}</span> &bull; {ord.paymentMethod}
                         </p>
-                      )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 text-slate-500">
+                    <div className="flex flex-col items-end gap-1.5 text-slate-500 flex-shrink-0">
                       <span className="text-[10px] font-mono">{new Date(ord.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-                      <ChevronRight className="w-4 h-4" />
+                      <span className="flex items-center gap-0.5 text-[9px] font-bold text-slate-400 hover:text-emerald-400 transition-all">
+                        <span>Detail</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </span>
                     </div>
                   </div>
                 );
@@ -441,383 +453,433 @@ export default function CashierDashboard() {
           )}
         </div>
 
-        {/* Right Section: Detailed Order Drawer/Panel */}
-        <div className="w-full lg:w-96 bg-slate-900 border border-slate-850 rounded-2xl p-5 h-[calc(100vh-130px)] lg:sticky lg:top-24 flex flex-col min-h-0">
-          {selectedOrder ? (
-            <div className="flex flex-col flex-1 min-h-0">
-              {/* Header Details (fixed) */}
-              <div className="border-b border-slate-800 pb-3 flex-shrink-0">
-                <div className="flex justify-between items-start">
+        {/* Drawer Slide-over Panel (Phase 6.9) */}
+        {selectedOrder && (() => {
+          const statusLabels: { [k: string]: string } = {
+            'Waiting for Payment': 'Menunggu Pembayaran',
+            'Paid': 'Lunas',
+            'Processing': 'Diproses',
+            'Ready': 'Siap',
+            'delivering': 'Sedang Dikirim',
+            'Completed': 'Selesai',
+            'Cancelled': 'Batal',
+          };
+          
+          const statusBadgeColors: { [k: string]: string } = {
+            'Waiting for Payment': 'bg-amber-500/10 text-amber-500 border border-amber-500/10',
+            'Paid': 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/10',
+            'Processing': 'bg-blue-500/10 text-blue-400 border border-blue-500/10',
+            'Ready': 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10',
+            'delivering': 'bg-amber-500/10 text-amber-400 border border-amber-500/10',
+            'Completed': 'bg-slate-850 text-slate-400 border border-slate-750',
+            'Cancelled': 'bg-rose-500/10 text-rose-450 border border-rose-500/15',
+          };
+
+          const getOrderBadgeLabel = (status: string, fulfillment?: string) => {
+            if (status === 'Ready') {
+              if (fulfillment === 'delivery') return 'Siap Dikirim';
+              if (fulfillment === 'pickup') return 'Siap Diambil';
+              return 'Siap Disajikan';
+            }
+            return statusLabels[status] || status;
+          };
+
+          return (
+            <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+              {/* Backdrop */}
+              <div 
+                className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-300"
+                onClick={() => setSelectedOrderId(null)}
+              />
+              
+              {/* Drawer Container */}
+              <div className="relative w-full sm:w-[480px] bg-slate-900 border-l border-slate-850 h-full flex flex-col shadow-2xl z-10 transform transition-transform duration-300 translate-x-0">
+                {/* Header */}
+                <div className="p-5 border-b border-slate-800 flex-shrink-0 flex items-start justify-between bg-slate-950/40">
                   <div>
                     <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">Rincian Antrean</span>
-                    <h2 className="text-2xl font-black text-white mt-0.5">{selectedOrder.queueNumber}</h2>
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-mono mt-1">
-                    ID: {selectedOrder.id.slice(6, 14).toUpperCase()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Scrollable Middle Content (Customer info, delivery details, items, totals) */}
-              <div className="flex-1 overflow-y-auto py-3 pr-1 min-h-0 scrollbar-thin flex flex-col gap-4">
-                {/* Customer Meta */}
-                <div className="flex flex-col gap-1.5 p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-xs">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <User className="w-3.5 h-3.5 text-slate-505" />
-                    <span>Nama: <strong className="text-white">{selectedOrder.customerName}</strong></span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Phone className="w-3.5 h-3.5 text-slate-550" />
-                    <span>Telepon: <strong className="text-white">{selectedOrder.customerPhone || '-'}</strong></span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
-                    <CreditCard className="w-3.5 h-3.5 text-slate-550" />
-                    <span>Metode: <strong className="text-white">{selectedOrder.paymentMethod}</strong></span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
-                    <ShoppingBag className="w-3.5 h-3.5 text-slate-550" />
-                    <span>Layanan: <strong className="text-white">
-                      {selectedOrder.fulfillmentType === 'delivery' ? 'Delivery' : selectedOrder.fulfillmentType === 'pickup' ? 'Ambil Sendiri' : 'Makan di Tempat'}
-                    </strong></span>
-                  </div>
-                  {selectedOrder.notes && (
-                    <div className="text-[11px] text-amber-400 border-t border-slate-900 pt-1.5 mt-0.5 italic">
-                      Catatan: &ldquo;{selectedOrder.notes}&rdquo;
-                    </div>
-                  )}
-                </div>
-
-                {/* Delivery details if fulfillment is delivery */}
-                {selectedOrder.fulfillmentType === 'delivery' && (
-                  <div className="p-2.5 bg-slate-950 rounded-xl border border-amber-500/20 text-xs flex flex-col gap-1.5 animate-fade-in">
-                    <div className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wider border-b border-slate-850 pb-1 mb-0.5">
-                      Detail Pengiriman
-                    </div>
-                    <div className="text-slate-400">
-                      Penerima: <strong className="text-slate-200">{selectedOrder.recipientName || '-'}</strong>
-                    </div>
-                    <div className="text-slate-400">
-                      WhatsApp: <strong className="text-slate-200">{selectedOrder.deliveryPhone || '-'}</strong>
-                    </div>
-                    <div className="text-slate-400 flex flex-col mt-0.5">
-                      <span>Alamat Pengantaran:</span>
-                      <span className="text-slate-200 bg-slate-900 p-2 rounded border border-slate-850 mt-1 leading-normal font-sans text-[11px]">
-                        {selectedOrder.deliveryAddress || '-'}
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <h2 className="text-2xl font-black text-white leading-none">{selectedOrder.queueNumber}</h2>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusBadgeColors[selectedOrder.status]}`}>
+                        {getOrderBadgeLabel(selectedOrder.status, selectedOrder.fulfillmentType)}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        selectedOrder.fulfillmentType === 'delivery'
+                          ? 'bg-amber-555/15 text-amber-450 border border-amber-500/20'
+                          : selectedOrder.fulfillmentType === 'pickup'
+                            ? 'bg-blue-555/15 text-blue-450 border border-blue-500/20'
+                            : 'bg-slate-800/80 text-slate-455 border border-slate-700/50'
+                      }`}>
+                        {selectedOrder.fulfillmentType === 'delivery' ? 'Delivery' : selectedOrder.fulfillmentType === 'pickup' ? 'Ambil' : 'Meja'}
                       </span>
                     </div>
-                    {selectedOrder.deliveryNotes && (
-                      <div className="text-slate-450 italic mt-0.5">
-                        Catatan: &ldquo;{selectedOrder.deliveryNotes}&rdquo;
-                      </div>
-                    )}
-                    {selectedOrder.deliveryDistanceKm !== undefined && selectedOrder.deliveryDistanceKm > 0 && (
-                      <div className="text-slate-400">
-                        Jarak: <strong className="text-slate-200">{selectedOrder.deliveryDistanceKm} KM</strong>
-                        {selectedOrder.deliveryDistanceSource === 'mock' && <span className="text-[9px] text-slate-500 ml-1">(Simulasi)</span>}
-                      </div>
-                    )}
-                    {selectedOrder.deliveryFeeCalculationType && (
-                      <div className="text-slate-400">
-                        Tipe Tarif: <strong className="text-slate-200">
-                          {selectedOrder.deliveryFeeCalculationType === 'distance_based' ? 'Berdasarkan Jarak' : 'Flat'}
-                        </strong>
-                      </div>
-                    )}
-                    {selectedOrder.deliveryDistanceKm !== undefined && 
-                     selectedOrder.deliveryDistanceKm > (businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10) && (
-                      <div className="mt-1.5 p-1.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-450 text-[10px] leading-normal font-mono">
-                        ⚠️ Jarak melebihi batas maks ({businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10} KM)
-                      </div>
-                    )}
+                    <p className="text-[10px] text-slate-500 font-mono mt-2">ID: {selectedOrder.id.toUpperCase()}</p>
                   </div>
-                )}
-
-                {/* Items List */}
-                <div>
-                  <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">Pesanan Pelanggan</h4>
-                  <div className="flex flex-col gap-2">
-                    {selectedOrder.items.map((item) => (
-                      <div key={item.productId} className="flex justify-between items-center text-xs text-slate-350 bg-slate-950/35 p-2.5 rounded-xl border border-slate-850/50">
-                        <div>
-                          <p className="font-semibold text-slate-200">{item.name}</p>
-                          <p className="text-[10px] text-slate-500">{item.quantity} x {formatRupiah(item.price)}</p>
-                        </div>
-                        <span className="font-bold text-slate-300">{formatRupiah(item.price * item.quantity)}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setSelectedOrderId(null)}
+                    className="p-1.5 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer flex-shrink-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
 
-                {/* Bill details */}
-                <div className="bg-slate-950/45 p-2.5 rounded-xl border border-slate-850/50 flex flex-col gap-1.5">
-                  {(selectedOrder.subtotal !== undefined && 
-                    (selectedOrder.subtotal !== selectedOrder.totalAmount || selectedOrder.fulfillmentType === 'delivery')) && (
-                    <>
-                      <div className="flex justify-between text-[11px] text-slate-455">
-                        <span>Subtotal:</span>
-                        <span className="text-slate-305">{formatRupiah(selectedOrder.subtotal)}</span>
+                {/* Scrollable Body */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-5 scrollbar-thin">
+                  {/* Customer Info */}
+                  <div className="flex flex-col gap-1.5 p-3 bg-slate-950 rounded-xl border border-slate-850 text-xs">
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <User className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Nama: <strong className="text-white">{selectedOrder.customerName}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <Phone className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Telepon: <strong className="text-white">{selectedOrder.customerPhone || '-'}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-2 mt-1">
+                      <CreditCard className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Metode: <strong className="text-white">{selectedOrder.paymentMethod}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-2 mt-1">
+                      <ShoppingBag className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Layanan: <strong className="text-white">
+                        {selectedOrder.fulfillmentType === 'delivery' ? 'Delivery' : selectedOrder.fulfillmentType === 'pickup' ? 'Ambil Sendiri' : 'Makan di Tempat'}
+                      </strong></span>
+                    </div>
+                    {selectedOrder.notes && (
+                      <div className="text-[11px] text-amber-400 border-t border-slate-900 pt-2 mt-1 italic">
+                        Catatan: &ldquo;{selectedOrder.notes}&rdquo;
                       </div>
-                      {selectedOrder.serviceChargeAmount !== undefined && selectedOrder.serviceChargeAmount > 0 && (
-                        <div className="flex justify-between text-[11px] text-slate-455">
-                          <span>Biaya Layanan:</span>
-                          <span className="text-slate-305">{formatRupiah(selectedOrder.serviceChargeAmount)}</span>
+                    )}
+                  </div>
+
+                  {/* Delivery details if fulfillment is delivery */}
+                  {selectedOrder.fulfillmentType === 'delivery' && (
+                    <div className="p-3 bg-slate-950 rounded-xl border border-amber-500/25 text-xs flex flex-col gap-1.5">
+                      <div className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wider border-b border-slate-850 pb-1 mb-1">
+                        Detail Pengiriman
+                      </div>
+                      <div className="text-slate-400">
+                        Penerima: <strong className="text-slate-200">{selectedOrder.recipientName || '-'}</strong>
+                      </div>
+                      <div className="text-slate-400">
+                        WhatsApp: <strong className="text-slate-200">{selectedOrder.deliveryPhone || '-'}</strong>
+                      </div>
+                      <div className="text-slate-400 flex flex-col mt-1">
+                        <span>Alamat Pengantaran:</span>
+                        <span className="text-slate-200 bg-slate-900 p-2.5 rounded border border-slate-800 mt-1 leading-normal font-sans text-[11px]">
+                          {selectedOrder.deliveryAddress || '-'}
+                        </span>
+                      </div>
+                      {selectedOrder.deliveryNotes && (
+                        <div className="text-slate-400 italic mt-1 bg-slate-900/40 p-2 rounded border border-slate-800/40 text-[11px]">
+                          Catatan Kurir: &ldquo;{selectedOrder.deliveryNotes}&rdquo;
                         </div>
                       )}
-                      {selectedOrder.taxAmount !== undefined && selectedOrder.taxAmount > 0 && (
-                        <div className="flex justify-between text-[11px] text-slate-455">
-                          <span>Pajak:</span>
-                          <span className="text-slate-305">{formatRupiah(selectedOrder.taxAmount)}</span>
+                      {selectedOrder.deliveryDistanceKm !== undefined && selectedOrder.deliveryDistanceKm > 0 && (
+                        <div className="text-slate-400 mt-1">
+                          Jarak: <strong className="text-slate-200">{selectedOrder.deliveryDistanceKm} KM</strong>
+                          {selectedOrder.deliveryDistanceSource === 'mock' && <span className="text-[9px] text-slate-500 ml-1">(Simulasi)</span>}
                         </div>
                       )}
-                      {selectedOrder.fulfillmentType === 'delivery' && (
-                        <>
-                          <div className="flex justify-between text-[11px] text-slate-455">
-                            <span>Ongkos Kirim:</span>
-                            {selectedOrder.freeDeliveryApplied ? (
-                              <span className="text-emerald-450 font-bold text-[10px]">Gratis Ongkir</span>
-                            ) : (
-                              <span className="text-slate-305">{formatRupiah(selectedOrder.deliveryFeeAmount ?? 0)}</span>
-                            )}
+                      {selectedOrder.deliveryFeeCalculationType && (
+                        <div className="text-slate-400">
+                          Tipe Tarif: <strong className="text-slate-200">
+                            {selectedOrder.deliveryFeeCalculationType === 'distance_based' ? 'Berdasarkan Jarak' : 'Flat'}
+                          </strong>
+                        </div>
+                      )}
+                      {selectedOrder.deliveryDistanceKm !== undefined && 
+                       selectedOrder.deliveryDistanceKm > (businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10) && (
+                        <div className="mt-2 p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-450 text-[10px] leading-normal font-mono">
+                          ⚠️ Jarak melebihi batas maks ({businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10} KM)
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Items List */}
+                  <div>
+                    <h4 className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2 font-bold">Pesanan Pelanggan</h4>
+                    <div className="flex flex-col gap-2">
+                      {selectedOrder.items.map((item) => (
+                        <div key={item.productId} className="flex justify-between items-center text-xs text-slate-305 bg-slate-950 p-2.5 rounded-xl border border-slate-850">
+                          <div>
+                            <p className="font-semibold text-slate-200">{item.name}</p>
+                            <p className="text-[10px] text-slate-500 mt-0.5">{item.quantity} x {formatRupiah(item.price)}</p>
                           </div>
-                          {selectedOrder.deliveryAdminFeeAmount !== undefined && selectedOrder.deliveryAdminFeeAmount > 0 && (
-                            <div className="flex justify-between text-[11px] text-slate-455">
-                              <span>Biaya Admin:</span>
-                              <span className="text-slate-305">{formatRupiah(selectedOrder.deliveryAdminFeeAmount)}</span>
+                          <span className="font-bold text-slate-200 font-mono">{formatRupiah(item.price * item.quantity)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bill details */}
+                  <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-850 flex flex-col gap-2">
+                    {(selectedOrder.subtotal !== undefined && 
+                      (selectedOrder.subtotal !== selectedOrder.totalAmount || selectedOrder.fulfillmentType === 'delivery')) && (
+                      <>
+                        <div className="flex justify-between text-xs text-slate-400">
+                          <span>Subtotal:</span>
+                          <span className="text-slate-200 font-mono">{formatRupiah(selectedOrder.subtotal)}</span>
+                        </div>
+                        {selectedOrder.serviceChargeAmount !== undefined && selectedOrder.serviceChargeAmount > 0 && (
+                          <div className="flex justify-between text-xs text-slate-400">
+                            <span>Biaya Layanan:</span>
+                            <span className="text-slate-200 font-mono">{formatRupiah(selectedOrder.serviceChargeAmount)}</span>
+                          </div>
+                        )}
+                        {selectedOrder.taxAmount !== undefined && selectedOrder.taxAmount > 0 && (
+                          <div className="flex justify-between text-xs text-slate-400">
+                            <span>Pajak:</span>
+                            <span className="text-slate-200 font-mono">{formatRupiah(selectedOrder.taxAmount)}</span>
+                          </div>
+                        )}
+                        {selectedOrder.fulfillmentType === 'delivery' && (
+                          <>
+                            <div className="flex justify-between text-xs text-slate-400">
+                              <span>Ongkos Kirim:</span>
+                              {selectedOrder.freeDeliveryApplied ? (
+                                <span className="text-emerald-400 font-bold text-[10px]">Gratis Ongkir</span>
+                              ) : (
+                                <span className="text-slate-200 font-mono">{formatRupiah(selectedOrder.deliveryFeeAmount ?? 0)}</span>
+                              )}
                             </div>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                  <div className="flex justify-between text-[11px] text-slate-455">
-                    <span>Status Bayar:</span>
-                    <span className={`font-bold ${selectedOrder.paymentStatus === 'Paid' ? 'text-emerald-400' : 'text-amber-500'}`}>
-                      {selectedOrder.paymentStatus === 'Paid' ? 'LUNAS' : 'Belum Bayar'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-bold text-xs text-white border-t border-slate-800 pt-1.5 mt-0.5">
-                    <span>Total Tagihan:</span>
-                    <span className="text-emerald-400 text-sm">{formatRupiah(selectedOrder.totalAmount)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* ETA Section (Phase 6.8) */}
-              {businessProfile?.etaSettings?.etaEnabled && selectedOrder.estimatedTotalMinutes !== undefined && (
-                <div className="border border-amber-500/15 rounded-xl p-3 bg-amber-500/4 flex flex-col gap-2.5 mx-0.5 mb-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] font-mono uppercase tracking-wider text-amber-400/70 flex items-center gap-1.5">
-                      <Clock className="w-3 h-3" /> Estimasi Waktu
-                    </h4>
-                    {selectedOrder.etaManuallyAdjusted && (
-                      <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">Disesuaikan</span>
+                            {selectedOrder.deliveryAdminFeeAmount !== undefined && selectedOrder.deliveryAdminFeeAmount > 0 && (
+                              <div className="flex justify-between text-xs text-slate-400">
+                                <span>Biaya Admin:</span>
+                                <span className="text-slate-200 font-mono">{formatRupiah(selectedOrder.deliveryAdminFeeAmount)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </>
                     )}
+                    <div className="flex justify-between text-xs text-slate-400 border-t border-slate-900 pt-2 mt-1">
+                      <span>Status Bayar:</span>
+                      <span className={`font-bold ${selectedOrder.paymentStatus === 'Paid' ? 'text-emerald-400' : 'text-amber-500'}`}>
+                        {selectedOrder.paymentStatus === 'Paid' ? 'LUNAS' : 'Belum Bayar'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-bold text-xs text-white border-t border-slate-900 pt-2">
+                      <span>Total Tagihan:</span>
+                      <span className="text-emerald-400 text-sm font-mono">{formatRupiah(selectedOrder.totalAmount)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-400">Total ETA</span>
-                    <span className="font-bold text-amber-300">{formatEtaMinutes(selectedOrder.estimatedTotalMinutes)}</span>
-                  </div>
-                  {selectedOrder.estimatedReadyAt && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">Perkiraan Siap</span>
-                      <span className="font-bold text-white">{formatEstimatedTime(selectedOrder.estimatedReadyAt)}</span>
-                    </div>
-                  )}
-                  {selectedOrder.estimatedArrivalAt && selectedOrder.fulfillmentType === 'delivery' && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">Perkiraan Sampai</span>
-                      <span className="font-bold text-white">{formatEstimatedTime(selectedOrder.estimatedArrivalAt)}</span>
-                    </div>
-                  )}
-                  {selectedOrder.etaAdjustmentReason && (
-                    <div className="text-[9px] text-amber-400/60 italic border-t border-amber-500/10 pt-1.5">
-                      Alasan: {selectedOrder.etaAdjustmentReason}
-                    </div>
-                  )}
 
-                  {/* Manual Adjustment Form */}
-                  <div className="border-t border-amber-500/10 pt-2.5 flex flex-col gap-2">
-                    <p className="text-[9px] font-mono uppercase tracking-wider text-slate-500">Ubah Estimasi (kasir)</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
+                  {/* ETA Section (Phase 6.8) */}
+                  {businessProfile?.etaSettings?.etaEnabled && selectedOrder.estimatedTotalMinutes !== undefined && (
+                    <div className="border border-amber-500/15 rounded-xl p-3 bg-amber-500/4 flex flex-col gap-2.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-[10px] font-mono uppercase tracking-wider text-amber-400/70 flex items-center gap-1.5 font-bold">
+                          <Clock className="w-3 h-3" /> Estimasi Waktu
+                        </h4>
+                        {selectedOrder.etaManuallyAdjusted && (
+                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold uppercase tracking-wider">Disesuaikan</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Total ETA</span>
+                        <span className="font-bold text-amber-300 font-mono">{formatEtaMinutes(selectedOrder.estimatedTotalMinutes)}</span>
+                      </div>
+                      {selectedOrder.estimatedReadyAt && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400">Perkiraan Siap</span>
+                          <span className="font-bold text-white font-mono">{formatEstimatedTime(selectedOrder.estimatedReadyAt)}</span>
+                        </div>
+                      )}
+                      {selectedOrder.estimatedArrivalAt && selectedOrder.fulfillmentType === 'delivery' && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400">Perkiraan Sampai</span>
+                          <span className="font-bold text-white font-mono">{formatEstimatedTime(selectedOrder.estimatedArrivalAt)}</span>
+                        </div>
+                      )}
+                      {selectedOrder.etaAdjustmentReason && (
+                        <div className="text-[10px] text-amber-450 bg-amber-950/20 border border-amber-500/10 rounded-lg p-2 leading-relaxed">
+                          💡 <strong>Alasan Penyesuaian:</strong> {selectedOrder.etaAdjustmentReason}
+                        </div>
+                      )}
+
+                      {/* Manual Adjustment Form */}
+                      <div className="border-t border-amber-500/10 pt-3 flex flex-col gap-2">
+                        <p className="text-[9px] font-mono uppercase tracking-wider text-slate-500 font-bold">Ubah Estimasi (kasir)</p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setEtaAdjustDelta((d) => d - 5)}
+                              className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center cursor-pointer transition-all border border-slate-700"
+                            >-5</button>
+                            <span className="w-12 text-center text-xs font-bold text-white font-mono">{etaAdjustDelta > 0 ? `+${etaAdjustDelta}` : etaAdjustDelta} mnt</span>
+                            <button
+                              type="button"
+                              onClick={() => setEtaAdjustDelta((d) => d + 5)}
+                              className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center cursor-pointer transition-all border border-slate-700"
+                            >+5</button>
+                          </div>
+                        </div>
+                        <input
+                          type="text"
+                          value={etaAdjustReason}
+                          onChange={(e) => setEtaAdjustReason(e.target.value)}
+                          placeholder="Alasan (mis: antrean panjang, bahan habis...)"
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                        />
                         <button
                           type="button"
-                          onClick={() => setEtaAdjustDelta((d) => d - 5)}
-                          className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center cursor-pointer transition-all"
-                        >-5</button>
-                        <span className="w-10 text-center text-xs font-bold text-white">{etaAdjustDelta > 0 ? `+${etaAdjustDelta}` : etaAdjustDelta} mnt</span>
-                        <button
-                          type="button"
-                          onClick={() => setEtaAdjustDelta((d) => d + 5)}
-                          className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center cursor-pointer transition-all"
-                        >+5</button>
+                          disabled={etaAdjustDelta === 0 || !etaAdjustReason.trim() || etaAdjustLoading}
+                          onClick={async () => {
+                            if (!etaAdjustReason.trim() || etaAdjustDelta === 0) return;
+                            setEtaAdjustLoading(true);
+                            try {
+                              await orderService.updateOrderEta(selectedOrder.id, etaAdjustDelta, etaAdjustReason);
+                              setEtaAdjustDelta(0);
+                              setEtaAdjustReason('');
+                              setEtaAdjustSuccess(true);
+                              // Instantly refresh local state
+                              const allOrders = await orderService.getOrders();
+                              setOrders(allOrders);
+                              setTimeout(() => setEtaAdjustSuccess(false), 2000);
+                            } catch (err) {
+                              alert(err instanceof Error ? err.message : 'Gagal mengubah ETA.');
+                            } finally {
+                              setEtaAdjustLoading(false);
+                            }
+                          }}
+                          className="w-full py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{etaAdjustLoading ? 'Menyimpan...' : etaAdjustSuccess ? '✓ Tersimpan' : 'Simpan Perubahan ETA'}</span>
+                        </button>
                       </div>
                     </div>
-                    <input
-                      type="text"
-                      value={etaAdjustReason}
-                      onChange={(e) => setEtaAdjustReason(e.target.value)}
-                      placeholder="Alasan (mis: antrean panjang, bahan habis...)"
-                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-[10px] text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
-                    />
+                  )}
+                </div>
+
+                {/* Sticky Footer */}
+                <div className="p-5 border-t border-slate-800 bg-slate-900 flex-shrink-0 flex flex-col gap-3">
+                  {/* State-Machine buttons */}
+                  <div className="flex flex-col gap-2">
+                    {selectedOrder.status === 'Waiting for Payment' && (
+                      <div className="flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus(selectedOrder.id, 'Paid')}
+                          className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer shadow-md hover:shadow-emerald-500/10"
+                        >
+                          <Check className="w-4 h-4 stroke-[2.5]" />
+                          <span>Konfirmasi Pembayaran Lunas</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus(selectedOrder.id, 'Cancelled')}
+                          className="w-full py-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 hover:text-rose-450 text-slate-400 border border-slate-750 hover:border-rose-500/20 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          <span>Batalkan Pesanan</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {selectedOrder.status === 'Paid' && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus(selectedOrder.id, 'Processing')}
+                        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-500/10 cursor-pointer"
+                      >
+                        <Play className="w-4 h-4" />
+                        <span>Mulai Proses</span>
+                      </button>
+                    )}
+
+                    {selectedOrder.status === 'Processing' && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus(selectedOrder.id, 'Ready')}
+                        className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-blue-500/10 cursor-pointer"
+                      >
+                        <CheckSquare className="w-4 h-4" />
+                        <span>
+                          {selectedOrder.fulfillmentType === 'delivery' 
+                            ? 'Tandai Siap Dikirim' 
+                            : selectedOrder.fulfillmentType === 'pickup' 
+                              ? 'Tandai Siap Diambil' 
+                              : 'Tandai Siap Disajikan'}
+                        </span>
+                      </button>
+                    )}
+
+                    {selectedOrder.status === 'Ready' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedOrder.fulfillmentType === 'delivery') {
+                            handleUpdateStatus(selectedOrder.id, 'delivering');
+                          } else {
+                            handleUpdateStatus(selectedOrder.id, 'Completed');
+                          }
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/10 cursor-pointer"
+                      >
+                        <CheckSquare className="w-4 h-4 stroke-[2.5]" />
+                        <span>
+                          {selectedOrder.fulfillmentType === 'delivery' 
+                            ? 'Mulai Pengiriman' 
+                            : 'Selesaikan / Ambil'}
+                        </span>
+                      </button>
+                    )}
+
+                    {selectedOrder.status === 'delivering' && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus(selectedOrder.id, 'Completed')}
+                        className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/10 cursor-pointer"
+                      >
+                        <CheckSquare className="w-4 h-4 stroke-[2.5]" />
+                        <span>Selesaikan Pesanan</span>
+                      </button>
+                    )}
+
+                    {selectedOrder.status === 'Completed' && (
+                      <div className="p-2.5 bg-emerald-950/20 text-center rounded-xl border border-emerald-500/15 text-[11px] text-emerald-400 flex items-center justify-center gap-1.5 font-semibold">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Pesanan ini telah Selesai dan Lunas.</span>
+                      </div>
+                    )}
+
+                    {selectedOrder.status === 'Cancelled' && (
+                      <div className="p-2.5 bg-rose-950/20 text-center rounded-xl border border-rose-500/15 text-[11px] text-rose-450 flex items-center justify-center gap-1.5 font-semibold">
+                        <XCircle className="w-4 h-4" />
+                        <span>Pesanan Dibatalkan. Stok dikembalikan.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Receipt links */}
+                  <div className="flex gap-2 border-t border-slate-800 pt-2.5">
                     <button
                       type="button"
-                      disabled={etaAdjustDelta === 0 || !etaAdjustReason.trim() || etaAdjustLoading}
-                      onClick={async () => {
-                        if (!etaAdjustReason.trim() || etaAdjustDelta === 0) return;
-                        setEtaAdjustLoading(true);
-                        try {
-                          await orderService.updateOrderEta(selectedOrder.id, etaAdjustDelta, etaAdjustReason);
-                          setEtaAdjustDelta(0);
-                          setEtaAdjustReason('');
-                          setEtaAdjustSuccess(true);
-                          // Instantly refresh local state
-                          const allOrders = await orderService.getOrders();
-                          setOrders(allOrders);
-                          setTimeout(() => setEtaAdjustSuccess(false), 2000);
-                        } catch (err) {
-                          alert(err instanceof Error ? err.message : 'Gagal mengubah ETA.');
-                        } finally {
-                          setEtaAdjustLoading(false);
-                        }
-                      }}
-                      className="w-full py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 font-bold text-[10px] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1"
+                      onClick={() => window.open(`/receipt/${selectedOrder.id}`, '_blank')}
+                      className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-750 text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Clock className="w-3 h-3" />
-                      {etaAdjustLoading ? 'Menyimpan...' : etaAdjustSuccess ? '✓ Tersimpan' : 'Simpan Perubahan ETA'}
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Lihat Struk</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => window.open(`/receipt/${selectedOrder.id}?print=true`, '_blank')}
+                      className="flex-1 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Cetak Struk</span>
                     </button>
                   </div>
                 </div>
-              )}
-
-              {/* Sticky bottom footer for workflow buttons and receipt links (fixed) */}
-              <div className="border-t border-slate-800 pt-3 mt-auto flex-shrink-0 bg-slate-900 flex flex-col gap-3">
-                {/* State-Machine buttons */}
-                <div className="flex flex-col gap-2">
-                  {selectedOrder.status === 'Waiting for Payment' && (
-                    <div className="flex flex-col gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateStatus(selectedOrder.id, 'Paid')}
-                        className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
-                      >
-                        <Check className="w-4 h-4 stroke-[2.5]" />
-                        <span>Konfirmasi Pembayaran Lunas</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateStatus(selectedOrder.id, 'Cancelled')}
-                        className="w-full py-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 hover:text-rose-450 text-slate-400 border border-slate-750 hover:border-rose-500/20 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        <span>Batalkan Pesanan</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {selectedOrder.status === 'Paid' && (
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatus(selectedOrder.id, 'Processing')}
-                      className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-500/10 cursor-pointer"
-                    >
-                      <Play className="w-4 h-4" />
-                      <span>Mulai Proses</span>
-                    </button>
-                  )}
-
-                  {selectedOrder.status === 'Processing' && (
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatus(selectedOrder.id, 'Ready')}
-                      className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-blue-500/10 cursor-pointer"
-                    >
-                      <CheckSquare className="w-4 h-4" />
-                      <span>
-                        {selectedOrder.fulfillmentType === 'delivery' 
-                          ? 'Tandai Siap Dikirim' 
-                          : selectedOrder.fulfillmentType === 'pickup' 
-                            ? 'Tandai Siap Saji' 
-                            : 'Tandai Siap Disajikan'}
-                      </span>
-                    </button>
-                  )}
-
-                  {selectedOrder.status === 'Ready' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (selectedOrder.fulfillmentType === 'delivery') {
-                          handleUpdateStatus(selectedOrder.id, 'delivering');
-                        } else {
-                          handleUpdateStatus(selectedOrder.id, 'Completed');
-                        }
-                      }}
-                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/10 cursor-pointer"
-                    >
-                      <CheckSquare className="w-4 h-4 stroke-[2.5]" />
-                      <span>
-                        {selectedOrder.fulfillmentType === 'delivery' 
-                          ? 'Mulai Pengiriman' 
-                          : 'Selesaikan / Ambil'}
-                      </span>
-                    </button>
-                  )}
-
-                  {selectedOrder.status === 'delivering' && (
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatus(selectedOrder.id, 'Completed')}
-                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-emerald-500/10 cursor-pointer"
-                    >
-                      <CheckSquare className="w-4 h-4 stroke-[2.5]" />
-                      <span>Selesaikan Pesanan</span>
-                    </button>
-                  )}
-
-                  {selectedOrder.status === 'Completed' && (
-                    <div className="p-2.5 bg-emerald-950/20 text-center rounded-xl border border-emerald-500/15 text-[11px] text-emerald-400 flex items-center justify-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Pesanan ini telah Selesai dan Lunas.</span>
-                    </div>
-                  )}
-
-                  {selectedOrder.status === 'Cancelled' && (
-                    <div className="p-2.5 bg-rose-950/20 text-center rounded-xl border border-rose-500/15 text-[11px] text-rose-450 flex items-center justify-center gap-1.5">
-                      <XCircle className="w-4 h-4" />
-                      <span>Pesanan Dibatalkan. Stok dikembalikan.</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Receipt links */}
-                <div className="flex gap-2 border-t border-slate-800 pt-2.5">
-                  <button
-                    type="button"
-                    onClick={() => window.open(`/receipt/${selectedOrder.id}`, '_blank')}
-                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-750 text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>Lihat Struk</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => window.open(`/receipt/${selectedOrder.id}?print=true`, '_blank')}
-                    className="flex-1 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Cetak Struk</span>
-                  </button>
-                </div>
               </div>
             </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-20 text-slate-500 text-xs gap-3">
-              <FileText className="w-8 h-8 text-slate-700" />
-              <p>Pilih salah satu pesanan untuk melihat detail dan mengupdate status.</p>
-            </div>
-          )}
-        </div>
+          );
+        })()}
       </div>
       </main>
     </div>

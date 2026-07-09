@@ -185,11 +185,21 @@ export default function AdminStockPage() {
                       {/* Name info */}
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <img 
-                            src={prod.imageUrl} 
-                            alt={prod.name} 
-                            className="w-10 h-10 object-cover rounded-lg bg-slate-950 border border-slate-800" 
-                          />
+                          <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0">
+                            {prod.imageUrl ? (
+                              <img 
+                                src={prod.imageUrl} 
+                                alt={prod.name} 
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).style.opacity = '0';
+                                }}
+                                className="w-full h-full object-cover transition-opacity duration-300" 
+                              />
+                            ) : null}
+                            <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex items-center justify-center text-slate-550 font-bold text-xs uppercase pointer-events-none -z-10">
+                              {prod.name.substring(0, 2).toUpperCase()}
+                            </div>
+                          </div>
                           <div>
                             <p className="font-bold text-white text-xs">{prod.name}</p>
                             <p className="text-[10px] text-slate-500 mt-0.5">ID: {prod.id.slice(5, 12)}</p>

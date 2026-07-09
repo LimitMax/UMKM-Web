@@ -135,6 +135,27 @@ export interface SalesSummary {
   lowStockCount: number;
 }
 
+export interface PromoRecommendation {
+  id: string;
+  title: string;
+  reason: string;
+  mainProductName: string;
+  bundleProductName: string;
+  suggestedPromoName: string;
+  suggestedDiscountAmount: number;
+  suggestedPrice: number;
+  normalPrice: number;
+  estimatedSavings: number;
+  targetTime: string;
+  targetCustomer: string;
+  campaignGoal: string;
+  whatsappCaption: string;
+  instagramCaption: string;
+  shortCaption: string;
+  confidenceScore: number;
+  basedOnSignals: string[];
+}
+
 export interface AIInsight {
   summary: string;
   recommendations: string[];
@@ -143,6 +164,7 @@ export interface AIInsight {
     description: string;
     caption: string;
   };
+  promoRecommendations?: PromoRecommendation[];
 }
 
 export const FULFILLMENT_LABELS = {

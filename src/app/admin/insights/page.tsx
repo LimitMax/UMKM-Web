@@ -8,8 +8,12 @@ import {
   Copy, 
   Lightbulb, 
   TrendingUp, 
-  HelpCircle,
-  Check
+  Check,
+  Download,
+  Printer,
+  Clock,
+  Target,
+  Award
 } from 'lucide-react';
 import { insightService } from '../../../services/insightService';
 import { orderService } from '../../../services/orderService';
@@ -37,7 +41,13 @@ export default function AdminInsightsPage() {
       timestamp: new Date(),
     },
   ]);
-  const [isCopied, setIsCopied] = useState(false);
+  const [activePromoId, setActivePromoId] = useState<string>('promo-bundle');
+  const [isCopiedWA, setIsCopiedWA] = useState(false);
+  const [isCopiedIG, setIsCopiedIG] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [printSuccess, setPrintSuccess] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom of chat
@@ -53,17 +63,43 @@ export default function AdminInsightsPage() {
       setProducts(p);
       
       // Generate AI Insights from current actual database
-      setInsight(insightService.generateInsights(o, p));
+      const res = insightService.generateInsights(o, p);
+      setInsight(res);
+      if (res.promoRecommendations && res.promoRecommendations.length > 0) {
+        setActivePromoId(res.promoRecommendations[0].id);
+      }
     };
     loadData();
   }, []);
 
-  // Copy Promo Caption
-  const copyPromoCaption = () => {
-    if (!insight) return;
-    navigator.clipboard.writeText(insight.suggestedPromo.caption);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
+  const copyWA = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setIsCopiedWA(true);
+    setTimeout(() => setIsCopiedWA(false), 2000);
+  };
+
+  const copyIG = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setIsCopiedIG(true);
+    setTimeout(() => setIsCopiedIG(false), 2000);
+  };
+
+  const handleDownloadPoster = () => {
+    setIsDownloading(true);
+    setTimeout(() => {
+      setIsDownloading(false);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 2000);
+    }, 1200);
+  };
+
+  const handlePrintPoster = () => {
+    setIsPrinting(true);
+    setTimeout(() => {
+      setIsPrinting(false);
+      setPrintSuccess(true);
+      setTimeout(() => setPrintSuccess(false), 2000);
+    }, 1200);
   };
 
   // Process Chatbot heuristic answers
@@ -270,59 +306,262 @@ export default function AdminInsightsPage() {
 
           </div>
 
-          {/* Right Column: Suggested Promo Details */}
-          <div className="bg-slate-900 border border-slate-850 rounded-3xl p-6 flex flex-col justify-between gap-6">
+          {/* Right Column: Sleek Promo Hub/Campaign Panel */}
+          <div className="bg-slate-900 border border-slate-850 rounded-3xl p-6 flex flex-col gap-6">
             <div>
-              <h3 className="text-sm font-bold text-white mb-4 border-b border-slate-800 pb-3 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
-                <span>Rekomendasi Kampanye Promo</span>
+              <h3 className="text-sm font-bold text-white mb-4 border-b border-slate-800 pb-3 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <span>Rekomendasi Kampanye Promo</span>
+                </span>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider">
+                  AI Hub
+                </span>
               </h3>
 
-              {/* Promo Banner Preview */}
-              <div className="bg-gradient-to-tr from-slate-950 to-slate-900 border border-slate-800 rounded-2xl p-4 mb-4">
-                <span className="text-[9px] font-mono text-emerald-400 font-extrabold uppercase border border-emerald-500/20 px-2 py-0.5 rounded-full bg-emerald-950/20">
-                  AI SUGGESTION
-                </span>
-                <h4 className="font-extrabold text-white text-sm mt-3">{insight.suggestedPromo.title}</h4>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  {insight.suggestedPromo.description}
-                </p>
-              </div>
-
-              {/* Social Caption */}
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] font-mono text-slate-500 uppercase font-bold">Materi Salin Caption (IG/WA)</span>
-                  <button
-                    onClick={copyPromoCaption}
-                    className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-slate-950 px-2 py-1 rounded border border-slate-850 transition-all"
-                  >
-                    {isCopied ? (
-                      <>
-                        <Check className="w-3 h-3" />
-                        <span>Tersalin</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3" />
-                        <span>Salin</span>
-                      </>
-                    )}
-                  </button>
+              {/* Tab Switcher */}
+              {insight.promoRecommendations && insight.promoRecommendations.length > 0 && (
+                <div className="flex gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-none border-b border-slate-800/60">
+                  {insight.promoRecommendations.map((promo) => (
+                    <button
+                      key={promo.id}
+                      onClick={() => setActivePromoId(promo.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                        activePromoId === promo.id
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25'
+                          : 'bg-slate-950/40 text-slate-550 border border-slate-900 hover:text-slate-300'
+                      }`}
+                    >
+                      {promo.title}
+                    </button>
+                  ))}
                 </div>
-                
-                {/* Preformatted caption display */}
-                <pre className="w-full bg-slate-950/70 p-4 rounded-xl border border-slate-900 font-sans text-xs text-slate-350 leading-relaxed whitespace-pre-wrap max-h-56 overflow-y-auto">
-                  {insight.suggestedPromo.caption}
-                </pre>
-              </div>
-            </div>
+              )}
 
-            <div className="p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 text-xs text-emerald-450 flex items-start gap-2.5">
-              <HelpCircle className="w-4 h-4 text-emerald-450 mt-0.5 flex-shrink-0" />
-              <p className="leading-relaxed">
-                Pasangkan materi caption di atas dengan foto produk bundling kombo terbaik Anda dan sebarkan di grup WhatsApp komunitas pelanggan Anda!
-              </p>
+              {/* Promo Details Display */}
+              {(() => {
+                const currentPromo = insight.promoRecommendations?.find(p => p.id === activePromoId) || insight.promoRecommendations?.[0];
+                if (!currentPromo) return null;
+
+                return (
+                  <div className="flex flex-col gap-5">
+                    {/* Header with Title and Confidence */}
+                    <div className="flex justify-between items-start gap-4">
+                      <div>
+                        <h4 className="font-extrabold text-white text-base leading-tight">
+                          {currentPromo.suggestedPromoName}
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                          {currentPromo.reason}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end flex-shrink-0">
+                        <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">
+                          <Award className="w-3.5 h-3.5" />
+                          <span>{currentPromo.confidenceScore}% Akurasi</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Signal Tags */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {currentPromo.basedOnSignals.map((sig, idx) => (
+                        <span key={idx} className="text-[9px] font-mono text-slate-400 bg-slate-950 px-2.5 py-0.5 rounded-md border border-slate-850">
+                          🎯 {sig}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Price and Savings Box */}
+                    <div className="bg-gradient-to-r from-slate-950 to-slate-900 border border-slate-850 rounded-2xl p-4 flex justify-between items-center">
+                      <div>
+                        <span className="block text-[9px] font-mono text-slate-500 uppercase font-bold tracking-wider">Perbandingan Harga</span>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-xl font-black text-emerald-400 font-mono">
+                            {formatRupiah(currentPromo.suggestedPrice)}
+                          </span>
+                          <span className="text-xs text-slate-500 line-through font-mono">
+                            {formatRupiah(currentPromo.normalPrice)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="block text-[9px] font-mono text-slate-500 uppercase font-bold tracking-wider">Potensi Hemat</span>
+                        <span className="inline-block mt-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-lg">
+                          Hemat {formatRupiah(currentPromo.estimatedSavings)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Target Parameters */}
+                    <div className="grid grid-cols-2 gap-3 bg-slate-950/45 p-3 rounded-2xl border border-slate-850/60 text-xs">
+                      <div>
+                        <span className="block text-[9px] font-mono text-slate-500 uppercase font-bold">Target Pelanggan</span>
+                        <span className="text-slate-200 font-semibold block mt-0.5">{currentPromo.targetCustomer}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-mono text-slate-500 uppercase font-bold">Waktu Kampanye</span>
+                        <span className="text-slate-200 font-semibold block mt-0.5 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-450" /> {currentPromo.targetTime}
+                        </span>
+                      </div>
+                      <div className="col-span-2 border-t border-slate-900 pt-2 mt-1">
+                        <span className="block text-[9px] font-mono text-slate-500 uppercase font-bold">Tujuan Kampanye</span>
+                        <span className="text-slate-300 block mt-0.5 flex items-start gap-1 leading-normal">
+                          <Target className="w-3.5 h-3.5 text-slate-550 mt-0.5 flex-shrink-0" />
+                          <span>{currentPromo.campaignGoal}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Social Media Share Section */}
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-mono text-slate-500 uppercase font-bold">Salin Caption Promosi</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => copyWA(currentPromo.whatsappCaption)}
+                          className="py-2.5 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 hover:text-slate-950 border border-emerald-500/20 text-emerald-400 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          {isCopiedWA ? (
+                            <>
+                              <Check className="w-4 h-4 stroke-[2.5]" />
+                              <span>Caption WA Tersalin</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copy untuk WhatsApp</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => copyIG(currentPromo.instagramCaption)}
+                          className="py-2.5 px-3 rounded-xl bg-purple-500/10 hover:bg-purple-500 hover:text-white border border-purple-500/20 text-purple-400 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          {isCopiedIG ? (
+                            <>
+                              <Check className="w-4 h-4 stroke-[2.5]" />
+                              <span>Caption IG Tersalin</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copy untuk Instagram</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Poster Preview Mockup */}
+                    <div className="mt-2 space-y-3">
+                      <span className="block text-[10px] font-mono text-slate-500 uppercase font-bold">Preview Poster Digital</span>
+                      
+                      {/* Physical Poster Design Wrapper */}
+                      <div className="relative overflow-hidden bg-slate-950 border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col gap-6 items-center text-center aspect-[4/5] justify-between">
+                        {/* Dynamic Neon Corner Accents */}
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 blur-2xl rounded-full" />
+                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-500/10 blur-2xl rounded-full" />
+
+                        {/* Brand header */}
+                        <div className="w-full flex flex-col items-center border-b border-slate-900 pb-3">
+                          <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 font-extrabold">UMKM PILOT MENU</span>
+                          <h5 className="text-[9px] font-sans font-bold text-emerald-450 uppercase mt-0.5 tracking-wider">Smart Digital Ordering</h5>
+                        </div>
+
+                        {/* Main Body */}
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-14 h-14 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl flex items-center justify-center text-slate-950 font-black text-2xl shadow-xl shadow-emerald-500/10">
+                            %
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-black text-white leading-tight uppercase tracking-wide">
+                              {currentPromo.title}
+                            </h3>
+                            <p className="text-[10px] text-slate-400 mt-1 max-w-[240px] leading-relaxed">
+                              {currentPromo.mainProductName} {currentPromo.bundleProductName !== 'Tidak Ada' && `+ ${currentPromo.bundleProductName}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Price display and savings badge */}
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest">HARGA SPESIAL</span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl font-black text-white font-mono">{formatRupiah(currentPromo.suggestedPrice)}</span>
+                            <span className="text-sm text-slate-500 line-through font-mono">{formatRupiah(currentPromo.normalPrice)}</span>
+                          </div>
+                          <span className="text-[9px] font-bold text-emerald-450 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full uppercase mt-1">
+                            Save {formatRupiah(currentPromo.estimatedSavings)}
+                          </span>
+                        </div>
+
+                        {/* Footer QR simulation */}
+                        <div className="w-full flex items-center justify-between border-t border-slate-900 pt-3.5">
+                          <div className="text-left">
+                            <span className="block text-[8px] font-mono text-slate-500 font-bold uppercase tracking-wider">Cara Pesan</span>
+                            <span className="text-[9px] text-slate-350 block mt-0.5 font-sans leading-none">Scan QR di Meja</span>
+                          </div>
+                          {/* Mock QR Code Graphic */}
+                          <div className="w-8 h-8 bg-white p-1 rounded-md flex flex-col gap-0.5 flex-shrink-0">
+                            <div className="flex justify-between gap-0.5 flex-1">
+                              <div className="w-2 bg-slate-950 rounded-[1px]" />
+                              <div className="w-1 bg-slate-950 rounded-[1px]" />
+                              <div className="w-2 bg-slate-950 rounded-[1px]" />
+                            </div>
+                            <div className="flex justify-between gap-0.5 flex-1 mt-0.5">
+                              <div className="w-1 bg-slate-950 rounded-[1px]" />
+                              <div className="w-2 bg-slate-950 rounded-[1px]" />
+                              <div className="w-1 bg-slate-950 rounded-[1px]" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Poster Controls */}
+                      <div className="grid grid-cols-2 gap-2 mt-2.5">
+                        <button
+                          onClick={handleDownloadPoster}
+                          disabled={isDownloading}
+                          className="py-2 px-3 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-750 text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {downloadSuccess ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
+                              <span className="text-emerald-400">Poster Diunduh</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3.5 h-3.5" />
+                              <span>{isDownloading ? 'Mengunduh...' : 'Unduh Poster'}</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={handlePrintPoster}
+                          disabled={isPrinting}
+                          className="py-2 px-3 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-750 text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {printSuccess ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
+                              <span className="text-emerald-400">Poster Dicetak</span>
+                            </>
+                          ) : (
+                            <>
+                              <Printer className="w-3.5 h-3.5" />
+                              <span>{isPrinting ? 'Mencetak...' : 'Cetak Poster'}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

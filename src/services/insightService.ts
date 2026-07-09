@@ -87,14 +87,59 @@ export const insightService = {
         'Pastikan stok produk diatur dengan benar agar pelanggan dapat melakukan pemesanan.',
         'Bagikan QR code pemesanan ke meja-meja pelanggan untuk mempermudah pemesanan mandiri.'
       );
+      
+      const fallbackPromos = [
+        {
+          id: 'promo-1',
+          title: 'Promo Pembukaan Toko',
+          reason: 'Menarik perhatian pelanggan awal pada fase grand opening.',
+          mainProductName: 'Semua Minuman',
+          bundleProductName: 'Tidak Ada',
+          suggestedPromoName: 'Grand Opening Bebas Haus',
+          suggestedDiscountAmount: 1800,
+          suggestedPrice: 16200,
+          normalPrice: 18000,
+          estimatedSavings: 1800,
+          targetTime: '12.00 - 14.00',
+          targetCustomer: 'Karyawan kantor & pelajar sekitar',
+          campaignGoal: 'Meningkatkan awareness brand & kunjungan outlet pertama kali.',
+          whatsappCaption: '*📢 PROMO GRAND OPENING! 📢*\n\nNikmati diskon 10% khusus minuman segar favoritmu hanya di UMKM Pilot! Caranya gampang banget, tinggal scan QR di meja dan langsung pesan. Yuk mampir sekarang! ☕️🧁',
+          instagramCaption: '📢 PROMO GRAND OPENING! 📢\nNikmati diskon 10% khusus minuman segar favoritmu hanya di UMKM Pilot! Caranya gampang banget, tinggal scan QR di meja dan langsung pesan. Yuk mampir sekarang! ☕️🧁\n#UMKMPilot #PromoKopi #KulinerLokal #GrandOpening',
+          shortCaption: 'Diskon 10% untuk semua minuman segar favorit!',
+          confidenceScore: 85,
+          basedOnSignals: ['Inisialisasi bisnis baru', 'Jam makan siang potensial']
+        },
+        {
+          id: 'promo-2',
+          title: 'Paket Sarapan Kombo',
+          reason: 'Meningkatkan omzet pagi hari dengan kombinasi produk pelengkap.',
+          mainProductName: 'Es Kopi Susu Gula Aren',
+          bundleProductName: 'Roti Bakar Cokelat Keju',
+          suggestedPromoName: 'Kombo Sarapan Ceria',
+          suggestedDiscountAmount: 5000,
+          suggestedPrice: 27000,
+          normalPrice: 32000,
+          estimatedSavings: 5000,
+          targetTime: '08.00 - 10.00',
+          targetCustomer: 'Komuter pagi & pekerja kantoran',
+          campaignGoal: 'Mendorong pembelian kombo makanan + minuman di pagi hari.',
+          whatsappCaption: '*☕️ Kombo Sarapan Ceria! 🍞*\n\nDapatkan Es Kopi Susu Gula Aren + Roti Bakar Cokelat Keju hanya *Rp 27.000* (Hemat Rp 5.000). Pesan praktis lewat HP!',
+          instagramCaption: '☕️ + 🍞 = PAGI YANG SEMPURNA!\n\nAwali harimu dengan Kombo Sarapan Ceria! Dapatkan Kopi Aren terfavorit dan Roti Bakar Cokelat Keju hangat hanya Rp 27.000 (Hemat Rp 5.000 dari harga normal!). 🥰\n#UMKMPilot #PromoSarapan #KopiDanRoti',
+          shortCaption: 'Kopi Aren + Roti Bakar Cokelat Keju hemat Rp 5.000!',
+          confidenceScore: 80,
+          basedOnSignals: ['Sinergi menu sarapan', 'Stok roti melimpah']
+        }
+      ];
+
       return {
         summary,
         recommendations,
         suggestedPromo: {
-          title: 'Promo Pembukaan Toko',
+          title: fallbackPromos[0].title,
           description: 'Berikan diskon 10% untuk semua produk minuman selama jam makan siang.',
-          caption: '📢 PROMO GRAND OPENING! 📢\nNikmati diskon 10% khusus minuman segar favoritmu hanya di UMKM Pilot! Caranya gampang banget, tinggal scan QR di meja dan langsung pesan. Yuk mampir sekarang! ☕️🧁\n#UMKMPilot #PromoKopi #KulinerLokal',
+          caption: fallbackPromos[0].instagramCaption,
         },
+        promoRecommendations: fallbackPromos
       };
     }
 
@@ -173,32 +218,115 @@ export const insightService = {
       }
     }
 
-    // Suggested Promotion
-    const promoTitle = `Paket Hemat ${bestSellerCategory === 'Minuman' ? 'Sore' : 'Kenyang'} Seru`;
-    const discountedPrice = Math.round((products.find(p => p.name === bestSellerName)?.price || 15000) * 0.9 + (products.find(p => p.name === slowSellerName)?.price || 15000) * 0.8);
-    const originalPrice = (products.find(p => p.name === bestSellerName)?.price || 15000) + (products.find(p => p.name === slowSellerName)?.price || 15000);
-
-    const promoDescription = `Kombinasikan ${bestSellerName} dengan ${slowSellerName} seharga ${formatRupiah(discountedPrice)} (Hemat ${formatRupiah(originalPrice - discountedPrice)}). Cocok dijalankan pada jam sibuk pukul ${formatHourRange(peakHour)}.`;
+    // Define items for structured dynamic recommendations
+    const mainProduct = products.find(p => p.name === bestSellerName) || products[0];
+    const bundleProduct = products.find(p => p.name === slowSellerName) || products[1];
     
-    const promoCaption = `☕️ + 🥪 = KOMBO SEMPURNA!
+    const mainProductPrice = mainProduct?.price || 15000;
+    const bundleProductPrice = bundleProduct?.price || 15000;
 
-Bikin sore kamu makin seru dengan "${promoTitle}" dari kami! Dapatkan kombinasi terfavorit:
-👉 ${bestSellerName} (Best Seller!)
-👉 ${slowSellerName}
+    // Promotion 1: Bundle Combo
+    const p1NormalPrice = mainProductPrice + bundleProductPrice;
+    const p1Discount = Math.round(p1NormalPrice * 0.15); // 15% off
+    const p1PromoPrice = p1NormalPrice - p1Discount;
+    const p1Title = `Paket Hemat ${bestSellerCategory === 'Minuman' ? 'Sore' : 'Kenyang'} Seru`;
+    const p1PromoName = `Kombo ${mainProduct.name.substring(0, 15)} + ${bundleProduct.name.substring(0, 15)}`;
+    
+    const p1Desc = `Kombinasikan ${bestSellerName} dengan ${slowSellerName} seharga ${formatRupiah(p1PromoPrice)} (Hemat ${formatRupiah(p1Discount)}). Cocok dijalankan pada jam sibuk pukul ${formatHourRange(peakHour)}.`;
+    
+    const p1WA = `*Promo Kombo Hemat!* 🔥\n\nNikmati perpaduan lezat *${bestSellerName}* dan *${slowSellerName}* dengan harga khusus hanya *${formatRupiah(p1PromoPrice)}* (Hemat *${formatRupiah(p1Discount)}* dari harga normal!).\n\nPesan sekarang dengan scan QR menu meja Anda! 📲`;
+    
+    const p1IG = `☕️ + 🥪 = KOMBO SEMPURNA!\n\nBikin harimu makin ceru dengan Paket "${p1Title}" dari kami! Dapatkan kombinasi terfavorit:\n👉 *${bestSellerName}* (Best Seller!)\n👉 *${slowSellerName}*\n\nHanya dengan *${formatRupiah(p1PromoPrice)}* saja! (Hemat *${formatRupiah(p1Discount)}* dari harga normal!).\n\nYuk buruan pesan lewat scan QR Meja di outlet terdekat! ✨\n#UMKMPilot #MenuHemat #NgemilSore #PromoKombo`;
 
-Hanya dengan ${formatRupiah(discountedPrice)} aja! (Hemat ${formatRupiah(originalPrice - discountedPrice)} dari harga normal!).
+    // Promotion 2: Happy Hour
+    const p2Discount = Math.round(mainProductPrice * 0.10); // 10% off
+    const p2PromoPrice = mainProductPrice - p2Discount;
+    const p2PromoName = `Flash Sale Happy Hour ${formatHourRange(peakHour).replace(' - ', '-')}`;
+    
+    const p2WA = `*Happy Hour Flash Sale!* ⚡\n\nKhusus jam *${formatHourRange(peakHour)}*, nikmati diskon khusus untuk *${bestSellerName}* seharga *${formatRupiah(p2PromoPrice)}* (Hemat *${formatRupiah(p2Discount)}*).\n\nPesan langsung via QR menu meja Anda!`;
+    
+    const p2IG = `⚡ FLASH SALE HAPPY HOUR IS BACK! ⚡\n\nDapatkan diskon spesial 10% untuk produk terlaris kami *${bestSellerName}* khusus pembelian pada jam sibuk *${formatHourRange(peakHour)}*!\n\nHarga promo hanya *${formatRupiah(p2PromoPrice)}*! Yuk pasang alarm dan jangan sampai kelewatan promonya ya! ⏰\n#UMKMPilot #HappyHour #DiskonKilat #KulinerAsik`;
 
-Khusus pembelian langsung lewat scan QR Meja ya! Yuk pesan sekarang sebelum kehabisan! 👇✨
-#UMKMPilot #MenuHemat #NgemilSore #KulinerLokal`;
+    // Promotion 3: Delivery Booster
+    const p3Discount = 6000;
+    const p3PromoName = `Bebas Ongkir Delivery`;
+    
+    const p3WA = `*Subsidi Ongkir Delivery!* 🛵\n\nMager keluar rumah? Nikmati subsidi ongkir s.d *Rp 6.000* untuk pemesanan delivery dengan minimal belanja *Rp 25.000*!\n\nPesan sekarang di web menu order kami!`;
+    
+    const p3IG = `🛵 MAGER KELUAR? KAMI ANTAR BEBAS ONGKIR! 🛵\n\nNikmati kemudahan pesan kuliner favoritmu langsung dari rumah dengan promo Bebas Ongkir dari kami! Minimal belanja hanya Rp 25.000 saja lho!\n\nYuk pesan sekarang lewat link bio kami! 📲\n#UMKMPilot #FreeOngkir #DeliveryService #KulinerPraktis`;
+
+    const promoRecommendations: PromoRecommendation[] = [
+      {
+        id: 'promo-bundle',
+        title: p1Title,
+        reason: `Mengawinkan produk terlaris (${bestSellerName}) dengan produk slow-moving (${slowSellerName}) untuk mempercepat perputaran inventaris.`,
+        mainProductName: bestSellerName,
+        bundleProductName: slowSellerName,
+        suggestedPromoName: p1PromoName,
+        suggestedDiscountAmount: p1Discount,
+        suggestedPrice: p1PromoPrice,
+        normalPrice: p1NormalPrice,
+        estimatedSavings: p1Discount,
+        targetTime: formatHourRange(peakHour),
+        targetCustomer: 'Pecinta kombo hemat & pemburu diskon',
+        campaignGoal: 'Meningkatkan penjualan produk slow-moving & menaikkan nilai rata-rata keranjang (AOV).',
+        whatsappCaption: p1WA,
+        instagramCaption: p1IG,
+        shortCaption: `Nikmati paket hemat ${bestSellerName} + ${slowSellerName} seharga ${formatRupiah(p1PromoPrice)}!`,
+        confidenceScore: 92,
+        basedOnSignals: [`Tinggi penjualan: ${bestSellerName} (${bestSellerQty} unit)`, `Stok melimpah: ${slowSellerName}`, `Jam sibuk teridentifikasi: ${formatHourRange(peakHour)}`]
+      },
+      {
+        id: 'promo-happy-hour',
+        title: 'Happy Hour Flash Sale',
+        reason: `Memaksimalkan transaksi produk terpopuler pada jam sibuk ${formatHourRange(peakHour)} untuk mendorong impulsiveness pembeli.`,
+        mainProductName: bestSellerName,
+        bundleProductName: 'Semua Minuman',
+        suggestedPromoName: p2PromoName,
+        suggestedDiscountAmount: p2Discount,
+        suggestedPrice: p2PromoPrice,
+        normalPrice: mainProductPrice,
+        estimatedSavings: p2Discount,
+        targetTime: formatHourRange(peakHour),
+        targetCustomer: 'Pekerja kantor, pelajar, dan mahasiswa saat istirahat/pulang',
+        campaignGoal: 'Menciptakan urgensi transaksi pada puncak jam sibuk.',
+        whatsappCaption: p2WA,
+        instagramCaption: p2IG,
+        shortCaption: `Diskon 10% untuk ${bestSellerName} khusus pukul ${formatHourRange(peakHour)}!`,
+        confidenceScore: 87,
+        basedOnSignals: [`Jam kunjungan puncak: pukul ${formatHourRange(peakHour)}`, `Produk paling disukai: ${bestSellerName}`]
+      },
+      {
+        id: 'promo-delivery',
+        title: 'Delivery Booster Campaign',
+        reason: 'Menstimulasi volume transaksi dari segmen pelanggan online/WFH dengan subsidi biaya pengiriman.',
+        mainProductName: 'Semua Menu',
+        bundleProductName: 'Fulfillment Delivery',
+        suggestedPromoName: p3PromoName,
+        suggestedDiscountAmount: p3Discount,
+        suggestedPrice: 19000,
+        normalPrice: 25000,
+        estimatedSavings: p3Discount,
+        targetTime: 'Sepanjang Hari',
+        targetCustomer: 'Pelanggan online / WFH / Residen perumahan',
+        campaignGoal: 'Meningkatkan volume pesanan delivery & memperluas jangkauan pasar.',
+        whatsappCaption: p3WA,
+        instagramCaption: p3IG,
+        shortCaption: `Subsidi ongkir Rp 6.000 untuk delivery dengan min. belanja Rp 25.000!`,
+        confidenceScore: 79,
+        basedOnSignals: ['Aktivitas pesanan delivery terdeteksi', 'Preferensi pengantaran jarak jauh']
+      }
+    ];
 
     return {
       summary,
       recommendations,
       suggestedPromo: {
-        title: promoTitle,
-        description: promoDescription,
-        caption: promoCaption,
+        title: p1Title,
+        description: p1Desc,
+        caption: p1IG,
       },
+      promoRecommendations
     };
   },
 };
