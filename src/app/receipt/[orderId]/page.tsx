@@ -253,6 +253,11 @@ export default function ReceiptPage() {
           </div>
           
           <div className="flex flex-col gap-2.5">
+            {order.itemsError && (
+              <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-[10px] text-center font-bold">
+                ⚠️ {order.itemsError}
+              </div>
+            )}
             {order.items.map((item) => (
               <div key={item.productId} className="flex justify-between items-start">
                 <div className="flex-1 pr-4">

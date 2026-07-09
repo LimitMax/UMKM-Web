@@ -72,6 +72,7 @@ export interface OrderItem {
 export interface Order {
   id: string;
   businessId?: string;
+  itemsError?: string;
   queueNumber: string;
   customerName: string;
   customerPhone: string;

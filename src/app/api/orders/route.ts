@@ -31,21 +31,14 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = createSupabaseAdminClient();
 
-    // 2. Load business settings (biz-1)
-    const { data: business, error: bizError } = await supabaseAdmin
-      .from('businesses')
-      .select('*')
-      .eq('id', 'biz-1')
-      .single();
-
-    if (bizError || !business) {
-      console.error('Failed to load business profile info:', bizError?.message);
-      return NextResponse.json({ message: 'Konfigurasi bisnis toko tidak ditemukan.' }, { status: 500 });
-    }
+    // 2. Resolve businessId from body or from first product
+    const requestBusinessId = body.businessId;
 
     // 3. Load active products and verify stock levels
     const productMap: Record<string, DbProduct> = {};
     const items = body.items as CartItem[];
+    let productBusinessId = '';
+    
     for (const item of items) {
       const { data: product, error: prodError } = await supabaseAdmin
         .from('products')
@@ -66,6 +59,27 @@ export async function POST(request: Request) {
       }
 
       productMap[item.productId] = product as DbProduct;
+      
+      const currentProdBizId = product.business_id || 'biz-1';
+      if (!productBusinessId) {
+        productBusinessId = currentProdBizId;
+      } else if (productBusinessId !== currentProdBizId) {
+        return NextResponse.json({ message: 'Semua produk harus berasal dari bisnis yang sama.' }, { status: 400 });
+      }
+    }
+
+    const finalBusinessId = requestBusinessId || productBusinessId || 'biz-1';
+
+    // 4. Load business settings
+    const { data: business, error: bizError } = await supabaseAdmin
+      .from('businesses')
+      .select('*')
+      .eq('id', finalBusinessId)
+      .single();
+
+    if (bizError || !business) {
+      console.error('Failed to load business profile info:', bizError?.message);
+      return NextResponse.json({ message: 'Business ID tidak valid untuk pesanan ini.' }, { status: 400 });
     }
 
     // 4. Calculate subtotal safely from verified database product prices
@@ -127,7 +141,7 @@ export async function POST(request: Request) {
     // 8. Construct database order row
     const orderRow = {
       id: orderId,
-      business_id: 'biz-1',
+      business_id: finalBusinessId,
       queue_number: queueNumber,
       customer_name: body.customerName,
       customer_phone: body.customerPhone || '',

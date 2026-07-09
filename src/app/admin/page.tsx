@@ -16,19 +16,34 @@ import { productService } from '../../services/productService';
 import { Order, Product } from '../../types';
 import { formatRupiah, formatDate } from '../../utils/format';
 
+import { useAuth } from '../../components/AuthProvider';
+
 export default function AdminDashboardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const { profile } = useAuth();
 
   useEffect(() => {
     const loadData = async () => {
-      const allOrders = await orderService.getOrders();
+      const bizId = profile?.business_id || 'biz-1';
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEBUG] Admin fetching dashboard summary for business_id: ${bizId}`);
+      }
+
+      const allOrders = await orderService.getOrdersByBusinessId(bizId);
       const allProducts = await productService.getProducts();
       setOrders(allOrders);
       setProducts(allProducts);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEBUG] Admin fetched dashboard summary order count: ${allOrders.length}`);
+      }
     };
-    loadData();
-  }, []);
+    if (profile) {
+      loadData();
+    }
+  }, [profile]);
 
   // Today's Date
   const todayStr = new Date().toDateString();

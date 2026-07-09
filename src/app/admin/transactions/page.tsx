@@ -16,19 +16,34 @@ import { orderService } from '../../../services/orderService';
 import { Order } from '../../../types';
 import { formatRupiah, formatDate } from '../../../utils/format';
 
+import { useAuth } from '../../../components/AuthProvider';
+
 export default function AdminTransactionsPage() {
   const [transactions, setTransactions] = useState<Order[]>([]);
   const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [methodFilter, setMethodFilter] = useState('Semua');
+  const { profile } = useAuth();
 
   useEffect(() => {
     const loadTx = async () => {
-      const data = await orderService.getCompletedTransactions();
+      const bizId = profile?.business_id || 'biz-1';
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEBUG] Admin fetching transactions for business_id: ${bizId}`);
+      }
+
+      const data = await orderService.getCompletedTransactions(bizId);
       setTransactions(data);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEBUG] Admin fetched transactions count: ${data.length}`);
+      }
     };
-    loadTx();
-  }, []);
+    if (profile) {
+      loadTx();
+    }
+  }, [profile]);
 
   // Filtered transactions list
   const filteredTransactions = transactions.filter((tx) => {

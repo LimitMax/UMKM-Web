@@ -394,6 +394,11 @@ export default function OrderSuccessPage() {
 
           {/* Ordered items list */}
           <div className="flex flex-col gap-3">
+            {order.itemsError && (
+              <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-455 text-xs font-semibold leading-relaxed text-center">
+                ⚠️ {order.itemsError}
+              </div>
+            )}
             {order.items.map((item) => (
               <div key={item.productId} className="flex justify-between items-center text-xs">
                 <div>

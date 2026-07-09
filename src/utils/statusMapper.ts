@@ -110,6 +110,7 @@ export function mapDbOrderToOrder(dbOrder: any): Order {
     etaUpdatedAt: dbOrder.eta_updated_at || undefined,
     etaManuallyAdjusted: dbOrder.eta_manually_adjusted !== null && dbOrder.eta_manually_adjusted !== undefined ? dbOrder.eta_manually_adjusted : false,
     etaAdjustmentReason: dbOrder.eta_adjustment_reason || undefined,
+    itemsError: dbOrder.items_error || undefined,
     items
   };
 }

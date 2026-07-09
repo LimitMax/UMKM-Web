@@ -19,6 +19,7 @@ import { insightService } from '../../../services/insightService';
 import { orderService } from '../../../services/orderService';
 import { productService } from '../../../services/productService';
 import { Order, Product, AIInsight } from '../../../types';
+import { useAuth } from '../../../components/AuthProvider';
 import { formatRupiah } from '../../../utils/format';
 
 interface ChatMessage {
@@ -55,12 +56,24 @@ export default function AdminInsightsPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  const { profile } = useAuth();
+
   useEffect(() => {
     const loadData = async () => {
-      const o = await orderService.getOrders();
+      const bizId = profile?.business_id || 'biz-1';
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEBUG] Admin insights fetching data for business_id: ${bizId}`);
+      }
+
+      const o = await orderService.getOrdersByBusinessId(bizId);
       const p = await productService.getProducts();
       setOrders(o);
       setProducts(p);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEBUG] Admin insights fetched order count: ${o.length}`);
+      }
       
       // Generate AI Insights from current actual database
       const res = insightService.generateInsights(o, p);
@@ -69,8 +82,10 @@ export default function AdminInsightsPage() {
         setActivePromoId(res.promoRecommendations[0].id);
       }
     };
-    loadData();
-  }, []);
+    if (profile) {
+      loadData();
+    }
+  }, [profile]);
 
   const copyWA = (text: string) => {
     navigator.clipboard.writeText(text);

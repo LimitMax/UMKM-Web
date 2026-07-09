@@ -35,7 +35,7 @@ export const orderService = {
     return getStorageItem<Order[]>(STORAGE_KEYS.ORDERS, []);
   },
 
-  async getOrderById(id: string): Promise<Order | undefined> {
+  async getOrdersByBusinessId(businessId: string): Promise<Order[]> {
     if (USE_SUPABASE) {
       const { data, error } = await supabase
         .from('orders')
@@ -43,8 +43,46 @@ export const orderService = {
           *,
           items:order_items(*)
         `)
+        .eq('business_id', businessId)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.error('Supabase getOrdersByBusinessId error:', error.message);
+        throw error;
+      }
+      return (data || []).map(mapDbOrderToOrder);
+    }
+    const orders = await this.getOrders();
+    return orders.filter((o) => o.businessId === businessId);
+  },
+
+  async getOrderById(id: string): Promise<Order | undefined> {
+    if (USE_SUPABASE) {
+      // In client-side context, calling client-side supabase directly might fail due to RLS policies.
+      // So if window is defined (browser environment), we fetch from the secure public GET API route!
+      if (typeof window !== 'undefined') {
+        try {
+          const response = await fetch(`/api/orders/${id}`);
+          if (!response.ok) {
+            console.warn(`Secure public lookup for order ${id} returned status:`, response.status);
+            return undefined;
+          }
+          const data = await response.json();
+          return mapDbOrderToOrder(data);
+        } catch (err) {
+          console.error(`Secure public lookup for order ${id} failed:`, err);
+          return undefined;
+        }
+      }
+
+      // On server-side (like API routes or static generation), we query Supabase directly
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          items:order_items(*)
+        `)
         .eq('id', id)
-        .single();
+        .maybeSingle();
       if (error) {
         console.error('Supabase getOrderById error:', error.message);
         return undefined;
@@ -53,6 +91,14 @@ export const orderService = {
     }
 
     return (await this.getOrders()).find((o) => o.id === id);
+  },
+
+  async getOrderWithItems(orderId: string): Promise<Order | undefined> {
+    return this.getOrderById(orderId);
+  },
+
+  async getOrdersWithItemsByBusinessId(businessId: string): Promise<Order[]> {
+    return this.getOrdersByBusinessId(businessId);
   },
 
   // Generates next queue number (e.g. A001, A002) resetting daily
@@ -92,6 +138,7 @@ export const orderService = {
     deliveryDistanceKm?: number;
     deliveryDistanceSource?: string;
     deliveryFeeCalculationType?: Order['deliveryFeeCalculationType'];
+    businessId?: string;
   }): Promise<Order> {
     if (USE_SUPABASE) {
       const response = await fetch('/api/orders', {
@@ -179,6 +226,7 @@ export const orderService = {
 
     const newOrder: Order = {
       id: orderId,
+      businessId: orderData.businessId || 'biz-1',
       queueNumber,
       customerName: orderData.customerName,
       customerPhone: orderData.customerPhone,
@@ -365,16 +413,21 @@ export const orderService = {
     return updatedOrder;
   },
 
-  async getCompletedTransactions(): Promise<Order[]> {
+  async getCompletedTransactions(businessId?: string): Promise<Order[]> {
     if (USE_SUPABASE) {
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           *,
           items:order_items(*)
         `)
-        .or('order_status.eq.completed,payment_status.eq.paid')
-        .order('created_at', { ascending: false });
+        .or('order_status.eq.completed,payment_status.eq.paid');
+      
+      if (businessId) {
+        query = query.eq('business_id', businessId);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
       if (error) {
         console.error('Supabase getCompletedTransactions error:', error.message);
         throw error;
@@ -382,9 +435,13 @@ export const orderService = {
       return (data || []).map(mapDbOrderToOrder);
     }
     const orders = await this.getOrders();
-    return orders.filter(
+    const filtered = orders.filter(
       (o) => o.status === 'Completed' || o.paymentStatus === 'Paid'
     );
+    if (businessId) {
+      return filtered.filter((o) => o.businessId === businessId);
+    }
+    return filtered;
   },
 
   /**

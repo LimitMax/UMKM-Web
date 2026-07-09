@@ -134,11 +134,21 @@ export default function CashierDashboard() {
 
   // Poll orders
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !profile) return;
 
     const fetchOrders = async () => {
-      const allOrders = await orderService.getOrders();
+      const bizId = profile.business_id || 'biz-1';
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEBUG] Cashier fetching orders for business_id: ${bizId}`);
+      }
+
+      const allOrders = await orderService.getOrdersByBusinessId(bizId);
       setOrders(allOrders);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEBUG] Cashier fetched order count: ${allOrders.length}`);
+      }
 
       // Play chime if a new order is received
       if (prevOrdersCountRef.current !== null && allOrders.length > prevOrdersCountRef.current) {
@@ -153,14 +163,15 @@ export default function CashierDashboard() {
     const interval = setInterval(fetchOrders, 3000); // Poll every 3 seconds
 
     return () => clearInterval(interval);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, profile]);
 
   // Actions handler
   const handleUpdateStatus = async (id: string, status: OrderStatus) => {
     try {
       await orderService.updateOrderStatus(id, status);
       // Update local state instantly
-      const allOrders = await orderService.getOrders();
+      const bizId = profile?.business_id || 'biz-1';
+      const allOrders = await orderService.getOrdersByBusinessId(bizId);
       setOrders(allOrders);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Gagal mengubah status.');

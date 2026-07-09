@@ -34,12 +34,15 @@ interface Toast {
   message: string;
 }
 
+import { useAuth } from '../../../components/AuthProvider';
+
 export default function ReportsPage() {
   const isSupabaseActive = isSupabaseConfigured();
   const [orders, setOrders] = useState<Order[]>([]);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<Toast | null>(null);
+  const { profile: authProfile } = useAuth();
 
   // Helper date generators
   const getTodayString = () => {
@@ -73,8 +76,19 @@ export default function ReportsPage() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const allOrders = await orderService.getOrders();
+        const bizId = authProfile?.business_id || 'biz-1';
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[DEBUG] Admin reports fetching orders for business_id: ${bizId}`);
+        }
+
+        const allOrders = await orderService.getOrdersByBusinessId(bizId);
         setOrders(allOrders);
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[DEBUG] Admin reports fetched order count: ${allOrders.length}`);
+        }
+
         const profile = await businessService.getProfile();
         setBusinessProfile(profile);
       } catch (err) {
@@ -83,8 +97,10 @@ export default function ReportsPage() {
         setIsLoading(false);
       }
     };
-    loadInitialData();
-  }, []);
+    if (authProfile) {
+      loadInitialData();
+    }
+  }, [authProfile]);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message });
