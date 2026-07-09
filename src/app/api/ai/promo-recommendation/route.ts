@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { buildPromoPrompt } from '@/lib/ai/promptBuilder';
 import { createChatCompletionJson, getConfiguredLlmTimeoutMs, isLlmConfigured, LlmRequestError } from '@/lib/ai/llmClient';
+import { normalizeAiDateRange } from '@/lib/ai/dateRange';
 import { validatePromoOutput } from '@/lib/ai/aiInsightSchema';
 import {
   buildRuleBasedPromoRecommendation,
   fetchAiBusinessContext,
   savePromoRecommendation,
   verifyAdminRequest,
-  DateRangeInput,
 } from '@/lib/ai/serverData';
 
 function fallbackMessageFor(errorType: string) {
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const businessId = typeof body.businessId === 'string' ? body.businessId : '';
-    const dateRange = body.dateRange as DateRangeInput | undefined;
+    const dateRange = normalizeAiDateRange(body.dateRange);
 
     if (!businessId) {
       return NextResponse.json({ message: 'Business ID wajib diisi.' }, { status: 400 });
@@ -41,7 +41,11 @@ export async function POST(request: Request) {
     if ('error' in auth) return auth.error;
 
     const context = await fetchAiBusinessContext(auth.supabaseAdmin, businessId, dateRange);
-    const fallback = buildRuleBasedPromoRecommendation(context);
+    const fallback = {
+      ...buildRuleBasedPromoRecommendation(context),
+      dateRange: dateRange.key,
+      dateRangeLabel: dateRange.label,
+    };
 
     if (!isLlmConfigured()) {
       const response = {
@@ -76,6 +80,8 @@ export async function POST(request: Request) {
         ...validated,
         generatedAt: new Date().toISOString(),
         source: 'llm' as const,
+        dateRange: dateRange.key,
+        dateRangeLabel: dateRange.label,
       };
 
       await savePromoRecommendation(auth.supabaseAdmin, businessId, context, promo);

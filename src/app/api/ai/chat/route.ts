@@ -3,20 +3,19 @@ import { buildChatBusinessContext, ChatDateRangeKey } from '@/lib/ai/chatContext
 import { buildOwnerChatPrompt, ChatHistoryMessage } from '@/lib/ai/chatPromptBuilder';
 import { createChatCompletionJson, getConfiguredLlmTimeoutMs, isLlmConfigured, LlmRequestError } from '@/lib/ai/llmClient';
 import { verifyAdminRequest } from '@/lib/ai/serverData';
+import { AI_DATE_RANGE_LABELS, isAiDateRangeKey } from '@/lib/ai/dateRange';
 
 interface ChatResponseShape {
   answer: string;
   suggestedActions: string[];
   source: 'llm' | 'fallback';
   generatedAt: string;
+  dateRange: string;
+  dateRangeLabel: string;
 }
 
-const validRanges: ChatDateRangeKey[] = ['today', '7d', '30d'];
-
 function validateRange(value: unknown): ChatDateRangeKey {
-  return typeof value === 'string' && validRanges.includes(value as ChatDateRangeKey)
-    ? (value as ChatDateRangeKey)
-    : '7d';
+  return isAiDateRangeKey(value) ? value : '7d';
 }
 
 function validateHistory(value: unknown): ChatHistoryMessage[] {
@@ -118,6 +117,8 @@ export async function POST(request: Request) {
         ...fallback,
         source: 'fallback',
         generatedAt: new Date().toISOString(),
+        dateRange,
+        dateRangeLabel: AI_DATE_RANGE_LABELS[dateRange],
       } satisfies ChatResponseShape);
     }
 
@@ -135,6 +136,8 @@ export async function POST(request: Request) {
           ...fallback,
           source: 'fallback',
           generatedAt: new Date().toISOString(),
+          dateRange,
+          dateRangeLabel: AI_DATE_RANGE_LABELS[dateRange],
         } satisfies ChatResponseShape);
       }
 
@@ -142,6 +145,8 @@ export async function POST(request: Request) {
         ...validated,
         source: 'llm',
         generatedAt: new Date().toISOString(),
+        dateRange,
+        dateRangeLabel: AI_DATE_RANGE_LABELS[dateRange],
       } satisfies ChatResponseShape);
     } catch (error) {
       const type = error instanceof LlmRequestError ? error.type : 'provider_error';
@@ -154,6 +159,8 @@ export async function POST(request: Request) {
         ...fallback,
         source: 'fallback',
         generatedAt: new Date().toISOString(),
+        dateRange,
+        dateRangeLabel: AI_DATE_RANGE_LABELS[dateRange],
       } satisfies ChatResponseShape);
     }
   } catch (error) {

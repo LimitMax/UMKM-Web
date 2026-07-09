@@ -1,7 +1,8 @@
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { AiBusinessContext, DateRangeInput, fetchAiBusinessContext } from './serverData';
+import { AiDateRangeKey, buildAiDateRange } from './dateRange';
 
-export type ChatDateRangeKey = 'today' | '7d' | '30d';
+export type ChatDateRangeKey = AiDateRangeKey;
 
 export interface ChatBusinessContext {
   businessName: string;
@@ -51,21 +52,7 @@ export interface ChatBusinessContext {
 }
 
 export function buildDateRangeFromKey(key: ChatDateRangeKey): DateRangeInput & { from: string; to: string } {
-  const now = new Date();
-  const from = new Date(now);
-
-  if (key === 'today') {
-    from.setHours(0, 0, 0, 0);
-  } else if (key === '7d') {
-    from.setDate(now.getDate() - 7);
-  } else {
-    from.setDate(now.getDate() - 30);
-  }
-
-  return {
-    from: from.toISOString(),
-    to: now.toISOString(),
-  };
+  return buildAiDateRange(key);
 }
 
 export async function buildChatBusinessContext(

@@ -190,6 +190,8 @@ export interface GeneratedBusinessInsight {
   source: AiInsightSource;
   fallbackReason?: string;
   fallbackMessage?: string;
+  dateRange?: string;
+  dateRangeLabel?: string;
 }
 
 export interface GeneratedPromoRecommendation {
@@ -214,6 +216,8 @@ export interface GeneratedPromoRecommendation {
   source: AiInsightSource;
   fallbackReason?: string;
   fallbackMessage?: string;
+  dateRange?: string;
+  dateRangeLabel?: string;
 }
 
 export const FULFILLMENT_LABELS = {
