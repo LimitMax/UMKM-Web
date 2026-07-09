@@ -54,6 +54,7 @@ export default function CustomerOrderPage() {
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [deliveryNotes, setDeliveryNotes] = useState<string>('');
   const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number>(0);
+  const [distanceInputStr, setDistanceInputStr] = useState<string>('');
   const [deliveryDistanceSource, setDeliveryDistanceSource] = useState<string>('manual');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -194,13 +195,17 @@ export default function CustomerOrderPage() {
       // Distance-based calculation validations
       const calcType = businessProfile?.deliverySettings?.deliveryFeeCalculationType || 'fixed';
       if (calcType === 'distance_based') {
+        if (!distanceInputStr.trim()) {
+          setErrorMsg('Jarak delivery wajib diisi.');
+          return;
+        }
         if (deliveryDistanceKm <= 0 || isNaN(deliveryDistanceKm)) {
-          setErrorMsg('Jarak pengiriman wajib ditentukan.');
+          setErrorMsg('Jarak harus lebih dari 0 KM.');
           return;
         }
         const maxDist = businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10;
         if (deliveryDistanceKm > maxDist) {
-          setErrorMsg(`Jarak pengiriman (${deliveryDistanceKm} KM) melebihi batas maksimal (${maxDist} KM).`);
+          setErrorMsg('Jarak melebihi maksimal area delivery.');
           return;
         }
       }
@@ -262,6 +267,7 @@ export default function CustomerOrderPage() {
       // simulate distance between 1 and maxDist
       const randomDist = Number((Math.random() * (maxDist - 1) + 1).toFixed(1));
       setDeliveryDistanceKm(randomDist);
+      setDistanceInputStr(String(randomDist));
       setDeliveryDistanceSource('mock');
     };
 
@@ -279,13 +285,18 @@ export default function CustomerOrderPage() {
         {calcMode === 'manual' ? (
           <div className="flex flex-col gap-1">
             <input
-              type="number"
-              min="0.1"
-              step="0.1"
+              type="text"
               required
-              value={deliveryDistanceKm || ''}
+              value={distanceInputStr}
               onChange={(e) => {
-                setDeliveryDistanceKm(Number(e.target.value));
+                const val = e.target.value;
+                setDistanceInputStr(val);
+                const parsed = parseFloat(val);
+                if (!isNaN(parsed)) {
+                  setDeliveryDistanceKm(parsed);
+                } else {
+                  setDeliveryDistanceKm(0);
+                }
                 setDeliveryDistanceSource('manual');
               }}
               placeholder="Masukkan jarak dalam KM (contoh: 3.5)..."
@@ -313,13 +324,13 @@ export default function CustomerOrderPage() {
               </button>
             </div>
             <span className="text-[9px] text-slate-500 italic block leading-normal font-sans">
-              💡 Klik button di atas untuk menyimulasikan jarak secara acak.
+              💡 Klik button di atas untuk menyimulan jarak secara acak.
             </span>
           </div>
         )}
 
         {deliveryDistanceKm > maxDist && (
-          <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[9px] leading-relaxed font-sans">
+          <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-455 text-[9px] leading-relaxed font-sans">
             ⚠️ Jarak pengiriman melebihi batas maksimal ({maxDist} KM).
           </div>
         )}
@@ -336,7 +347,7 @@ export default function CustomerOrderPage() {
 
   const isDistanceInvalid = fulfillmentType === 'delivery' && 
     (businessProfile?.deliverySettings?.deliveryFeeCalculationType === 'distance_based') && 
-    (deliveryDistanceKm <= 0 || deliveryDistanceKm > (businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10) || isNaN(deliveryDistanceKm));
+    (!distanceInputStr.trim() || deliveryDistanceKm <= 0 || deliveryDistanceKm > (businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10) || isNaN(deliveryDistanceKm));
 
   const isCheckoutDisabled = isLoading || isDistanceInvalid;
 

@@ -27,6 +27,7 @@ import {
   calculateReportSummary, 
   generateCSVReport 
 } from '../../../utils/reportHelpers';
+import { isSupabaseConfigured } from '../../../lib/supabase/client';
 
 interface Toast {
   type: 'success' | 'error';
@@ -34,6 +35,7 @@ interface Toast {
 }
 
 export default function ReportsPage() {
+  const isSupabaseActive = isSupabaseConfigured();
   const [orders, setOrders] = useState<Order[]>([]);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -397,7 +399,11 @@ export default function ReportsPage() {
               * Omzet dihitung dari total harga akhir (termasuk pajak daerah PPN & biaya layanan).
             </p>
             <p>
-              * Data diambil dari database lokal browser (<span className="text-emerald-400">localStorage</span>).
+              * Data diambil dari {isSupabaseActive ? (
+                <span className="text-emerald-400">database cloud (Supabase)</span>
+              ) : (
+                <span className="text-amber-400">database lokal browser (localStorage)</span>
+              )}.
             </p>
           </div>
         </div>
