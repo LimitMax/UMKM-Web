@@ -80,9 +80,9 @@ Both dashboards are protected by role-based mock authentication. You can sign in
 
 ---
 
-## ⚙️ Configuration & Supabase Setup (Phase 7A)
+## ⚙️ Configuration & Supabase Setup (Phase 7A & 7B)
 
-UMKM Pilot is built with a swappable repository layer. It operates offline/locally via `localStorage` by default, but it is **Supabase PostgreSQL ready**. 
+UMKM Pilot is built with a swappable repository layer. It operates offline/locally via `localStorage` by default, but it is **Supabase PostgreSQL & Auth ready**. 
 
 ### 1. Configure Credentials
 Create a `.env.local` file at the root of the project (copying `.env.example`) and fill it with your keys:
@@ -102,14 +102,20 @@ Go to your Supabase project dashboard, open the **SQL Editor**, create a new que
 ### 3. How to Run seed.sql
 In your Supabase project dashboard, open the **SQL Editor**, create a new query, copy the contents of [supabase/seed.sql](file:///d:/Riset/UMKM%20Web/supabase/seed.sql), and run it. This populates your database with a default business profile (`biz-1`), admin and cashier user profiles, and the initial products catalog matching our mock dataset.
 
-### 4. Database Schema Details
+### 4. Supabase Authentication Setup
+To enable real login and registration:
+1. Go to your Supabase Dashboard &rarr; **Authentication** &rarr; **Providers** and ensure the **Email** provider is enabled.
+2. Under **Auth Settings**, you can optionally disable **Confirm Email** for quick testing, so users can log in immediately after registration without verifying their email address.
+3. Open `http://localhost:3000/register` to register a new admin or cashier account.
+   - Note: The registration process checks if the business ID `biz-1` is seeded in the database. If the seed SQL has not been executed, a warning will block registration.
+4. Open `http://localhost:3000/login` to log in with the registered credentials.
+
+### 5. Database Schema Details
 For a detailed review of all columns, relationships, check constraints, indexes, and planned RLS policies, refer to the [docs/SUPABASE_SCHEMA.md](file:///d:/Riset/UMKM%20Web/docs/SUPABASE_SCHEMA.md) file.
 
-### 5. Current Limitation
-Although the environment setup, client initialization, database schema, and data source abstractions are ready in Phase 7A, **the app still uses `localStorage` as its active default data source** to preserve local offline capabilities. 
-
-### 6. Next Phase
-The next phase (Phase 7C/7D) will implement the migration of the business profile and product catalog over to Supabase while routing transactions securely.
+### 6. Current Limitations
+- **Main Transaction Routing**: Sales orders, products, and insights are still retrieved from and stored in `localStorage` to preserve offline compatibility. Their database tables are structured and seeded but will be integrated into the app code in subsequent phases (Phase 7C/7D).
+- **Demo Mode Switcher**: If the user is logged out, the Demo Role Switcher remains fully functional. Logging in via Supabase locks access to the authenticated user's real role and details and labels it as "Login Supabase Aktif".
 
 ---
 

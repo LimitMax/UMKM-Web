@@ -26,7 +26,8 @@ import { orderService } from '../../services/orderService';
 import { businessService } from '../../services/businessService';
 import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
-import { authService, UserProfile } from '../../services/authService';
+import { authService as mockAuthService } from '../../services/authService';
+import { useAuth } from '../../components/AuthProvider';
 import { Order, OrderStatus } from '../../types';
 import { formatRupiah } from '../../utils/format';
 import { formatEtaMinutes, formatEstimatedTime } from '../../utils/etaHelpers';
@@ -34,7 +35,8 @@ import { Clock } from 'lucide-react';
 
 export default function CashierDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const { user: supabaseUser, profile, isDemoMode, isSupabaseConfigured, loading: authLoading, signOut } = useAuth();
+  const [user, setUser] = useState<{ name: string; role: string } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const businessProfile = businessService.getProfile();
   const [isLoading, setIsLoading] = useState(true);
@@ -90,19 +92,44 @@ export default function CashierDashboard() {
     }
   };
 
-  // Track session on mount
+  // Track session on mount & react to auth loading changes
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (!currentUser) {
-      router.push('/login');
-    } else {
-      setTimeout(() => {
-        setUser(currentUser);
-        setIsAuthenticated(true);
-        setIsLoading(false);
-      }, 0);
+    if (!authLoading) {
+      if (isSupabaseConfigured && !isDemoMode) {
+        if (!supabaseUser || !profile) {
+          setTimeout(() => {
+            router.push('/login');
+          }, 0);
+        } else {
+          setTimeout(() => {
+            setUser({
+              name: profile.full_name,
+              role: profile.role === 'admin' ? 'Owner/Admin' : 'Kasir',
+            });
+            setIsAuthenticated(true);
+            setIsLoading(false);
+          }, 0);
+        }
+      } else {
+        // Demo mode check
+        const mockSession = mockAuthService.getCurrentUser();
+        if (!mockSession) {
+          setTimeout(() => {
+            router.push('/login');
+          }, 0);
+        } else {
+          setTimeout(() => {
+            setUser({
+              name: mockSession.name,
+              role: mockSession.role === 'admin' ? 'Owner Demo' : 'Kasir Demo',
+            });
+            setIsAuthenticated(true);
+            setIsLoading(false);
+          }, 0);
+        }
+      }
     }
-  }, [router]);
+  }, [supabaseUser, profile, isDemoMode, isSupabaseConfigured, authLoading, router]);
 
   // Listen for Escape key to close drawer (Phase 6.9)
   useEffect(() => {
@@ -115,8 +142,8 @@ export default function CashierDashboard() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleLogout = () => {
-    authService.logout();
+  const handleLogout = async () => {
+    await signOut();
     router.push('/login');
   };
 

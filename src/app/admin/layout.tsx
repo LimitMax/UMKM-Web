@@ -17,8 +17,9 @@ import {
   Settings,
   ClipboardList
 } from 'lucide-react';
-import { authService, UserProfile } from '../../services/authService';
+import { authService as mockAuthService } from '../../services/authService';
 import { demoRoleService } from '../../services/demoRoleService';
+import { useAuth } from '../../components/AuthProvider';
 import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
 
@@ -26,27 +27,37 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const { user: supabaseUser, profile, isDemoMode, isSupabaseConfigured, loading: authLoading, signOut } = useAuth();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (!currentUser) {
-      router.push('/login');
-    } else {
-      setTimeout(() => {
-        setUser(currentUser);
-        setIsLoading(false);
-      }, 0);
+    if (!authLoading) {
+      if (isSupabaseConfigured && !isDemoMode) {
+        if (!supabaseUser || !profile) {
+          setTimeout(() => {
+            setIsRedirecting(true);
+            router.push('/login');
+          }, 0);
+        }
+      } else {
+        // Demo mode check
+        const mockSession = mockAuthService.getCurrentUser();
+        if (!mockSession) {
+          setTimeout(() => {
+            setIsRedirecting(true);
+            router.push('/login');
+          }, 0);
+        }
+      }
     }
-  }, [router]);
+  }, [supabaseUser, profile, isDemoMode, isSupabaseConfigured, authLoading, router]);
 
-  const handleLogout = () => {
-    authService.logout();
+  const handleLogout = async () => {
+    await signOut();
     router.push('/login');
   };
 
-  const currentDemoRole = demoRoleService.getCurrentDemoRole();
+  const currentRole = isDemoMode ? demoRoleService.getCurrentDemoRole() : (profile?.role || 'admin');
 
   let navItems = [
     { href: '/admin', label: 'Ringkasan', icon: BarChart3 },
@@ -58,36 +69,44 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/settings', label: 'Pengaturan Bisnis', icon: Settings },
   ];
 
-  if (currentDemoRole === 'cashier') {
+  if (currentRole === 'cashier') {
     navItems = [
       { href: '/cashier', label: 'Dashboard Kasir', icon: BarChart3 },
       { href: '/admin/transactions', label: 'Struk Transaksi', icon: ClipboardList },
       { href: '/order', label: 'Order Customer', icon: ShoppingBag },
     ];
-  } else if (currentDemoRole === 'customer') {
+  } else if (currentRole === 'customer') {
     navItems = [
       { href: '/order', label: 'Menu / Order', icon: ShoppingBag },
       { href: '/', label: 'Halaman Utama', icon: Settings },
     ];
   }
 
-  if (isLoading) {
+  if (authLoading || isRedirecting) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-slate-550 text-xs font-mono animate-pulse">Memverifikasi sesi admin...</div>
+        <div className="text-slate-500 text-xs font-mono animate-pulse">Memverifikasi sesi admin...</div>
       </div>
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-slate-550 text-xs font-mono animate-pulse">Mengalihkan ke halaman masuk...</div>
-      </div>
-    );
-  }
+  // Display fields based on auth mode
+  let displayName = 'Owner Demo';
+  let displayRole = 'Pemilik UMKM';
+  let displayBusiness = 'Warung Kopi Nusantara';
 
-  // No hard redirects for role checks in demo mode
+  if (isSupabaseConfigured && !isDemoMode && profile) {
+    displayName = profile.full_name;
+    displayRole = profile.role === 'admin' ? 'Owner/Admin' : 'Kasir';
+    displayBusiness = 'Kopi & Cemilan Pilot';
+  } else {
+    const mockSession = mockAuthService.getCurrentUser();
+    if (mockSession) {
+      displayName = mockSession.name;
+      displayRole = mockSession.role === 'admin' ? 'Owner Demo' : 'Kasir Demo';
+      displayBusiness = mockSession.businessName;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row text-slate-100">
@@ -96,7 +115,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="md:hidden flex items-center justify-between bg-slate-900 border-b border-slate-800 px-6 py-4 sticky top-0 z-30">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-400 to-teal-500 flex items-center justify-center shadow-md">
-            <Sparkles className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+            <Sparkles className="w-4.5 h-4.5 text-slate-950 stroke-[2.5]" />
           </div>
           <span className="font-extrabold text-sm text-white">
             UMKM Pilot <span className="text-[10px] font-mono text-emerald-400">Admin</span>
@@ -106,7 +125,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <DemoRoleSwitcher />
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+            className="p-1.5 rounded-lg bg-slate-800 text-slate-350 hover:text-white"
           >
             {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -162,6 +181,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="px-4 pb-2">
             <DemoRoleSwitcher />
           </div>
+
+          {/* Display User Card Info */}
+          <div className="px-4 py-2 bg-slate-950/40 border border-slate-850 rounded-xl mb-1.5 flex flex-col gap-0.5 leading-tight">
+            <span className="text-[8px] font-mono text-slate-500 uppercase">Akses Aktif</span>
+            <span className="text-[10px] font-bold text-white truncate">{displayName}</span>
+            <span className="text-[9px] text-slate-400 truncate">{displayRole}</span>
+          </div>
           
           <button
             onClick={handleLogout}
@@ -180,7 +206,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
           
           <div className="text-[10px] text-slate-600 pl-4 font-mono truncate">
-            Toko: {user.businessName}
+            Toko: {displayBusiness}
           </div>
         </div>
       </aside>

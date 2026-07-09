@@ -10,25 +10,36 @@ import {
   ArrowRight, 
   AlertCircle,
   UserCheck,
-  ShieldCheck
+  ShieldCheck,
+  Database
 } from 'lucide-react';
-import { authService } from '../../services/authService';
+import { authService as supabaseAuthService } from '../../lib/services/authService';
+import { authService as mockAuthService } from '../../services/authService';
+import { demoRoleService } from '../../services/demoRoleService';
+import { useAuth } from '../../components/AuthProvider';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { user, profile, isDemoMode, isSupabaseConfigured } = useAuth();
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // If already authenticated, redirect
+  // If already authenticated via Supabase or demo mode, redirect
   useEffect(() => {
-    const user = authService.getCurrentUser();
-    if (user) {
-      if (user.role === 'admin') router.push('/admin');
+    if (isSupabaseConfigured && !isDemoMode && user && profile) {
+      if (profile.role === 'admin') router.push('/admin');
       else router.push('/cashier');
+    } else if (isDemoMode) {
+      const mockSession = mockAuthService.getCurrentUser();
+      if (mockSession) {
+        if (mockSession.role === 'admin') router.push('/admin');
+        else router.push('/cashier');
+      }
     }
-  }, [router]);
+  }, [user, profile, isDemoMode, isSupabaseConfigured, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,11 +47,36 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const user = await authService.login(email);
-      if (user.role === 'admin') {
-        router.push('/admin');
+      if (isSupabaseConfigured) {
+        // Real Supabase Auth Login
+        await supabaseAuthService.signInWithEmail(email, password);
+        
+        const currentUser = await supabaseAuthService.getCurrentUser();
+        if (currentUser) {
+          const currentProfile = await supabaseAuthService.getCurrentProfile();
+          if (currentProfile) {
+            // Update demo role switcher state to align with logged-in user
+            demoRoleService.setCurrentDemoRole(currentProfile.role);
+            
+            if (currentProfile.role === 'admin') {
+              router.push('/admin');
+            } else {
+              router.push('/cashier');
+            }
+            return;
+          }
+        }
+        throw new Error('Gagal memuat profil akun dari database Supabase.');
       } else {
-        router.push('/cashier');
+        // Fallback to Mock Auth
+        const userSession = await mockAuthService.login(email);
+        demoRoleService.setCurrentDemoRole(userSession.role);
+        
+        if (userSession.role === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/cashier');
+        }
       }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Terjadi kesalahan saat masuk.');
@@ -48,15 +84,17 @@ export default function LoginPage() {
     }
   };
 
-  // Quick Login Test Helper
+  // Quick Login Test Helper (Demo mode)
   const handleQuickLogin = async (role: 'admin' | 'cashier') => {
     setErrorMsg('');
     setIsLoading(true);
     const mockEmail = role === 'admin' ? 'admin@tokoku.com' : 'cashier@tokoku.com';
     
     try {
-      const user = await authService.login(mockEmail);
-      if (user.role === 'admin') {
+      const userSession = await mockAuthService.login(mockEmail);
+      demoRoleService.setCurrentDemoRole(role);
+      
+      if (userSession.role === 'admin') {
         router.push('/admin');
       } else {
         router.push('/cashier');
@@ -91,6 +129,26 @@ export default function LoginPage() {
 
         {/* Form Card */}
         <div className="glass rounded-3xl p-8 border border-slate-800/80 shadow-2xl">
+          
+          {/* Supabase status notice */}
+          {!isSupabaseConfigured ? (
+            <div className="mb-6 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] leading-relaxed font-mono flex items-start gap-2.5">
+              <Database className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block mb-0.5">Mode Demo Aktif</span>
+                Supabase belum dikonfigurasi. Form di bawah akan disimulasikan menggunakan data lokal.
+              </div>
+            </div>
+          ) : (
+            <div className="mb-6 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] leading-relaxed font-mono flex items-start gap-2.5">
+              <Database className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block mb-0.5">Koneksi Supabase Siap</span>
+                Otentikasi nyata aktif. Masuk menggunakan email dan password terdaftar.
+              </div>
+            </div>
+          )}
+
           <h2 className="text-lg font-bold text-white mb-6">Masuk ke Akun Anda</h2>
           
           <form onSubmit={handleLogin} className="flex flex-col gap-4">

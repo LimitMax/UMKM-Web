@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { demoRoleService, DemoRole } from '../services/demoRoleService';
 import DemoRoleSwitcher from '../components/DemoRoleSwitcher';
+import { useAuth } from '../components/AuthProvider';
 import { 
   Brain, 
   Smartphone, 
@@ -17,6 +18,7 @@ import { resetDB } from '../services/db';
 
 export default function LandingPage() {
   const router = useRouter();
+  const { user, profile, isDemoMode, isSupabaseConfigured } = useAuth();
   const [resetSuccess, setResetSuccess] = useState(false);
 
   const handleReset = () => {
@@ -29,8 +31,16 @@ export default function LandingPage() {
   };
 
   const handleEntry = (role: DemoRole, path: string) => {
-    demoRoleService.setCurrentDemoRole(role);
-    router.push(path);
+    if (isSupabaseConfigured && !isDemoMode && user && profile) {
+      if (profile.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/cashier');
+      }
+    } else {
+      demoRoleService.setCurrentDemoRole(role);
+      router.push(path);
+    }
   };
 
   return (
