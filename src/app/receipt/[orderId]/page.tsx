@@ -25,7 +25,7 @@ export default function ReceiptPage() {
         if (foundOrder) {
           setOrder(foundOrder);
         }
-        const profile = businessService.getProfile();
+        const profile = await businessService.getProfile();
         setBusinessProfile(profile);
       } catch (err) {
         console.error('Error loading receipt data:', err);

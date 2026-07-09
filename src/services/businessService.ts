@@ -1,29 +1,30 @@
-import { BusinessProfile, OrderEtaSettings } from '../types';
+import { BusinessProfile, OrderEtaSettings, DeliverySettings } from '../types';
 import { getStorageItem, setStorageItem } from './db';
+import { isSupabaseConfigured } from '../lib/supabase/client';
+import { supabaseDataSource } from '../lib/data/supabaseDataSource';
+import { DataSourceMode } from '../config/dataSourceConfig';
 
 export const BUSINESS_PROFILE_KEY = 'umkm_pilot_business_profile';
 
-export const DEFAULT_DELIVERY_SETTINGS = {
+export const DEFAULT_DELIVERY_SETTINGS: DeliverySettings = {
   deliveryEnabled: true,
   deliveryFeeEnabled: true,
   deliveryFeeAmount: 10000,
   freeDeliveryEnabled: false,
   freeDeliveryMinimumAmount: 50000,
   deliveryAdminFeeEnabled: false,
-  deliveryAdminFeeType: 'fixed' as const,
+  deliveryAdminFeeType: 'fixed',
   deliveryAdminFeeValue: 0,
   deliveryInstruction: 'Pesanan delivery akan dikonfirmasi oleh kasir sebelum dikirim.',
-  // Phase 6.6B extensions
-  deliveryFeeCalculationType: 'fixed' as const,
+  deliveryFeeCalculationType: 'fixed',
   baseDeliveryFee: 8000,
   baseDeliveryDistanceKm: 2,
   deliveryFeePerKm: 2500,
   maxDeliveryDistanceKm: 10,
-  distanceRoundingMode: 'ceil' as const,
-  distanceCalculationMode: 'manual' as const,
+  distanceRoundingMode: 'ceil',
+  distanceCalculationMode: 'manual',
 };
 
-// Phase 6.8 — ETA default settings
 export const DEFAULT_ETA_SETTINGS: OrderEtaSettings = {
   etaEnabled: true,
   defaultPreparationMinutes: 15,
@@ -54,9 +55,8 @@ export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
 };
 
 export const businessService = {
-  getProfile(): BusinessProfile {
+  getProfileSync(): BusinessProfile {
     const profile = getStorageItem<BusinessProfile>(BUSINESS_PROFILE_KEY, DEFAULT_BUSINESS_PROFILE);
-    // Return with defaults fallback for safety
     return {
       ...DEFAULT_BUSINESS_PROFILE,
       ...profile,
@@ -71,8 +71,31 @@ export const businessService = {
     };
   },
 
-  updateProfile(profile: Partial<BusinessProfile>): BusinessProfile {
-    const current = this.getProfile();
+  async getProfile(mode?: DataSourceMode, businessId?: string): Promise<BusinessProfile> {
+    const activeMode = mode || (isSupabaseConfigured() && typeof window !== 'undefined' && window.localStorage.getItem('umkm_pilot_user_session') ? 'supabase' : 'localStorage');
+    
+    if (activeMode === 'supabase') {
+      try {
+        return await supabaseDataSource.getBusinessProfile(businessId);
+      } catch (err) {
+        console.error('Failed to get business profile from Supabase, falling back to localStorage:', err);
+      }
+    }
+    return this.getProfileSync();
+  },
+
+  async updateProfile(profile: Partial<BusinessProfile>, mode?: DataSourceMode, businessId?: string): Promise<BusinessProfile> {
+    const activeMode = mode || (isSupabaseConfigured() && typeof window !== 'undefined' && window.localStorage.getItem('umkm_pilot_user_session') ? 'supabase' : 'localStorage');
+
+    if (activeMode === 'supabase') {
+      try {
+        return await supabaseDataSource.updateBusinessProfile(profile, businessId);
+      } catch (err) {
+        console.error('Failed to update business profile in Supabase, falling back to localStorage:', err);
+      }
+    }
+
+    const current = this.getProfileSync();
     const updated = {
       ...current,
       ...profile,
@@ -81,8 +104,43 @@ export const businessService = {
     return updated;
   },
 
-  resetProfile(): BusinessProfile {
+  async resetProfile(mode?: DataSourceMode, businessId?: string): Promise<BusinessProfile> {
+    const activeMode = mode || (isSupabaseConfigured() && typeof window !== 'undefined' && window.localStorage.getItem('umkm_pilot_user_session') ? 'supabase' : 'localStorage');
+
+    if (activeMode === 'supabase') {
+      try {
+        return await supabaseDataSource.updateBusinessProfile(DEFAULT_BUSINESS_PROFILE, businessId);
+      } catch (err) {
+        console.error('Failed to reset business profile in Supabase, falling back to localStorage:', err);
+      }
+    }
+
     setStorageItem(BUSINESS_PROFILE_KEY, DEFAULT_BUSINESS_PROFILE);
     return DEFAULT_BUSINESS_PROFILE;
+  },
+
+  // Alias functions to satisfy strict prompts
+  async getBusinessProfile(businessId?: string, mode?: DataSourceMode): Promise<BusinessProfile> {
+    return this.getProfile(mode, businessId);
+  },
+
+  async updateBusinessProfile(profile: Partial<BusinessProfile>, businessId?: string, mode?: DataSourceMode): Promise<BusinessProfile> {
+    return this.updateProfile(profile, mode, businessId);
+  },
+
+  async resetBusinessProfile(businessId?: string, mode?: DataSourceMode): Promise<BusinessProfile> {
+    return this.resetProfile(mode, businessId);
+  },
+
+  async getBusinessSettings(businessId?: string, mode?: DataSourceMode) {
+    const profile = await this.getProfile(mode, businessId);
+    return {
+      taxEnabled: profile.taxEnabled,
+      taxPercentage: profile.taxPercentage,
+      serviceChargeEnabled: profile.serviceChargeEnabled,
+      serviceChargePercentage: profile.serviceChargePercentage,
+      deliverySettings: profile.deliverySettings,
+      etaSettings: profile.etaSettings,
+    };
   }
 };

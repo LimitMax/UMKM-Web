@@ -27,8 +27,11 @@ import {
 import QRCode from 'react-qr-code';
 import { demoService, DemoStats, GenerateResult } from '../../../services/demoService';
 import { businessService, DEFAULT_ETA_SETTINGS } from '../../../services/businessService';
+import { productService } from '../../../services/productService';
+import { useAuth } from '../../../components/AuthProvider';
 import { formatRupiah } from '../../../utils/format';
 import type { EtaDisplayMode } from '../../../types';
+import { Database } from 'lucide-react';
 
 interface ConfirmConfig {
   title: string;
@@ -51,147 +54,147 @@ export default function AdminSettingsPage() {
   // Business Profile states
   const [businessName, setBusinessName] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return businessService.getProfile().businessName;
+    return businessService.getProfileSync().businessName;
   });
   const [businessType, setBusinessType] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return businessService.getProfile().businessType;
+    return businessService.getProfileSync().businessType;
   });
   const [description, setDescription] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return businessService.getProfile().description;
+    return businessService.getProfileSync().description;
   });
   const [logoUrl, setLogoUrl] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return businessService.getProfile().logoUrl;
+    return businessService.getProfileSync().logoUrl;
   });
   const [address, setAddress] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return businessService.getProfile().address;
+    return businessService.getProfileSync().address;
   });
   const [whatsappNumber, setWhatsappNumber] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return businessService.getProfile().whatsappNumber;
+    return businessService.getProfileSync().whatsappNumber;
   });
   const [openingHours, setOpeningHours] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return businessService.getProfile().openingHours;
+    return businessService.getProfileSync().openingHours;
   });
   const [taxEnabled, setTaxEnabled] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return businessService.getProfile().taxEnabled;
+    return businessService.getProfileSync().taxEnabled;
   });
   const [taxPercentage, setTaxPercentage] = useState(() => {
     if (typeof window === 'undefined') return 10;
-    return businessService.getProfile().taxPercentage;
+    return businessService.getProfileSync().taxPercentage;
   });
   const [serviceChargeEnabled, setServiceChargeEnabled] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return businessService.getProfile().serviceChargeEnabled;
+    return businessService.getProfileSync().serviceChargeEnabled;
   });
   const [serviceChargePercentage, setServiceChargePercentage] = useState(() => {
     if (typeof window === 'undefined') return 5;
-    return businessService.getProfile().serviceChargePercentage;
+    return businessService.getProfileSync().serviceChargePercentage;
   });
 
   // Delivery Settings states
   const [deliveryEnabled, setDeliveryEnabled] = useState(() => {
     if (typeof window === 'undefined') return true;
-    return businessService.getProfile().deliverySettings?.deliveryEnabled ?? true;
+    return businessService.getProfileSync().deliverySettings?.deliveryEnabled ?? true;
   });
   const [deliveryFeeEnabled, setDeliveryFeeEnabled] = useState(() => {
     if (typeof window === 'undefined') return true;
-    return businessService.getProfile().deliverySettings?.deliveryFeeEnabled ?? true;
+    return businessService.getProfileSync().deliverySettings?.deliveryFeeEnabled ?? true;
   });
   const [deliveryFeeAmount, setDeliveryFeeAmount] = useState(() => {
     if (typeof window === 'undefined') return 10000;
-    return businessService.getProfile().deliverySettings?.deliveryFeeAmount ?? 10000;
+    return businessService.getProfileSync().deliverySettings?.deliveryFeeAmount ?? 10000;
   });
   const [freeDeliveryEnabled, setFreeDeliveryEnabled] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return businessService.getProfile().deliverySettings?.freeDeliveryEnabled ?? false;
+    return businessService.getProfileSync().deliverySettings?.freeDeliveryEnabled ?? false;
   });
   const [freeDeliveryMinimumAmount, setFreeDeliveryMinimumAmount] = useState(() => {
     if (typeof window === 'undefined') return 50000;
-    return businessService.getProfile().deliverySettings?.freeDeliveryMinimumAmount ?? 50000;
+    return businessService.getProfileSync().deliverySettings?.freeDeliveryMinimumAmount ?? 50000;
   });
   const [deliveryAdminFeeEnabled, setDeliveryAdminFeeEnabled] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return businessService.getProfile().deliverySettings?.deliveryAdminFeeEnabled ?? false;
+    return businessService.getProfileSync().deliverySettings?.deliveryAdminFeeEnabled ?? false;
   });
   const [deliveryAdminFeeType, setDeliveryAdminFeeType] = useState<'fixed' | 'percentage'>(() => {
     if (typeof window === 'undefined') return 'fixed';
-    return businessService.getProfile().deliverySettings?.deliveryAdminFeeType ?? 'fixed';
+    return businessService.getProfileSync().deliverySettings?.deliveryAdminFeeType ?? 'fixed';
   });
   const [deliveryAdminFeeValue, setDeliveryAdminFeeValue] = useState(() => {
     if (typeof window === 'undefined') return 0;
-    return businessService.getProfile().deliverySettings?.deliveryAdminFeeValue ?? 0;
+    return businessService.getProfileSync().deliverySettings?.deliveryAdminFeeValue ?? 0;
   });
   const [deliveryInstruction, setDeliveryInstruction] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return businessService.getProfile().deliverySettings?.deliveryInstruction ?? '';
+    return businessService.getProfileSync().deliverySettings?.deliveryInstruction ?? '';
   });
   const [deliveryFeeCalculationType, setDeliveryFeeCalculationType] = useState<'fixed' | 'distance_based'>(() => {
     if (typeof window === 'undefined') return 'fixed';
-    return businessService.getProfile().deliverySettings?.deliveryFeeCalculationType ?? 'fixed';
+    return businessService.getProfileSync().deliverySettings?.deliveryFeeCalculationType ?? 'fixed';
   });
   const [baseDeliveryFee, setBaseDeliveryFee] = useState(() => {
     if (typeof window === 'undefined') return 8000;
-    return businessService.getProfile().deliverySettings?.baseDeliveryFee ?? 8000;
+    return businessService.getProfileSync().deliverySettings?.baseDeliveryFee ?? 8000;
   });
   const [baseDeliveryDistanceKm, setBaseDeliveryDistanceKm] = useState(() => {
     if (typeof window === 'undefined') return 2;
-    return businessService.getProfile().deliverySettings?.baseDeliveryDistanceKm ?? 2;
+    return businessService.getProfileSync().deliverySettings?.baseDeliveryDistanceKm ?? 2;
   });
   const [deliveryFeePerKm, setDeliveryFeePerKm] = useState(() => {
     if (typeof window === 'undefined') return 2500;
-    return businessService.getProfile().deliverySettings?.deliveryFeePerKm ?? 2500;
+    return businessService.getProfileSync().deliverySettings?.deliveryFeePerKm ?? 2500;
   });
   const [maxDeliveryDistanceKm, setMaxDeliveryDistanceKm] = useState(() => {
     if (typeof window === 'undefined') return 10;
-    return businessService.getProfile().deliverySettings?.maxDeliveryDistanceKm ?? 10;
+    return businessService.getProfileSync().deliverySettings?.maxDeliveryDistanceKm ?? 10;
   });
   const [distanceRoundingMode, setDistanceRoundingMode] = useState<'ceil' | 'round' | 'floor'>(() => {
     if (typeof window === 'undefined') return 'ceil';
-    return businessService.getProfile().deliverySettings?.distanceRoundingMode ?? 'ceil';
+    return businessService.getProfileSync().deliverySettings?.distanceRoundingMode ?? 'ceil';
   });
   const [distanceCalculationMode, setDistanceCalculationMode] = useState<'manual' | 'mock' | 'maps_api_later'>(() => {
     if (typeof window === 'undefined') return 'manual';
-    return businessService.getProfile().deliverySettings?.distanceCalculationMode ?? 'manual';
+    return businessService.getProfileSync().deliverySettings?.distanceCalculationMode ?? 'manual';
   });
 
   // ETA Settings states (Phase 6.8)
   const [etaEnabled, setEtaEnabled] = useState(() => {
     if (typeof window === 'undefined') return true;
-    return businessService.getProfile().etaSettings?.etaEnabled ?? true;
+    return businessService.getProfileSync().etaSettings?.etaEnabled ?? true;
   });
   const [defaultPreparationMinutes, setDefaultPreparationMinutes] = useState(() => {
     if (typeof window === 'undefined') return 15;
-    return businessService.getProfile().etaSettings?.defaultPreparationMinutes ?? 15;
+    return businessService.getProfileSync().etaSettings?.defaultPreparationMinutes ?? 15;
   });
   const [rushHourBufferMinutes, setRushHourBufferMinutes] = useState(() => {
     if (typeof window === 'undefined') return 5;
-    return businessService.getProfile().etaSettings?.rushHourBufferMinutes ?? 5;
+    return businessService.getProfileSync().etaSettings?.rushHourBufferMinutes ?? 5;
   });
   const [dineInServingBufferMinutes, setDineInServingBufferMinutes] = useState(() => {
     if (typeof window === 'undefined') return 3;
-    return businessService.getProfile().etaSettings?.dineInServingBufferMinutes ?? 3;
+    return businessService.getProfileSync().etaSettings?.dineInServingBufferMinutes ?? 3;
   });
   const [pickupBufferMinutes, setPickupBufferMinutes] = useState(() => {
     if (typeof window === 'undefined') return 5;
-    return businessService.getProfile().etaSettings?.pickupBufferMinutes ?? 5;
+    return businessService.getProfileSync().etaSettings?.pickupBufferMinutes ?? 5;
   });
   const [deliveryBaseMinutes, setDeliveryBaseMinutes] = useState(() => {
     if (typeof window === 'undefined') return 5;
-    return businessService.getProfile().etaSettings?.deliveryBaseMinutes ?? 5;
+    return businessService.getProfileSync().etaSettings?.deliveryBaseMinutes ?? 5;
   });
   const [deliveryMinutesPerKm, setDeliveryMinutesPerKm] = useState(() => {
     if (typeof window === 'undefined') return 4;
-    return businessService.getProfile().etaSettings?.deliveryMinutesPerKm ?? 4;
+    return businessService.getProfileSync().etaSettings?.deliveryMinutesPerKm ?? 4;
   });
   const [etaDisplayMode, setEtaDisplayMode] = useState<EtaDisplayMode>(() => {
     if (typeof window === 'undefined') return 'both';
-    return businessService.getProfile().etaSettings?.etaDisplayMode ?? 'both';
+    return businessService.getProfileSync().etaSettings?.etaDisplayMode ?? 'both';
   });
 
   // Dynamic order link state
@@ -206,6 +209,11 @@ export default function AdminSettingsPage() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Auth & data source mode
+  const { isSupabaseConfigured, isDemoMode, user: supabaseUser } = useAuth();
+  const isSupabaseActive = isSupabaseConfigured && !isDemoMode && !!supabaseUser;
+  const [isMigrationLoading, setIsMigrationLoading] = useState(false);
 
   // Load business profile and stats
   const loadStats = useCallback(() => {
@@ -248,9 +256,59 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // ── Supabase Migration Actions ────────────────────────────────────────────
+
+  const handleImportBusinessProfile = async () => {
+    if (!isSupabaseActive) {
+      showToast('error', 'Fitur migrasi hanya tersedia saat login Supabase aktif.');
+      return;
+    }
+    setIsMigrationLoading(true);
+    try {
+      const localProfile = businessService.getProfileSync();
+      const imported = await businessService.updateProfile(localProfile, 'supabase');
+      if (imported) {
+        showToast('success', 'Profil bisnis demo berhasil diimpor ke Supabase!');
+      }
+    } catch (err) {
+      showToast('error', `Gagal mengimpor profil bisnis: ${err instanceof Error ? err.message : 'Kesalahan tidak diketahui'}`);
+    } finally {
+      setIsMigrationLoading(false);
+    }
+  };
+
+  const handleImportProducts = async () => {
+    if (!isSupabaseActive) {
+      showToast('error', 'Fitur migrasi hanya tersedia saat login Supabase aktif.');
+      return;
+    }
+    setIsMigrationLoading(true);
+    try {
+      const localProducts = await productService.getProducts('localStorage');
+      const supabaseProducts = await productService.getProducts('supabase');
+      const existingNames = new Set(supabaseProducts.map(p => p.name));
+      const toImport = localProducts.filter(p => !existingNames.has(p.name));
+      if (toImport.length === 0) {
+        showToast('success', 'Semua produk sudah ada di Supabase — tidak ada yang perlu diimpor.');
+        return;
+      }
+      let importedCount = 0;
+      for (const prod of toImport) {
+        const { id: _id, ...productData } = prod;
+        await productService.createProduct(productData, 'supabase');
+        importedCount++;
+      }
+      showToast('success', `${importedCount} produk berhasil diimpor ke Supabase! ${localProducts.length - toImport.length} produk sudah ada (dilewati).`);
+    } catch (err) {
+      showToast('error', `Gagal mengimpor produk: ${err instanceof Error ? err.message : 'Kesalahan tidak diketahui'}`);
+    } finally {
+      setIsMigrationLoading(false);
+    }
+  };
+
   // ── Business Settings Actions ────────────────────────────────────────────
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!businessName.trim()) {
       showToast('error', 'Nama bisnis wajib diisi.');
@@ -263,7 +321,7 @@ export default function AdminSettingsPage() {
 
     setIsActionLoading(true);
     try {
-      businessService.updateProfile({
+      await businessService.updateProfile({
         businessName,
         businessType,
         description,
@@ -343,11 +401,11 @@ export default function AdminSettingsPage() {
       ],
       confirmLabel: 'Ya, Reset Pengaturan',
       variant: 'warning',
-      onConfirm: () => {
+      onConfirm: async () => {
         setIsActionLoading(true);
         setConfirm(null);
         try {
-          const defaults = businessService.resetProfile();
+          const defaults = await businessService.resetProfile();
           setBusinessName(defaults.businessName);
           setBusinessType(defaults.businessType);
           setDescription(defaults.description);
@@ -620,6 +678,14 @@ export default function AdminSettingsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold border ${
+            isSupabaseActive
+              ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+              : 'bg-slate-800 text-slate-400 border-slate-700'
+          }`}>
+            <Database className="w-3.5 h-3.5" />
+            {isSupabaseActive ? 'Sumber Data: Supabase' : 'Sumber Data: Demo Lokal'}
+          </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <Sparkles className="w-3.5 h-3.5" />
             UMKM Digital
@@ -1726,6 +1792,46 @@ export default function AdminSettingsPage() {
                 Pulihkan Produk
               </button>
             </div>
+          </div>
+
+          {/* ── Supabase Migration Panel ──────────────────────────────────────── */}
+          <div className="bg-slate-900 border border-blue-500/20 rounded-2xl p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                <Database className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Migrasi Data Demo ke Supabase</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {isSupabaseActive
+                    ? 'Import data lokal ke Supabase. Hanya data yang belum ada yang akan diimpor.'
+                    : 'Login dengan akun Supabase untuk mengaktifkan fitur migrasi data.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleImportBusinessProfile}
+                disabled={!isSupabaseActive || isMigrationLoading}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all"
+              >
+                <Database className="w-3.5 h-3.5" />
+                Import Profil Bisnis Demo
+              </button>
+              <button
+                onClick={handleImportProducts}
+                disabled={!isSupabaseActive || isMigrationLoading}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all"
+              >
+                <Database className="w-3.5 h-3.5" />
+                Import Produk Demo
+              </button>
+            </div>
+            {!isSupabaseActive && (
+              <p className="text-[10px] text-slate-500 mt-3 text-center">
+                Tombol aktif hanya saat login Supabase aktif (bukan demo mode).
+              </p>
+            )}
           </div>
 
           <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-850 text-[11px] text-slate-500 leading-relaxed">

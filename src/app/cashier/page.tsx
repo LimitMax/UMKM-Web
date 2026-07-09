@@ -28,7 +28,7 @@ import DemoRoleSwitcher from '../../components/DemoRoleSwitcher';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
 import { authService as mockAuthService } from '../../services/authService';
 import { useAuth } from '../../components/AuthProvider';
-import { Order, OrderStatus } from '../../types';
+import { Order, OrderStatus, BusinessProfile } from '../../types';
 import { formatRupiah } from '../../utils/format';
 import { formatEtaMinutes, formatEstimatedTime } from '../../utils/etaHelpers';
 import { Clock } from 'lucide-react';
@@ -38,7 +38,7 @@ export default function CashierDashboard() {
   const { user: supabaseUser, profile, isDemoMode, isSupabaseConfigured, loading: authLoading, signOut } = useAuth();
   const [user, setUser] = useState<{ name: string; role: string } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const businessProfile = businessService.getProfile();
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(() => businessService.getProfileSync());
   const [isLoading, setIsLoading] = useState(true);
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -101,7 +101,13 @@ export default function CashierDashboard() {
             router.push('/login');
           }, 0);
         } else {
-          setTimeout(() => {
+          setTimeout(async () => {
+            try {
+              const p = await businessService.getProfile();
+              setBusinessProfile(p);
+            } catch (err) {
+              console.error('Failed to load profile in cashier:', err);
+            }
             setUser({
               name: profile.full_name,
               role: profile.role === 'admin' ? 'Owner/Admin' : 'Kasir',
@@ -118,7 +124,13 @@ export default function CashierDashboard() {
             router.push('/login');
           }, 0);
         } else {
-          setTimeout(() => {
+          setTimeout(async () => {
+            try {
+              const p = await businessService.getProfile();
+              setBusinessProfile(p);
+            } catch (err) {
+              console.error('Failed to load profile in cashier:', err);
+            }
             setUser({
               name: mockSession.name,
               role: mockSession.role === 'admin' ? 'Owner Demo' : 'Kasir Demo',

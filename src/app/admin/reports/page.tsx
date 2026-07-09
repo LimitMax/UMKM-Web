@@ -73,7 +73,7 @@ export default function ReportsPage() {
       try {
         const allOrders = await orderService.getOrders();
         setOrders(allOrders);
-        const profile = businessService.getProfile();
+        const profile = await businessService.getProfile();
         setBusinessProfile(profile);
       } catch (err) {
         console.error('Error loading report orders:', err);

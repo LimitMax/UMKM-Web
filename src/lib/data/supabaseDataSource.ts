@@ -1,20 +1,54 @@
 import { Product, Order, BusinessProfile } from '../../types';
 import { DataSource } from './dataSource';
 import { supabaseClient } from '../supabase/client';
+import { 
+  mapSupabaseBusinessToBusinessProfile,
+  mapBusinessProfileToSupabaseBusinessUpdate,
+  mapSupabaseProductToProduct,
+  mapProductToSupabaseInsert,
+  mapProductToSupabaseUpdate 
+} from './mappers';
+
+/**
+ * Helper to dynamically resolve the business ID.
+ * Returns providedId if present; otherwise, attempts to resolve from the authenticated
+ * Supabase session profile, falling back to 'biz-1' (default public business).
+ */
+async function resolveBusinessId(providedId?: string): Promise<string> {
+  if (providedId) return providedId;
+  
+  try {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (user) {
+      const { data: profile, error } = await supabaseClient
+        .from('profiles')
+        .select('business_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      if (!error && profile?.business_id) {
+        return profile.business_id;
+      }
+    }
+  } catch (err) {
+    console.error('Error resolving business ID in supabaseDataSource:', err);
+  }
+  
+  return 'biz-1';
+}
 
 /**
  * Supabase database driver implementation.
- * Prepared for live Supabase PostgreSQL schema query operations.
- *
- * NOTE: This source will be fully activated and integrated into client layouts
- * in subsequent phases (Phase 7C/7D) once auth flows are resolved.
+ * Queries/updates real PostgreSQL tables by checking dynamic session business IDs.
  */
 export const supabaseDataSource: DataSource = {
-  async getBusinessProfile(): Promise<BusinessProfile> {
+  async getBusinessProfile(businessId?: string): Promise<BusinessProfile> {
+    const resolvedId = await resolveBusinessId(businessId);
+    
     const { data, error } = await supabaseClient
       .from('businesses')
       .select('*')
-      .eq('id', 'biz-1')
+      .eq('id', resolvedId)
       .single();
 
     if (error) {
@@ -22,46 +56,17 @@ export const supabaseDataSource: DataSource = {
       throw error;
     }
 
-    return {
-      businessName: data.name,
-      businessType: data.business_type,
-      description: data.description,
-      logoUrl: data.logo_url,
-      address: data.address,
-      whatsappNumber: data.whatsapp_number,
-      openingHours: data.opening_hours,
-      orderLink: '',
-      currency: data.currency || 'IDR',
-      taxEnabled: data.tax_enabled,
-      taxPercentage: Number(data.tax_percentage),
-      serviceChargeEnabled: data.service_charge_enabled,
-      serviceChargePercentage: Number(data.service_charge_percentage),
-      deliverySettings: data.delivery_settings,
-      etaSettings: data.eta_settings,
-    };
+    return mapSupabaseBusinessToBusinessProfile(data);
   },
 
-  async updateBusinessProfile(profile: Partial<BusinessProfile>): Promise<BusinessProfile> {
-    const dbPayload: Partial<Record<string, string | number | boolean | object | null>> = {};
-    if (profile.businessName !== undefined) dbPayload.name = profile.businessName;
-    if (profile.businessType !== undefined) dbPayload.business_type = profile.businessType;
-    if (profile.description !== undefined) dbPayload.description = profile.description;
-    if (profile.logoUrl !== undefined) dbPayload.logo_url = profile.logoUrl;
-    if (profile.address !== undefined) dbPayload.address = profile.address;
-    if (profile.whatsappNumber !== undefined) dbPayload.whatsapp_number = profile.whatsappNumber;
-    if (profile.openingHours !== undefined) dbPayload.opening_hours = profile.openingHours;
-    if (profile.currency !== undefined) dbPayload.currency = profile.currency;
-    if (profile.taxEnabled !== undefined) dbPayload.tax_enabled = profile.taxEnabled;
-    if (profile.taxPercentage !== undefined) dbPayload.tax_percentage = profile.taxPercentage;
-    if (profile.serviceChargeEnabled !== undefined) dbPayload.service_charge_enabled = profile.serviceChargeEnabled;
-    if (profile.serviceChargePercentage !== undefined) dbPayload.service_charge_percentage = profile.serviceChargePercentage;
-    if (profile.deliverySettings !== undefined) dbPayload.delivery_settings = profile.deliverySettings;
-    if (profile.etaSettings !== undefined) dbPayload.eta_settings = profile.etaSettings;
+  async updateBusinessProfile(profile: Partial<BusinessProfile>, businessId?: string): Promise<BusinessProfile> {
+    const resolvedId = await resolveBusinessId(businessId);
+    const dbPayload = mapBusinessProfileToSupabaseBusinessUpdate(profile);
 
     const { data, error } = await supabaseClient
       .from('businesses')
       .update(dbPayload)
-      .eq('id', 'biz-1')
+      .eq('id', resolvedId)
       .select()
       .single();
 
@@ -70,29 +75,16 @@ export const supabaseDataSource: DataSource = {
       throw error;
     }
 
-    return {
-      businessName: data.name,
-      businessType: data.business_type,
-      description: data.description,
-      logoUrl: data.logo_url,
-      address: data.address,
-      whatsappNumber: data.whatsapp_number,
-      openingHours: data.opening_hours,
-      orderLink: '',
-      currency: data.currency || 'IDR',
-      taxEnabled: data.tax_enabled,
-      taxPercentage: Number(data.tax_percentage),
-      serviceChargeEnabled: data.service_charge_enabled,
-      serviceChargePercentage: Number(data.service_charge_percentage),
-      deliverySettings: data.delivery_settings,
-      etaSettings: data.eta_settings,
-    };
+    return mapSupabaseBusinessToBusinessProfile(data);
   },
 
-  async getProducts(): Promise<Product[]> {
+  async getProducts(businessId?: string): Promise<Product[]> {
+    const resolvedId = await resolveBusinessId(businessId);
+
     const { data, error } = await supabaseClient
       .from('products')
       .select('*')
+      .eq('business_id', resolvedId)
       .order('name', { ascending: true });
 
     if (error) {
@@ -100,15 +92,7 @@ export const supabaseDataSource: DataSource = {
       throw error;
     }
 
-    return (data || []).map((p: { id: string; name: string; category: string; price: string | number; stock: number; image_url: string | null; is_active: boolean }) => ({
-      id: p.id,
-      name: p.name,
-      category: p.category as Product['category'],
-      price: Number(p.price),
-      stock: p.stock,
-      imageUrl: p.image_url || '',
-      isActive: p.is_active,
-    }));
+    return (data || []).map(mapSupabaseProductToProduct);
   },
 
   async getProductById(id: string): Promise<Product | undefined> {
@@ -116,36 +100,24 @@ export const supabaseDataSource: DataSource = {
       .from('products')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Supabase getProductById error:', error.message);
       return undefined;
     }
 
-    return {
-      id: data.id,
-      name: data.name,
-      category: data.category as Product['category'],
-      price: Number(data.price),
-      stock: data.stock,
-      imageUrl: data.image_url || '',
-      isActive: data.is_active,
-    };
+    if (!data) return undefined;
+    return mapSupabaseProductToProduct(data);
   },
 
-  async createProduct(productData: Omit<Product, 'id'>): Promise<Product> {
+  async createProduct(productData: Omit<Product, 'id'>, businessId?: string): Promise<Product> {
+    const resolvedId = await resolveBusinessId(businessId);
+    const insertPayload = mapProductToSupabaseInsert(productData, resolvedId);
+
     const { data, error } = await supabaseClient
       .from('products')
-      .insert([{
-        business_id: 'biz-1',
-        name: productData.name,
-        category: productData.category,
-        price: productData.price,
-        stock: productData.stock,
-        image_url: productData.imageUrl,
-        is_active: productData.isActive,
-      }])
+      .insert([insertPayload])
       .select()
       .single();
 
@@ -154,29 +126,16 @@ export const supabaseDataSource: DataSource = {
       throw error;
     }
 
-    return {
-      id: data.id,
-      name: data.name,
-      category: data.category as Product['category'],
-      price: Number(data.price),
-      stock: data.stock,
-      imageUrl: data.image_url || '',
-      isActive: data.is_active,
-    };
+    return mapSupabaseProductToProduct(data);
   },
 
-  async updateProduct(id: string, productData: Partial<Omit<Product, 'id'>>): Promise<Product> {
-    const dbPayload: Partial<Record<string, string | number | boolean | object | null>> = {};
-    if (productData.name !== undefined) dbPayload.name = productData.name;
-    if (productData.category !== undefined) dbPayload.category = productData.category;
-    if (productData.price !== undefined) dbPayload.price = productData.price;
-    if (productData.stock !== undefined) dbPayload.stock = productData.stock;
-    if (productData.imageUrl !== undefined) dbPayload.image_url = productData.imageUrl;
-    if (productData.isActive !== undefined) dbPayload.is_active = productData.isActive;
+  async updateProduct(id: string, productData: Partial<Omit<Product, 'id'>>, _businessId?: string): Promise<Product> {
+    // _businessId is intentionally unused — we locate by primary key, but the param keeps method signatures compatible
+    const updatePayload = mapProductToSupabaseUpdate(productData);
 
     const { data, error } = await supabaseClient
       .from('products')
-      .update(dbPayload)
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();
@@ -186,21 +145,14 @@ export const supabaseDataSource: DataSource = {
       throw error;
     }
 
-    return {
-      id: data.id,
-      name: data.name,
-      category: data.category as Product['category'],
-      price: Number(data.price),
-      stock: data.stock,
-      imageUrl: data.image_url || '',
-      isActive: data.is_active,
-    };
+    return mapSupabaseProductToProduct(data);
   },
 
   async deleteProduct(id: string): Promise<void> {
+    // Use is_active instead of hard delete by default as requested
     const { error } = await supabaseClient
       .from('products')
-      .delete()
+      .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (error) {
@@ -210,7 +162,7 @@ export const supabaseDataSource: DataSource = {
   },
 
   async getOrders(): Promise<Order[]> {
-    // Placeholder implementation (mapping details will be refined in Phase 7C)
+    // Orders remain localStorage for now (Phase 7C limitation)
     return [];
   },
 
@@ -219,14 +171,14 @@ export const supabaseDataSource: DataSource = {
   },
 
   async createOrder(): Promise<Order> {
-    throw new Error('SupabaseDataSource.createOrder is not fully implemented yet.');
+    throw new Error('Orders are not migrated to Supabase in Phase 7C.');
   },
 
   async updateOrderStatus(): Promise<Order> {
-    throw new Error('SupabaseDataSource.updateOrderStatus is not fully implemented yet.');
+    throw new Error('Orders are not migrated to Supabase in Phase 7C.');
   },
 
   async updateOrderEta(): Promise<Order> {
-    throw new Error('SupabaseDataSource.updateOrderEta is not fully implemented yet.');
+    throw new Error('Orders are not migrated to Supabase in Phase 7C.');
   },
 };

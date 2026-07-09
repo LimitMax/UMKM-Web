@@ -290,7 +290,7 @@ export const demoService = {
         0,
       );
 
-      const profile = businessService.getProfile();
+      const profile = businessService.getProfileSync();
       const totals = calculateOrderTotals({
         subtotal,
         fulfillmentType: blueprint.fulfillmentType || 'dine_in',

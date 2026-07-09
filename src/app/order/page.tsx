@@ -66,8 +66,8 @@ export default function CustomerOrderPage() {
       const activeProds = await productService.getActiveProducts();
       setProducts(activeProds);
     };
-    const loadProfile = () => {
-      const profile = businessService.getProfile();
+    const loadProfile = async () => {
+      const profile = await businessService.getProfile();
       setBusinessProfile(profile);
     };
     loadProducts();

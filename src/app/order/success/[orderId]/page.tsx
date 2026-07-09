@@ -27,12 +27,17 @@ export default function OrderSuccessPage() {
   const { orderId } = useParams() as { orderId: string };
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [businessProfile] = useState<BusinessProfile | null>(() => {
-    return businessService.getProfile();
-  });
-  const [whatsappNumber] = useState<string>(() => {
-    return businessService.getProfile()?.whatsappNumber || '';
-  });
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
+  const [whatsappNumber, setWhatsappNumber] = useState<string>('');
+
+  useEffect(() => {
+    async function loadBusiness() {
+      const profile = await businessService.getProfile();
+      setBusinessProfile(profile);
+      setWhatsappNumber(profile?.whatsappNumber || '');
+    }
+    loadBusiness();
+  }, []);
 
   // Poll localStorage to get live cashier status updates
   useEffect(() => {

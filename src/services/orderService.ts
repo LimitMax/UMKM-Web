@@ -1,11 +1,11 @@
 import { Order, OrderStatus, PaymentStatus, OrderItem } from '../types';
 import { getStorageItem, setStorageItem, STORAGE_KEYS } from './db';
 import { productService } from './productService';
-import { USE_SUPABASE } from '../config/dbConfig';
 import { supabase } from '../lib/supabase';
 import { businessService } from './businessService';
 import { calculateOrderTotals } from '../utils/calculations';
 import { calculateOrderEta, applyEtaAdjustment } from '../utils/etaHelpers';
+const USE_SUPABASE = false; // Force localStorage for orders in Phase 7C
 
 interface DbOrderItem {
   product_id: string;
@@ -197,7 +197,7 @@ export const orderService = {
     }
 
     // 3. Calculate subtotal, tax, service charge, and total amount
-    const profile = businessService.getProfile();
+    const profile = await businessService.getProfile();
     const subtotal = orderData.items.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0

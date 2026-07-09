@@ -5,14 +5,14 @@ import { USE_SUPABASE } from '../../config/dbConfig';
 
 export interface DataSource {
   // Business Profile operations
-  getBusinessProfile(): Promise<BusinessProfile>;
-  updateBusinessProfile(profile: Partial<BusinessProfile>): Promise<BusinessProfile>;
+  getBusinessProfile(businessId?: string): Promise<BusinessProfile>;
+  updateBusinessProfile(profile: Partial<BusinessProfile>, businessId?: string): Promise<BusinessProfile>;
 
   // Product operations
-  getProducts(): Promise<Product[]>;
+  getProducts(businessId?: string): Promise<Product[]>;
   getProductById(id: string): Promise<Product | undefined>;
-  createProduct(productData: Omit<Product, 'id'>): Promise<Product>;
-  updateProduct(id: string, productData: Partial<Omit<Product, 'id'>>): Promise<Product>;
+  createProduct(productData: Omit<Product, 'id'>, businessId?: string): Promise<Product>;
+  updateProduct(id: string, productData: Partial<Omit<Product, 'id'>>, businessId?: string): Promise<Product>;
   deleteProduct(id: string): Promise<void>;
 
   // Order operations

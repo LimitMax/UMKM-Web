@@ -180,7 +180,7 @@ export const insightService = {
           "Sebagian pesanan hari ini menggunakan delivery. Pastikan alamat pelanggan dikonfirmasi sebelum pengiriman."
         );
       }
-      const profile = businessService.getProfile();
+      const profile = businessService.getProfileSync();
       const freeDeliveryCount = deliveryOrders.filter((o) => o.freeDeliveryApplied).length;
       if (freeDeliveryCount > 0 || profile.deliverySettings?.freeDeliveryEnabled) {
         recommendations.push(
@@ -190,31 +190,31 @@ export const insightService = {
     }
 
     // Phase 6.8 — ETA insights
-    const etaProfile = businessService.getProfile();
+    const etaProfile = businessService.getProfileSync();
     if (etaProfile.etaSettings?.etaEnabled) {
       const ordersWithEta = activeOrders.filter((o) => o.estimatedTotalMinutes !== undefined);
-      if (ordersWithEta.length > 0) {
-        const avgTotal = ordersWithEta.reduce((sum, o) => sum + (o.estimatedTotalMinutes ?? 0), 0) / ordersWithEta.length;
-        if (avgTotal > 35) {
+      const avgTotal = ordersWithEta.length > 0
+        ? ordersWithEta.reduce((sum, o) => sum + (o.estimatedTotalMinutes ?? 0), 0) / ordersWithEta.length
+        : 0;
+      if (avgTotal > 35) {
+        recommendations.push(
+          `Rata-rata ETA pesanan hari ini adalah ${Math.round(avgTotal)} menit — lebih lama dari ideal. Pertimbangkan mengurangi buffer jam sibuk atau menambah kapasitas dapur.`
+        );
+      }
+      const deliveryWithEta = ordersWithEta.filter((o) => o.fulfillmentType === 'delivery');
+      if (deliveryWithEta.length > 0) {
+        const avgDelivery = deliveryWithEta.reduce((sum, o) => sum + (o.estimatedTotalMinutes ?? 0), 0) / deliveryWithEta.length;
+        if (avgDelivery > 40) {
           recommendations.push(
-            `Rata-rata ETA pesanan hari ini adalah ${Math.round(avgTotal)} menit — lebih lama dari ideal. Pertimbangkan mengurangi buffer jam sibuk atau menambah kapasitas dapur.`
+            `Rata-rata ETA delivery mencapai ${Math.round(avgDelivery)} menit. Pertimbangkan membatasi radius pengiriman atau menambah mitra kurir untuk area yang jauh.`
           );
         }
-        const deliveryWithEta = ordersWithEta.filter((o) => o.fulfillmentType === 'delivery');
-        if (deliveryWithEta.length > 0) {
-          const avgDelivery = deliveryWithEta.reduce((sum, o) => sum + (o.estimatedTotalMinutes ?? 0), 0) / deliveryWithEta.length;
-          if (avgDelivery > 40) {
-            recommendations.push(
-              `Rata-rata ETA delivery mencapai ${Math.round(avgDelivery)} menit. Pertimbangkan membatasi radius pengiriman atau menambah mitra kurir untuk area yang jauh.`
-            );
-          }
-        }
-        const manuallyAdjusted = ordersWithEta.filter((o) => o.etaManuallyAdjusted).length;
-        if (manuallyAdjusted > 0) {
-          recommendations.push(
-            `${manuallyAdjusted} pesanan ETA-nya sudah disesuaikan kasir secara manual. Jika terjadi berulang, pertimbangkan menaikkan waktu persiapan default di Pengaturan ETA.`
-          );
-        }
+      }
+      const manuallyAdjusted = ordersWithEta.filter((o) => o.etaManuallyAdjusted).length;
+      if (manuallyAdjusted > 0) {
+        recommendations.push(
+          `${manuallyAdjusted} pesanan ETA-nya sudah disesuaikan kasir secara manual. Jika terjadi berulang, pertimbangkan menaikkan waktu persiapan default di Pengaturan ETA.`
+        );
       }
     }
 
