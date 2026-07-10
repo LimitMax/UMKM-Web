@@ -414,6 +414,111 @@ export const orderService = {
     setStorageItem(STORAGE_KEYS.ORDERS, orders);
     return updatedOrder;
   },
+  
+  async markOrderPaidManually(id: string, reason: string, businessId: string): Promise<Order> {
+    if (USE_SUPABASE) {
+      const now = new Date().toISOString();
+      
+      const currentOrder = await this.getOrderById(id);
+      if (!currentOrder) {
+        throw new Error(`Order dengan ID ${id} tidak ditemukan.`);
+      }
+
+      // Fetch the corresponding payment record if any
+      const { data: paymentRecord } = await supabase
+        .from('payments')
+        .select('id, status, provider_reference_id')
+        .eq('order_id', id)
+        .maybeSingle();
+
+      // Update order in Supabase
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          order_status: 'paid',
+          payment_status: 'paid',
+          paid_at: now,
+          updated_at: now
+        })
+        .eq('id', id);
+
+      if (orderError) throw orderError;
+
+      // Update payments table in Supabase
+      if (paymentRecord) {
+        await supabase
+          .from('payments')
+          .update({
+            status: 'paid',
+            paid_at: now,
+            payment_type: 'manual_override',
+            provider: 'manual_override',
+            updated_at: now
+          })
+          .eq('id', paymentRecord.id);
+      } else {
+        // Create manual payment record if none exists
+        const paymentId = `pay-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        await supabase
+          .from('payments')
+          .insert([{
+            id: paymentId,
+            business_id: businessId,
+            order_id: id,
+            provider: 'manual_override',
+            provider_reference_id: `man-${Date.now()}`,
+            payment_method: 'non_cash',
+            amount: currentOrder.totalAmount,
+            status: 'paid',
+            paid_at: now,
+            payment_type: 'manual_override',
+            created_at: now,
+            updated_at: now
+          }]);
+      }
+
+      // Write event to payment_events (audit trail)
+      const eventId = `pe-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      await supabase
+        .from('payment_events')
+        .insert([{
+          id: eventId,
+          business_id: businessId,
+          order_id: id,
+          payment_id: paymentRecord?.id || null,
+          provider: 'manual_override',
+          provider_reference_id: paymentRecord?.provider_reference_id || null,
+          event_type: 'manual_override',
+          previous_status: paymentRecord?.status || 'pending',
+          new_status: 'paid',
+          transaction_status: 'settlement',
+          fraud_status: 'accept',
+          raw_payload: {
+            reason,
+            verified_by: 'cashier',
+            method: 'manual_override_non_cash'
+          },
+          created_at: now
+        }]);
+
+      const updated = await this.getOrderById(id);
+      if (!updated) throw new Error('Gagal memuat rincian pesanan.');
+      return updated;
+    }
+
+    // Local Storage mock implementation (fallback)
+    const orders = await this.getOrders();
+    const idx = orders.findIndex(o => o.id === id);
+    if (idx !== -1) {
+      orders[idx].paymentStatus = 'Paid';
+      orders[idx].status = 'Paid';
+      orders[idx].paidAt = new Date().toISOString();
+      setStorageItem(STORAGE_KEYS.ORDERS, orders);
+    }
+    const updated = await this.getOrderById(id);
+    if (!updated) throw new Error('Gagal memuat rincian pesanan.');
+    return updated;
+  },
 
   async getCompletedTransactions(businessId?: string): Promise<Order[]> {
     if (USE_SUPABASE) {

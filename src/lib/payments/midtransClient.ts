@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { paymentConfig, validatePaymentConfig } from './paymentConfig';
 
 export type MidtransPaymentMethod = 'non_cash';
 
@@ -46,25 +47,24 @@ function assertServerOnly() {
 }
 
 export function isMidtransProductionEnabled(): boolean {
-  return process.env.MIDTRANS_IS_PRODUCTION === 'true';
+  return paymentConfig.MIDTRANS_IS_PRODUCTION;
 }
 
 export function getMidtransSnapBaseUrl(): string {
-  return (process.env.MIDTRANS_SNAP_BASE_URL || 'https://app.sandbox.midtrans.com').replace(/\/+$/, '');
+  return paymentConfig.MIDTRANS_SNAP_BASE_URL;
 }
 
 export function getMidtransCoreApiBaseUrl(): string {
-  return (process.env.MIDTRANS_CORE_API_BASE_URL || 'https://api.sandbox.midtrans.com').replace(/\/+$/, '');
+  return paymentConfig.MIDTRANS_CORE_API_BASE_URL;
 }
 
 export function getMidtransServerKey(): string {
   assertServerOnly();
 
-  if (isMidtransProductionEnabled()) {
-    throw new Error('Midtrans production mode is disabled for this phase. Use sandbox credentials only.');
-  }
+  // Production readiness strict validation check
+  validatePaymentConfig();
 
-  const serverKey = process.env.MIDTRANS_SERVER_KEY;
+  const serverKey = paymentConfig.MIDTRANS_SERVER_KEY;
   if (!serverKey) {
     throw new Error('MIDTRANS_SERVER_KEY belum dikonfigurasi.');
   }

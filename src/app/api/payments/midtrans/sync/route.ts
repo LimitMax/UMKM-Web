@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     }
 
     const statusPayload = await getMidtransTransactionStatus(payment.provider_reference_id);
-    const result = await processMidtransPaymentNotification(statusPayload);
+    const result = await processMidtransPaymentNotification(statusPayload, 'sync');
 
     return NextResponse.json({
       ok: true,

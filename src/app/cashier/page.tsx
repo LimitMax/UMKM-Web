@@ -56,8 +56,10 @@ export default function CashierDashboard() {
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
     description: string;
-    onConfirm: () => void;
+    showReasonInput?: boolean;
+    onConfirm: (reason?: string) => void;
   } | null>(null);
+  const [manualOverrideReason, setManualOverrideReason] = useState<string>('');
   
   // Track previous order count to play notification chime on new order
   const prevOrdersCountRef = useRef<number | null>(null);
@@ -224,6 +226,18 @@ export default function CashierDashboard() {
       setOrders(allOrders);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Gagal mengubah status.');
+    }
+  };
+
+  const handleMarkPaidManually = async (id: string, reason: string) => {
+    try {
+      const bizId = profile?.business_id || 'biz-1';
+      await orderService.markOrderPaidManually(id, reason, bizId);
+      const allOrders = await orderService.getOrdersByBusinessId(bizId);
+      setOrders(allOrders);
+      showToastNotification('Pesanan berhasil ditandai lunas manual.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gagal menandai lunas manual.');
     }
   };
 
@@ -886,7 +900,8 @@ export default function CashierDashboard() {
                                 setConfirmModal({
                                   title: 'Tandai pembayaran sebagai lunas?',
                                   description: 'Gunakan hanya jika pembayaran sudah diverifikasi manual.',
-                                  onConfirm: () => handleUpdateStatus(selectedOrder.id, 'Paid')
+                                  showReasonInput: true,
+                                  onConfirm: (reason) => handleMarkPaidManually(selectedOrder.id, reason || '')
                                 });
                               }}
                               className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white border border-slate-750 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
@@ -1034,11 +1049,30 @@ export default function CashierDashboard() {
               <AlertCircle className="w-6 h-6" />
             </div>
             <h3 className="text-base font-extrabold text-white mb-2">{confirmModal.title}</h3>
-            <p className="text-xs text-slate-400 mb-6 leading-relaxed">{confirmModal.description}</p>
+            <p className="text-xs text-slate-400 mb-4 leading-relaxed">{confirmModal.description}</p>
+            
+            {confirmModal.showReasonInput && (
+              <div className="text-left mb-5">
+                <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                  Alasan verifikasi manual (opsional)
+                </label>
+                <input
+                  type="text"
+                  value={manualOverrideReason}
+                  onChange={(e) => setManualOverrideReason(e.target.value)}
+                  placeholder="Masukkan alasan, cth: Transfer diterima"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+                />
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setConfirmModal(null)}
+                onClick={() => {
+                  setConfirmModal(null);
+                  setManualOverrideReason('');
+                }}
                 className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white border border-slate-750 text-xs font-bold transition-all cursor-pointer"
               >
                 Batal
@@ -1046,8 +1080,9 @@ export default function CashierDashboard() {
               <button
                 type="button"
                 onClick={() => {
-                  confirmModal.onConfirm();
+                  confirmModal.onConfirm(manualOverrideReason);
                   setConfirmModal(null);
+                  setManualOverrideReason('');
                 }}
                 className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition-all cursor-pointer"
               >

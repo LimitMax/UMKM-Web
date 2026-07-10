@@ -207,7 +207,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('[Midtrans] Create payment error:', error instanceof Error ? error.message : error);
     return NextResponse.json(
-      { message: 'Gagal membuat pembayaran Midtrans Sandbox.' },
+      { message: 'Pembayaran online sedang tidak tersedia. Silakan pilih Tunai atau hubungi kasir.' },
       { status: 500 }
     );
   }

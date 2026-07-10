@@ -55,15 +55,19 @@ export function formatPaymentStatus(status?: string | null): string {
 
 export function formatPaymentProvider(provider?: string | null, method?: string | null): string {
   const normMethod = method?.toLowerCase();
+  if (provider === 'manual_override' || provider === 'manual') return 'Dibayar Manual oleh Kasir';
   if (normMethod === 'cash' || normMethod === 'tunai') return 'Kasir Manual';
   if (!provider) return 'Midtrans Sandbox';
   const normProvider = provider.toLowerCase();
   if (normProvider === 'midtrans' || normProvider === 'midtrans_snap_sandbox') return 'Midtrans Sandbox';
+  if (normProvider === 'manual_override') return 'Dibayar Manual oleh Kasir';
   return provider;
 }
 
 export function formatMidtransPaymentType(paymentType?: string | null): string {
   switch (paymentType?.toLowerCase()) {
+    case 'manual_override':
+      return 'Dibayar Manual oleh Kasir';
     case 'qris':
       return 'QRIS';
     case 'gopay':

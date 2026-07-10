@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { MidtransNotificationPayload } from './midtransClient';
+import { logPaymentEvent } from './paymentAuditLogger';
 
 type AppPaymentStatus = 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled' | 'refunded';
 
@@ -71,7 +72,8 @@ function timestampOrNull(value: unknown): string | null {
 }
 
 export async function processMidtransPaymentNotification(
-  payload: MidtransNotificationPayload
+  payload: MidtransNotificationPayload,
+  source: 'webhook' | 'sync' = 'webhook'
 ): Promise<ProcessResult> {
   if (!payload.order_id) {
     throw new Error('Midtrans notification missing order_id.');
@@ -123,6 +125,9 @@ export async function processMidtransPaymentNotification(
     settlement_time: timestampOrNull(payload.settlement_time),
     raw_callback_payload: payload,
     updated_at: now,
+    webhook_received_at: now,
+    last_webhook_status: payload.status_code || null,
+    last_webhook_transaction_status: payload.transaction_status || null,
   };
 
   if (isPaid && !paymentUpdates.settlement_time) {
@@ -214,6 +219,21 @@ export async function processMidtransPaymentNotification(
       })
       .eq('order_id', orderRow.id);
   }
+
+  // Log payment event (best-effort audit log)
+  await logPaymentEvent({
+    business_id: paymentRow.business_id,
+    order_id: paymentRow.order_id,
+    payment_id: paymentRow.id,
+    provider: 'midtrans',
+    provider_reference_id: paymentRow.provider_reference_id,
+    event_type: source === 'sync' ? 'manual_sync' : 'webhook_received',
+    previous_status: paymentRow.status,
+    new_status: effectiveStatus,
+    transaction_status: payload.transaction_status || null,
+    fraud_status: payload.fraud_status || null,
+    raw_payload: payload
+  });
 
   return {
     paymentId: paymentRow.id,

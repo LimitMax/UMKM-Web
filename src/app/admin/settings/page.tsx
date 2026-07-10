@@ -32,6 +32,7 @@ import { useAuth } from '../../../components/AuthProvider';
 import { formatRupiah } from '../../../utils/format';
 import type { EtaDisplayMode } from '../../../types';
 import { Database } from 'lucide-react';
+import { supabaseClient } from '../../../lib/supabase/client';
 
 interface ConfirmConfig {
   title: string;
@@ -47,9 +48,26 @@ interface Toast {
   message: string;
 }
 
+interface PaymentHealthData {
+  provider: string;
+  environment: string;
+  isProduction: boolean;
+  productionEnabled: boolean;
+  hasMerchantId: boolean;
+  hasClientKey: boolean;
+  hasServerKey: boolean;
+  snapBaseUrl: string;
+  coreApiBaseUrl: string;
+  webhookUrl: string;
+  appUrl: string;
+  canCreatePayment: boolean;
+  lastWebhookReceivedAt: string | null;
+  warnings: string[];
+}
+
 export default function AdminSettingsPage() {
-  // Tab state: 'profile' | 'demo'
-  const [activeTab, setActiveTab] = useState<'profile' | 'demo'>('profile');
+  // Tab state: 'profile' | 'demo' | 'payment'
+  const [activeTab, setActiveTab] = useState<'profile' | 'demo' | 'payment'>('profile');
 
   // Business Profile states
   const [businessName, setBusinessName] = useState(() => {
@@ -214,6 +232,33 @@ export default function AdminSettingsPage() {
   const { isSupabaseConfigured, user: supabaseUser } = useAuth();
   const isSupabaseActive = isSupabaseConfigured && !!supabaseUser;
   const [isMigrationLoading, setIsMigrationLoading] = useState(false);
+
+  // Payment integration health checks state
+  const [healthData, setHealthData] = useState<PaymentHealthData | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+
+  const fetchPaymentHealth = useCallback(async () => {
+    setHealthLoading(true);
+    try {
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      const token = sessionData.session?.access_token || '';
+      const res = await fetch('/api/admin/payments/health', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHealthData(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch payment health data:', err);
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
+
+
 
   // Load business profile and stats
   const loadStats = useCallback(() => {
@@ -716,6 +761,20 @@ export default function AdminSettingsPage() {
         >
           <Zap className="w-4.5 h-4.5" />
           <span>Alat Demo &amp; Developer</span>
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('payment');
+            fetchPaymentHealth();
+          }}
+          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all relative ${
+            activeTab === 'payment'
+              ? 'text-emerald-400 border-b-2 border-emerald-500'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <ShoppingCart className="w-4.5 h-4.5 text-indigo-400" />
+          <span>Status Pembayaran</span>
         </button>
       </div>
 
@@ -1836,6 +1895,153 @@ export default function AdminSettingsPage() {
 
           <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-850 text-[11px] text-slate-500 leading-relaxed">
             <strong className="text-slate-400">Catatan Pengembang:</strong> Semua perubahan di tab ini memengaruhi database localStorage lokal browser secara langsung. Refresh tab lainnya untuk memvalidasi perubahan Anda.
+          </div>
+        </div>
+      )}
+      {activeTab === 'payment' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Health check header panel */}
+          <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 shadow-xl flex flex-col gap-6">
+            <div className="border-b border-slate-800 pb-3 flex justify-between items-center">
+              <div>
+                <h2 className="text-sm font-extrabold text-white flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-indigo-500" />
+                  <span>Koneksi Midtrans &amp; Kesiapan Produksi</span>
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Status integrasi gerbang pembayaran online (Online Payment Gateway) UMKM Pilot.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchPaymentHealth}
+                disabled={healthLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-xs font-bold text-slate-300 transition-all cursor-pointer border border-slate-750"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${healthLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {healthLoading ? (
+              <div className="text-slate-500 text-xs font-mono py-12 animate-pulse text-center">
+                Mengecek konfigurasi sistem pembayaran...
+              </div>
+            ) : healthData ? (
+              <div className="space-y-6">
+                {/* Badges based on active environment */}
+                <div>
+                  {healthData.isProduction ? (
+                    <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/8 flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-black text-emerald-400">
+                        Mode Production — transaksi nyata aktif
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/8 flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                      <span className="text-xs font-black text-amber-400">
+                        Mode Sandbox — tidak ada transaksi nyata
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Warning message if production mode configured incorrectly */}
+                {healthData.isProduction && healthData.productionEnabled && (
+                  <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 text-xs text-amber-300 leading-relaxed font-semibold">
+                    ⚠️ Pastikan webhook production, payment channel, dan settlement sudah diverifikasi di dashboard Midtrans Merchant.
+                  </div>
+                )}
+
+                {/* Health parameters grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Left Column: Technical Details */}
+                  <div className="bg-slate-950/40 border border-slate-850 rounded-xl p-4 space-y-3">
+                    <h3 className="text-xs font-bold text-indigo-400 mb-1">Rincian Integrasi</h3>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-400">Provider:</span>
+                      <span className="text-white font-semibold capitalize">{healthData.provider}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2.5">
+                      <span className="text-slate-400">Environment:</span>
+                      <span className="text-white font-semibold capitalize">{healthData.environment}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2.5">
+                      <span className="text-slate-400">Online Payment:</span>
+                      <span className={`font-bold ${healthData.canCreatePayment ? 'text-emerald-400' : 'text-rose-455'}`}>
+                        {healthData.canCreatePayment ? 'Aktif' : 'Tidak Aktif'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2.5">
+                      <span className="text-slate-400">Manual Sync:</span>
+                      <span className="text-emerald-400 font-bold">Aktif</span>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Credentials check */}
+                  <div className="bg-slate-950/40 border border-slate-850 rounded-xl p-4 space-y-3">
+                    <h3 className="text-xs font-bold text-indigo-400 mb-1">Status Kredensial</h3>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-400">Merchant ID:</span>
+                      <span className={healthData.hasMerchantId ? 'text-emerald-400 font-bold' : 'text-slate-500 font-semibold'}>
+                        {healthData.hasMerchantId ? 'Tersedia' : 'Kosong'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2.5">
+                      <span className="text-slate-400">Client Key (Public):</span>
+                      <span className={healthData.hasClientKey ? 'text-emerald-400 font-bold' : 'text-rose-455 font-bold'}>
+                        {healthData.hasClientKey ? 'Tersedia' : 'Wajib Ada'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2.5">
+                      <span className="text-slate-400">Server Key (Secret):</span>
+                      <span className={healthData.hasServerKey ? 'text-emerald-400 font-bold' : 'text-rose-455 font-bold'}>
+                        {healthData.hasServerKey ? 'Tersedia' : 'Wajib Ada'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2.5">
+                      <span className="text-slate-400">Webhook Handshake:</span>
+                      <span className="text-emerald-400 font-bold">Valid (SHA512)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* URL and last webhook info */}
+                <div className="bg-slate-950/40 border border-slate-850 rounded-xl p-4 space-y-3.5 text-xs">
+                  <h3 className="text-xs font-bold text-indigo-400 mb-1">Rincian Endpoints</h3>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-slate-500 font-semibold text-[9px] uppercase">Webhook Notification URL</span>
+                    <span className="text-slate-200 font-mono text-[10.5px] select-all break-all">{healthData.webhookUrl}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 border-t border-slate-900 pt-3">
+                    <span className="text-slate-500 font-semibold text-[9px] uppercase">Webhook Terakhir Diterima</span>
+                    <span className="text-slate-200 font-semibold">
+                      {healthData.lastWebhookReceivedAt
+                        ? new Date(healthData.lastWebhookReceivedAt).toLocaleString('id-ID')
+                        : 'Belum ada webhook yang diterima (Menunggu transaksi pertama).'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Warning details list */}
+                {healthData.warnings && healthData.warnings.length > 0 && (
+                  <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/5 space-y-2">
+                    <h4 className="text-xs font-black text-rose-400">Peringatan Konfigurasi:</h4>
+                    <ul className="list-disc pl-4 text-xs text-rose-300 space-y-1">
+                      {healthData.warnings.map((warn: string, idx: number) => (
+                        <li key={idx}>{warn}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-rose-400 text-xs font-semibold py-8 text-center border border-rose-500/20 bg-rose-500/5 rounded-xl">
+                Gagal memuat status kesehatan sistem pembayaran. Silakan periksa koneksi atau role login.
+              </div>
+            )}
           </div>
         </div>
       )}
