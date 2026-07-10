@@ -118,8 +118,11 @@ export interface Order {
 }
 
 export interface BusinessProfile {
+  id?: string;
   businessName: string;
   businessType: string;
+  slug?: string;
+  publicOrderEnabled?: boolean;
   description: string;
   logoUrl: string;
   address: string;
@@ -133,6 +136,8 @@ export interface BusinessProfile {
   serviceChargePercentage: number;
   deliverySettings?: DeliverySettings;
   etaSettings?: OrderEtaSettings;
+  planCode?: string;
+  subscriptionStatus?: string;
 }
 
 export interface SalesSummary {
@@ -228,3 +233,34 @@ export const FULFILLMENT_LABELS = {
   pickup: 'Ambil Sendiri',
   delivery: 'Delivery',
 } as const;
+
+export interface Plan {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  priceMonthly: number;
+  productLimit: number;
+  orderLimitMonthly: number;
+  cashierLimit: number;
+  aiEnabled: boolean;
+  midtransEnabled: boolean;
+  reportExportEnabled: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessSubscription {
+  id: string;
+  businessId: string;
+  planId: string;
+  status: 'trialing' | 'active' | 'past_due' | 'cancelled';
+  startedAt: string;
+  trialEndsAt: string | null;
+  currentPeriodStart: string;
+  currentPeriodEnd: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -16,7 +16,6 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { orderService } from '@/services/orderService';
-import { businessService } from '@/services/businessService';
 import { realtimeService } from '@/lib/services/realtimeService';
 import { Order, BusinessProfile } from '@/types';
 import { formatPaymentMethod, formatRupiah, formatDate, formatOrderStatus, formatPaymentStatus } from '@/utils/format';
@@ -64,13 +63,40 @@ export default function OrderSuccessPage() {
   const [paymentOpenLoading, setPaymentOpenLoading] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadBusiness() {
-      const profile = await businessService.getProfile();
+  const loadBusinessById = useCallback(async (businessId?: string) => {
+    if (!businessId) return;
+    try {
+      const response = await fetch(`/api/public/businesses/id/${encodeURIComponent(businessId)}`);
+      if (!response.ok) return;
+      const payload = await response.json();
+      const business = payload.business;
+      const profile = {
+        id: business.id,
+        businessName: business.name || '',
+        businessType: business.business_type || '',
+        slug: business.slug || '',
+        publicOrderEnabled: business.public_order_enabled ?? true,
+        description: business.description || '',
+        logoUrl: business.logo_url || '',
+        address: business.address || '',
+        whatsappNumber: business.whatsapp_number || '',
+        openingHours: business.opening_hours || '',
+        orderLink: '',
+        currency: business.currency || 'IDR',
+        taxEnabled: business.tax_enabled ?? false,
+        taxPercentage: Number(business.tax_percentage || 0),
+        serviceChargeEnabled: business.service_charge_enabled ?? false,
+        serviceChargePercentage: Number(business.service_charge_percentage || 0),
+        deliverySettings: business.delivery_settings || {},
+        etaSettings: business.eta_settings || {},
+        planCode: business.plan_code || 'free',
+        subscriptionStatus: business.subscription_status || 'active',
+      } as BusinessProfile;
       setBusinessProfile(profile);
-      setWhatsappNumber(profile?.whatsappNumber || '');
+      setWhatsappNumber(profile.whatsappNumber || '');
+    } catch (err) {
+      console.warn('Failed to load order business profile:', err);
     }
-    loadBusiness();
   }, []);
 
   useEffect(() => {
@@ -93,7 +119,7 @@ export default function OrderSuccessPage() {
     const interval = setInterval(fetchLatestPayment, 5000);
 
     return () => clearInterval(interval);
-  }, [orderId]);
+  }, [orderId, loadBusinessById]);
 
   // Subscribe to realtime changes and poll as a robust fallback
   useEffect(() => {
@@ -104,6 +130,7 @@ export default function OrderSuccessPage() {
         const found = await orderService.getOrderById(orderId);
         if (found) {
           setOrder(found);
+          loadBusinessById(found.businessId);
           if (found.status === 'Completed' || found.status === 'Cancelled') {
             clearInterval(interval);
           }
@@ -130,6 +157,7 @@ export default function OrderSuccessPage() {
         const found = await orderService.getOrderById(orderId);
         if (found) {
           setOrder(found);
+          loadBusinessById(found.businessId);
           if (found.status === 'Completed' || found.status === 'Cancelled') {
             clearInterval(interval);
           }
@@ -151,7 +179,7 @@ export default function OrderSuccessPage() {
       clearInterval(interval);
       realtimeService.unsubscribeChannel(channel);
     };
-  }, [orderId]);
+  }, [orderId, loadBusinessById]);
 
   if (isLoading) {
     return (
@@ -225,6 +253,7 @@ export default function OrderSuccessPage() {
   const isCancelled = order.status === 'Cancelled';
   const isMidtransOrder = order.paymentMethod === 'Non-Cash';
   const paymentDescription = getPaymentStatusDescription(order);
+  const menuHref = businessProfile?.slug ? `/order/${businessProfile.slug}` : '/order';
 
   const loadMidtransSnapScript = (): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -356,7 +385,7 @@ export default function OrderSuccessPage() {
         
         {/* Navigation links */}
         <div className="flex justify-between items-center px-2">
-          <Link href="/order" className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 transition-all">
+          <Link href={menuHref} className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 transition-all">
             <ArrowLeft className="w-4 h-4" />
             <span>Pesan Lagi</span>
           </Link>
@@ -800,7 +829,7 @@ export default function OrderSuccessPage() {
           </div>
 
           <Link
-            href="/order"
+            href={menuHref}
             className="w-full py-3 bg-slate-900 border border-slate-850 hover:bg-slate-800 text-slate-350 hover:text-white text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition-all"
           >
             <ArrowLeft className="w-4 h-4" />

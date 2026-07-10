@@ -11,8 +11,8 @@ import {
 
 /**
  * Helper to dynamically resolve the business ID.
- * Returns providedId if present; otherwise, attempts to resolve from the authenticated
- * Supabase session profile, falling back to 'biz-1' (default public business).
+ * Returns providedId if present; otherwise resolves from the authenticated
+ * Supabase session profile.
  */
 async function resolveBusinessId(providedId?: string): Promise<string> {
   if (providedId) return providedId;
@@ -34,7 +34,7 @@ async function resolveBusinessId(providedId?: string): Promise<string> {
     console.error('Error resolving business ID in supabaseDataSource:', err);
   }
   
-  return 'biz-1';
+  throw new Error('Business ID tidak ditemukan untuk sesi aktif.');
 }
 
 /**

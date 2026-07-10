@@ -11,6 +11,7 @@ interface CartItem {
 
 interface DbProduct {
   id: string;
+  business_id: string;
   name: string;
   price: number;
   stock: number;
@@ -31,8 +32,10 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = createSupabaseAdminClient();
 
-    // 2. Resolve businessId from body or from first product
     const requestBusinessId = body.businessId;
+    if (!requestBusinessId || typeof requestBusinessId !== 'string') {
+      return NextResponse.json({ message: 'Business ID wajib dikirim dari link order bisnis.' }, { status: 400 });
+    }
 
     // 3. Load active products and verify stock levels
     const productMap: Record<string, DbProduct> = {};
@@ -60,7 +63,7 @@ export async function POST(request: Request) {
 
       productMap[item.productId] = product as DbProduct;
       
-      const currentProdBizId = product.business_id || 'biz-1';
+      const currentProdBizId = product.business_id;
       if (!productBusinessId) {
         productBusinessId = currentProdBizId;
       } else if (productBusinessId !== currentProdBizId) {
@@ -68,13 +71,18 @@ export async function POST(request: Request) {
       }
     }
 
-    const finalBusinessId = requestBusinessId || productBusinessId || 'biz-1';
+    if (productBusinessId !== requestBusinessId) {
+      return NextResponse.json({ message: 'Produk tidak sesuai dengan bisnis pada link order.' }, { status: 400 });
+    }
+
+    const finalBusinessId = requestBusinessId;
 
     // 4. Load business settings
     const { data: business, error: bizError } = await supabaseAdmin
       .from('businesses')
       .select('*')
       .eq('id', finalBusinessId)
+      .eq('public_order_enabled', true)
       .single();
 
     if (bizError || !business) {
@@ -107,6 +115,7 @@ export async function POST(request: Request) {
     const { data: todayOrders, error: queueError } = await supabaseAdmin
       .from('orders')
       .select('queue_number')
+      .eq('business_id', finalBusinessId)
       .gte('created_at', todayStart.toISOString());
 
     if (queueError) {
@@ -223,7 +232,8 @@ export async function POST(request: Request) {
       const { error: updateStockError } = await supabaseAdmin
         .from('products')
         .update({ stock: product.stock - item.quantity, updated_at: new Date().toISOString() })
-        .eq('id', item.productId);
+        .eq('id', item.productId)
+        .eq('business_id', finalBusinessId);
 
       if (updateStockError) {
         console.error(`Failed to update stock for product ${item.productId}:`, updateStockError.message);

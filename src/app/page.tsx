@@ -6,7 +6,6 @@ import {
   Brain, 
   Smartphone, 
   Laptop, 
-  ArrowRight, 
   Sparkles,
   UserPlus,
   LogIn
@@ -75,6 +74,9 @@ export default function LandingPage() {
         <p className="text-slate-400 text-center max-w-2xl text-base md:text-lg mb-12 leading-relaxed">
           Platform all-in-one untuk toko kelontong, kafe, laundry, dan rumah makan. 
           Kelola pemesanan meja mandiri, kasir pintar, kontrol stok real-time, dan dapatkan analisis bisnis bertenaga AI.
+          <span className="block text-xs text-emerald-450 font-bold mt-3 bg-emerald-500/5 py-1 px-3.5 rounded-full border border-emerald-500/10 w-fit mx-auto animate-pulse">
+            ✨ Mulai dari paket Free/Trial untuk mencoba.
+          </span>
         </p>
 
         {/* Feature / Role Cards Grid */}
@@ -93,13 +95,9 @@ export default function LandingPage() {
                 Akses halaman pemesanan pelanggan untuk menjelajahi menu digital, memesan mandiri, dan melihat estimasi waktu hidangan (ETA).
               </p>
             </div>
-            <Link 
-              href="/order"
-              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all shadow-lg hover:shadow-emerald-500/20 text-xs font-sans"
-            >
-              <span>Buka Menu Pesanan</span>
-              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-            </Link>
+            <div className="mt-auto flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-slate-800/70 text-slate-300 font-bold border border-slate-700 text-xs font-sans text-center">
+              <span>Scan QR toko atau gunakan link order dari UMKM.</span>
+            </div>
           </div>
 
           {/* Card 2: Cashier Dashboard */}
@@ -133,17 +131,17 @@ export default function LandingPage() {
                 <Brain className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-white mb-2 group-hover:text-teal-400 transition-colors font-sans">
-                Daftar UMKM
+                Daftarkan Bisnis Anda
               </h3>
               <p className="text-sm text-slate-400 leading-relaxed mb-6 font-sans">
-                Belum terdaftar? Buat akun bisnis baru, konfigurasi profil toko Anda, dan mulailah proses digitalisasi UMKM Anda hari ini.
+                Buat akun owner, pilih paket, dan mulai kelola bisnis Anda dengan UMKM Pilot.
               </p>
             </div>
             <Link 
               href="/register"
-              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-400 font-bold border border-teal-500/20 hover:border-teal-400/40 transition-all text-xs font-sans"
+              className="mt-auto inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-400 font-bold border border-teal-500/20 hover:border-teal-400/40 transition-all text-xs font-sans cursor-pointer"
             >
-              <span>Daftar Sekarang</span>
+              <span>Daftar Bisnis</span>
               <UserPlus className="w-4 h-4 stroke-[2.5]" />
             </Link>
           </div>

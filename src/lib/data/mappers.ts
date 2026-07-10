@@ -5,6 +5,8 @@ interface SupabaseBusinessRow {
   id?: string;
   name?: string;
   business_type?: string;
+  slug?: string;
+  public_order_enabled?: boolean;
   description?: string;
   logo_url?: string;
   address?: string;
@@ -17,11 +19,15 @@ interface SupabaseBusinessRow {
   service_charge_percentage?: number | string;
   delivery_settings?: Partial<DeliverySettings>;
   eta_settings?: Partial<OrderEtaSettings>;
+  plan_code?: string;
+  subscription_status?: string;
 }
 
 interface SupabaseBusinessUpdatePayload {
   name?: string;
   business_type?: string;
+  slug?: string;
+  public_order_enabled?: boolean;
   description?: string;
   logo_url?: string;
   address?: string;
@@ -72,6 +78,9 @@ export function mapSupabaseBusinessToBusinessProfile(data: SupabaseBusinessRow):
   return {
     businessName: data.name || '',
     businessType: data.business_type || 'makanan_minuman',
+    id: data.id,
+    slug: data.slug || '',
+    publicOrderEnabled: data.public_order_enabled ?? true,
     description: data.description || '',
     logoUrl: data.logo_url || '',
     address: data.address || '',
@@ -85,6 +94,8 @@ export function mapSupabaseBusinessToBusinessProfile(data: SupabaseBusinessRow):
     serviceChargePercentage: Number(data.service_charge_percentage || 0),
     deliverySettings: (data.delivery_settings || {}) as DeliverySettings,
     etaSettings: (data.eta_settings || {}) as OrderEtaSettings,
+    planCode: data.plan_code || 'free',
+    subscriptionStatus: data.subscription_status || 'active',
   };
 }
 
@@ -92,6 +103,8 @@ export function mapBusinessProfileToSupabaseBusinessUpdate(profile: Partial<Busi
   const dbPayload: SupabaseBusinessUpdatePayload = {};
   if (profile.businessName !== undefined) dbPayload.name = profile.businessName;
   if (profile.businessType !== undefined) dbPayload.business_type = profile.businessType;
+  if (profile.slug !== undefined) dbPayload.slug = profile.slug;
+  if (profile.publicOrderEnabled !== undefined) dbPayload.public_order_enabled = profile.publicOrderEnabled;
   if (profile.description !== undefined) dbPayload.description = profile.description;
   if (profile.logoUrl !== undefined) dbPayload.logo_url = profile.logoUrl;
   if (profile.address !== undefined) dbPayload.address = profile.address;

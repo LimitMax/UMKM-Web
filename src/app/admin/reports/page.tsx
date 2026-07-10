@@ -77,7 +77,8 @@ export default function ReportsPage() {
   useEffect(() => {
     if (!authProfile) return;
 
-    const bizId = authProfile.business_id || 'biz-1';
+    if (!authProfile.business_id) return;
+    const bizId = authProfile.business_id;
     let debounceTimer: NodeJS.Timeout;
 
     const loadInitialData = async () => {
@@ -225,6 +226,11 @@ export default function ReportsPage() {
           <p className="text-xs text-slate-400 mt-1">
             Analisis penjualan, ringkasan pembayaran, dan ekspor spreadsheet transaksi.
           </p>
+          {businessProfile?.planCode === 'free' && (
+            <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/5 py-1 px-2.5 rounded-full border border-amber-500/10 mt-2">
+              ⚠️ Ekspor laporan tersedia di paket Starter dan Pro (Mode Demo Aktif)
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

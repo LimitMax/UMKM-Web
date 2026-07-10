@@ -27,7 +27,8 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (!profile) return;
 
-    const bizId = profile.business_id || 'biz-1';
+    if (!profile.business_id) return;
+    const bizId = profile.business_id;
     let debounceTimer: NodeJS.Timeout;
 
     const loadData = async () => {

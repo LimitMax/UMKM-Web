@@ -25,7 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { user: supabaseUser, profile, loading: authLoading, signOut } = useAuth();
+  const { user: supabaseUser, profile, currentBusiness, loading: authLoading, signOut } = useAuth();
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
@@ -99,14 +99,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     navItems = [
       { href: '/cashier', label: 'Dashboard Kasir', icon: BarChart3 },
       { href: '/admin/transactions', label: 'Struk Transaksi', icon: ClipboardList },
-      { href: '/order', label: 'Order Customer', icon: ShoppingBag },
+      { href: currentBusiness?.slug ? `/order/${currentBusiness.slug}` : '/order', label: 'Order Customer', icon: ShoppingBag },
     ];
   }
 
   // Display fields based on auth mode
   const displayName = profile?.full_name || 'Pemilik UMKM';
   const displayRole = profile?.role === 'admin' ? 'Pemilik/Admin' : 'Kasir';
-  const displayBusiness = 'Kopi & Cemilan Pilot';
+  const displayBusiness = currentBusiness?.name || 'Bisnis UMKM';
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row text-slate-100">

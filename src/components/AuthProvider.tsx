@@ -7,9 +7,32 @@ import { authService } from '../lib/services/authService';
 import { SupabaseProfile } from '../lib/services/profileService';
 import { supabaseClient } from '../lib/supabase/client';
 
+export interface CurrentBusiness {
+  id: string;
+  name: string;
+  business_type: string | null;
+  slug: string | null;
+  public_order_enabled: boolean | null;
+  description?: string | null;
+  logo_url?: string | null;
+  address?: string | null;
+  whatsapp_number?: string | null;
+  opening_hours?: string | null;
+  tax_enabled?: boolean | null;
+  tax_percentage?: number | string | null;
+  service_charge_enabled?: boolean | null;
+  service_charge_percentage?: number | string | null;
+  delivery_settings?: Record<string, unknown> | null;
+  eta_settings?: Record<string, unknown> | null;
+  plan_code?: string | null;
+  subscription_status?: string | null;
+  trial_ends_at?: string | null;
+}
+
 interface AuthContextType {
   user: User | null;
   profile: SupabaseProfile | null;
+  currentBusiness: CurrentBusiness | null;
   role: 'admin' | 'cashier' | 'customer' | null;
   loading: boolean;
   isSupabaseConfigured: boolean;
@@ -22,6 +45,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<SupabaseProfile | null>(null);
+  const [currentBusiness, setCurrentBusiness] = useState<CurrentBusiness | null>(null);
   const [role, setRole] = useState<'admin' | 'cashier' | 'customer' | null>(null);
   const [loading, setLoading] = useState(true);
   const configured = isSupabaseConfigured();
@@ -30,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!configured) {
       setUser(null);
       setProfile(null);
+      setCurrentBusiness(null);
       setRole(null);
       setLoading(false);
       return;
@@ -50,21 +75,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(currentUser);
           setProfile(currentProfile as SupabaseProfile);
           setRole(currentProfile.role);
+
+          const { data: businessData, error: businessErr } = await supabaseClient
+            .from('businesses')
+            .select('*')
+            .eq('id', currentProfile.business_id)
+            .maybeSingle();
+
+          if (!businessErr && businessData) {
+            setCurrentBusiness(businessData as CurrentBusiness);
+          } else {
+            setCurrentBusiness(null);
+          }
         } else {
           // Fallback if auth exists but profile row is missing
           setUser(currentUser);
           setProfile(null);
+          setCurrentBusiness(null);
           setRole(null);
         }
       } else {
         setUser(null);
         setProfile(null);
+        setCurrentBusiness(null);
         setRole(null);
       }
     } catch (err) {
       console.error('Error loading Supabase auth state:', err);
       setUser(null);
       setProfile(null);
+      setCurrentBusiness(null);
       setRole(null);
     } finally {
       setLoading(false);
@@ -111,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear state
     setUser(null);
     setProfile(null);
+    setCurrentBusiness(null);
     setRole(null);
     setLoading(false);
   };
@@ -120,6 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         profile,
+        currentBusiness,
         role,
         loading,
         isSupabaseConfigured: configured,

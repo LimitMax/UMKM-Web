@@ -155,7 +155,8 @@ export default function CashierDashboard() {
     if (!isAuthenticated || !profile) return;
 
     const fetchOrders = async () => {
-      const bizId = profile.business_id || 'biz-1';
+      if (!profile.business_id) return;
+      const bizId = profile.business_id;
       
       if (process.env.NODE_ENV === 'development') {
         console.log(`[DEBUG] Cashier fetching orders for business_id: ${bizId}`);
@@ -175,7 +176,8 @@ export default function CashierDashboard() {
     fetchOrders();
 
     // Subscribe to realtime orders for cashier's business
-    const bizId = profile.business_id || 'biz-1';
+    if (!profile.business_id) return;
+    const bizId = profile.business_id;
     const channel = realtimeService.subscribeToOrdersByBusinessId(bizId, async (payload) => {
       if (process.env.NODE_ENV === 'development') {
         console.log('[DEBUG] Cashier realtime change payload:', payload);
@@ -221,7 +223,8 @@ export default function CashierDashboard() {
     try {
       await orderService.updateOrderStatus(id, status);
       // Update local state instantly
-      const bizId = profile?.business_id || 'biz-1';
+      if (!profile?.business_id) return;
+      const bizId = profile.business_id;
       const allOrders = await orderService.getOrdersByBusinessId(bizId);
       setOrders(allOrders);
     } catch (err) {
@@ -231,7 +234,8 @@ export default function CashierDashboard() {
 
   const handleMarkPaidManually = async (id: string, reason: string) => {
     try {
-      const bizId = profile?.business_id || 'biz-1';
+      if (!profile?.business_id) return;
+      const bizId = profile.business_id;
       await orderService.markOrderPaidManually(id, reason, bizId);
       const allOrders = await orderService.getOrdersByBusinessId(bizId);
       setOrders(allOrders);
@@ -257,7 +261,8 @@ export default function CashierDashboard() {
         throw new Error(data?.message || 'Gagal cek status Midtrans.');
       }
 
-      const bizId = profile?.business_id || 'biz-1';
+      if (!profile?.business_id) return;
+      const bizId = profile.business_id;
       const allOrders = await orderService.getOrdersByBusinessId(bizId);
       setOrders(allOrders);
       showToastNotification(data?.orderPaymentStatus === 'paid' ? 'Pembayaran Midtrans sudah lunas.' : 'Status Midtrans diperbarui.');

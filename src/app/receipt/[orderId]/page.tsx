@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Printer, ArrowLeft, Phone, AlertTriangle } from 'lucide-react';
 import { orderService } from '../../../services/orderService';
-import { businessService } from '../../../services/businessService';
 import { realtimeService } from '../../../lib/services/realtimeService';
 import { Order, BusinessProfile } from '../../../types';
 import { formatRupiah, formatDate, formatOrderStatus } from '../../../utils/format';
@@ -20,6 +19,40 @@ export default function ReceiptPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [latestPayment, setLatestPayment] = useState<PaymentMetadata | null>(null);
 
+  const loadBusinessById = useCallback(async (businessId?: string) => {
+    if (!businessId) return;
+    try {
+      const response = await fetch(`/api/public/businesses/id/${encodeURIComponent(businessId)}`);
+      if (!response.ok) return;
+      const payload = await response.json();
+      const business = payload.business;
+      setBusinessProfile({
+        id: business.id,
+        businessName: business.name || '',
+        businessType: business.business_type || '',
+        slug: business.slug || '',
+        publicOrderEnabled: business.public_order_enabled ?? true,
+        description: business.description || '',
+        logoUrl: business.logo_url || '',
+        address: business.address || '',
+        whatsappNumber: business.whatsapp_number || '',
+        openingHours: business.opening_hours || '',
+        orderLink: '',
+        currency: business.currency || 'IDR',
+        taxEnabled: business.tax_enabled ?? false,
+        taxPercentage: Number(business.tax_percentage || 0),
+        serviceChargeEnabled: business.service_charge_enabled ?? false,
+        serviceChargePercentage: Number(business.service_charge_percentage || 0),
+        deliverySettings: business.delivery_settings || {},
+        etaSettings: business.eta_settings || {},
+        planCode: business.plan_code || 'free',
+        subscriptionStatus: business.subscription_status || 'active',
+      } as BusinessProfile);
+    } catch (err) {
+      console.error('Error loading receipt business profile:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!orderId) return;
 
@@ -28,6 +61,7 @@ export default function ReceiptPage() {
         const foundOrder = await orderService.getOrderById(orderId);
         if (foundOrder) {
           setOrder(foundOrder);
+          loadBusinessById(foundOrder.businessId);
           if (foundOrder.status === 'Completed' || foundOrder.status === 'Cancelled') {
             clearInterval(interval);
           }
@@ -41,12 +75,6 @@ export default function ReceiptPage() {
 
     const loadData = async () => {
       await fetchOrder();
-      try {
-        const profile = await businessService.getProfile();
-        setBusinessProfile(profile);
-      } catch (err) {
-        console.error('Error loading business profile:', err);
-      }
       try {
         const response = await fetch(`/api/payments/midtrans/latest?orderId=${encodeURIComponent(orderId)}`);
         if (response.ok) {
@@ -72,6 +100,7 @@ export default function ReceiptPage() {
         const foundOrder = await orderService.getOrderById(orderId);
         if (foundOrder) {
           setOrder(foundOrder);
+          loadBusinessById(foundOrder.businessId);
           if (foundOrder.status === 'Completed' || foundOrder.status === 'Cancelled') {
             clearInterval(interval);
           }
@@ -83,7 +112,7 @@ export default function ReceiptPage() {
       clearInterval(interval);
       realtimeService.unsubscribeChannel(channel);
     };
-  }, [orderId]);
+  }, [orderId, loadBusinessById]);
 
   // Handle auto-printing on load if ?print=true is present
   useEffect(() => {
@@ -128,7 +157,18 @@ export default function ReceiptPage() {
     );
   }
 
-  if (!order || !businessProfile) {
+  if (order && !businessProfile) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-slate-400 text-xs font-mono animate-pulse">Memuat profil bisnis...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!order) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
         <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-sm w-full text-center">
@@ -138,7 +178,7 @@ export default function ReceiptPage() {
             ID Pesanan tidak valid atau transaksi tidak tersedia dalam database lokal.
           </p>
           <button
-            onClick={() => router.push('/order')}
+            onClick={() => router.push(businessProfile?.slug ? `/order/${businessProfile.slug}` : '/order')}
             className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-all text-xs"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -148,6 +188,8 @@ export default function ReceiptPage() {
       </div>
     );
   }
+
+  const receiptBusinessProfile = businessProfile as BusinessProfile;
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-start p-4 sm:p-8 relative">
@@ -210,13 +252,13 @@ export default function ReceiptPage() {
         
         {/* Header UMKM Brand */}
         <div className="text-center flex flex-col gap-1 border-b border-dashed border-slate-300 pb-4">
-          <h2 className="text-sm font-black uppercase tracking-tight text-black">{businessProfile.businessName}</h2>
-          <p className="text-[10px] text-slate-600 font-sans">{businessProfile.businessType}</p>
-          {businessProfile.address && (
-            <p className="text-[9px] text-slate-500 leading-tight mt-0.5">{businessProfile.address}</p>
+          <h2 className="text-sm font-black uppercase tracking-tight text-black">{receiptBusinessProfile.businessName}</h2>
+          <p className="text-[10px] text-slate-600 font-sans">{receiptBusinessProfile.businessType}</p>
+          {receiptBusinessProfile.address && (
+            <p className="text-[9px] text-slate-500 leading-tight mt-0.5">{receiptBusinessProfile.address}</p>
           )}
-          {businessProfile.whatsappNumber && (
-            <p className="text-[9px] text-slate-500">Telp/WA: {businessProfile.whatsappNumber}</p>
+          {receiptBusinessProfile.whatsappNumber && (
+            <p className="text-[9px] text-slate-500">Telp/WA: {receiptBusinessProfile.whatsappNumber}</p>
           )}
         </div>
 
@@ -375,14 +417,14 @@ export default function ReceiptPage() {
 
           {order.serviceChargeAmount !== undefined && order.serviceChargeAmount > 0 && (
             <div className="flex justify-between">
-              <span>B. LAYANAN ({businessProfile.serviceChargePercentage}%):</span>
+              <span>B. LAYANAN ({receiptBusinessProfile.serviceChargePercentage}%):</span>
               <span>{formatRupiah(order.serviceChargeAmount)}</span>
             </div>
           )}
 
           {order.taxAmount !== undefined && order.taxAmount > 0 && (
             <div className="flex justify-between">
-              <span>PAJAK (PPN {businessProfile.taxPercentage}%):</span>
+              <span>PAJAK (PPN {receiptBusinessProfile.taxPercentage}%):</span>
               <span>{formatRupiah(order.taxAmount)}</span>
             </div>
           )}
@@ -436,7 +478,7 @@ export default function ReceiptPage() {
           <span>Cetak Struk (Browser)</span>
         </button>
 
-        {businessProfile.whatsappNumber && (
+        {receiptBusinessProfile.whatsappNumber && (
           <a
             href={getWhatsAppUrl()}
             target="_blank"

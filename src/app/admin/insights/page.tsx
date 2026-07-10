@@ -116,9 +116,31 @@ export default function AdminInsightsPage() {
   const [copiedCaption, setCopiedCaption] = useState<CaptionTab | null>(null);
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
   const [range, setRange] = useState<RangeKey>('7d');
+  const [planCode, setPlanCode] = useState<string>('free');
+
+  const businessId = profile?.business_id;
+
+  useEffect(() => {
+    async function fetchPlan() {
+      if (businessId) {
+        try {
+          const { data } = await supabaseClient
+            .from('businesses')
+            .select('plan_code')
+            .eq('id', businessId)
+            .maybeSingle();
+          if (data?.plan_code) {
+            setPlanCode(data.plan_code);
+          }
+        } catch (e) {
+          console.error('Failed to fetch plan code for AI insights gating:', e);
+        }
+      }
+    }
+    fetchPlan();
+  }, [businessId]);
 
   const isAdmin = role === 'admin';
-  const businessId = profile?.business_id;
   const lastGeneratedAt = businessInsight?.generatedAt || promo?.generatedAt;
   const statusMeta = getStatusMeta(aiStatus, businessInsight, promo);
   const kpis = useMemo(() => getKpis(orders, range), [orders, range]);
@@ -253,6 +275,13 @@ export default function AdminInsightsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader aiStatus={aiStatus} statusMeta={statusMeta} lastGeneratedAt={lastGeneratedAt} />
+
+      {planCode !== 'pro' && (
+        <div className="p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-xs text-amber-350 leading-relaxed font-semibold flex items-center gap-2">
+          <span>✨</span>
+          <span>Fitur AI Insights tersedia di paket Pro. Akun Anda saat ini berada di paket {planCode === 'starter' ? 'Starter' : 'Free'}.</span>
+        </div>
+      )}
 
       <AIControlPanel
         aiStatus={aiStatus}

@@ -228,7 +228,7 @@ export const orderService = {
 
     const newOrder: Order = {
       id: orderId,
-      businessId: orderData.businessId || 'biz-1',
+      businessId: orderData.businessId || 'local-demo-business',
       queueNumber,
       customerName: orderData.customerName,
       customerPhone: orderData.customerPhone,
@@ -340,12 +340,15 @@ export const orderService = {
 
       // Create invoice/transaction record if completed
       if (status === 'Completed' && currentOrder.status !== 'Completed') {
+        if (!currentOrder.businessId) {
+          throw new Error('Business ID pesanan tidak ditemukan.');
+        }
         const txId = `tx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const { error: txError } = await supabase
           .from('transactions')
           .insert([{
             id: txId,
-            business_id: currentOrder.businessId || 'biz-1',
+            business_id: currentOrder.businessId,
             order_id: id,
             amount: currentOrder.totalAmount,
             payment_method: mapFrontendPaymentMethodToDb(currentOrder.paymentMethod),

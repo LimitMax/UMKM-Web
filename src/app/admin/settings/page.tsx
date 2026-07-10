@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Package,
   ShoppingCart,
+  Award,
   DollarSign,
   ListOrdered,
   ChevronRight,
@@ -30,9 +31,11 @@ import { businessService, DEFAULT_ETA_SETTINGS } from '../../../services/busines
 import { productService } from '../../../services/productService';
 import { useAuth } from '../../../components/AuthProvider';
 import { formatRupiah } from '../../../utils/format';
-import type { EtaDisplayMode } from '../../../types';
+import type { EtaDisplayMode, Plan } from '../../../types';
 import { Database } from 'lucide-react';
 import { supabaseClient } from '../../../lib/supabase/client';
+import { planService } from '../../../lib/services/planService';
+import { generateBusinessSlug, slugifyBusinessName } from '../../../lib/utils/slug';
 
 interface ConfirmConfig {
   title: string;
@@ -65,6 +68,15 @@ interface PaymentHealthData {
   warnings: string[];
 }
 
+const BUSINESS_CATEGORY_OPTIONS = [
+  'Kedai Kopi & Makanan',
+  'Laundry',
+  'Toko Kelontong',
+  'Rumah Makan',
+  'Jasa / Dagang Lainnya',
+  'Lainnya',
+];
+
 export default function AdminSettingsPage() {
   // Tab state: 'profile' | 'demo' | 'payment'
   const [activeTab, setActiveTab] = useState<'profile' | 'demo' | 'payment'>('profile');
@@ -78,6 +90,8 @@ export default function AdminSettingsPage() {
     if (typeof window === 'undefined') return '';
     return businessService.getProfileSync().businessType;
   });
+  const [customBusinessType, setCustomBusinessType] = useState('');
+  const [businessSlug, setBusinessSlug] = useState('');
   const [description, setDescription] = useState(() => {
     if (typeof window === 'undefined') return '';
     return businessService.getProfileSync().description;
@@ -229,7 +243,7 @@ export default function AdminSettingsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Auth & data source mode
-  const { isSupabaseConfigured, user: supabaseUser } = useAuth();
+  const { isSupabaseConfigured, user: supabaseUser, currentBusiness, refreshAuth } = useAuth();
   const isSupabaseActive = isSupabaseConfigured && !!supabaseUser;
   const [isMigrationLoading, setIsMigrationLoading] = useState(false);
 
@@ -258,6 +272,57 @@ export default function AdminSettingsPage() {
     }
   }, []);
 
+  interface SubDetails {
+    status: string;
+    trialEndsAt: string | null;
+    subData: Record<string, unknown> | null;
+  }
+
+  // SaaS Package details state
+  const [activePlan, setActivePlan] = useState<Plan | null>(null);
+  const [subDetails, setSubDetails] = useState<SubDetails | null>(null);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+
+  const loadPlanDetails = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+      
+      const { data: profileData } = await supabaseClient
+        .from('profiles')
+        .select('business_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      if (!profileData?.business_id) return;
+      
+      const { data: bizData } = await supabaseClient
+        .from('businesses')
+        .select('plan_code, subscription_status, trial_ends_at')
+        .eq('id', profileData.business_id)
+        .maybeSingle();
+
+      if (!bizData) return;
+
+      const planData = await planService.getPlanByCode(bizData.plan_code || 'free');
+
+      const { data: subData } = await supabaseClient
+        .from('business_subscriptions')
+        .select('*')
+        .eq('business_id', profileData.business_id)
+        .maybeSingle();
+
+      setActivePlan(planData);
+      setSubDetails({
+        status: bizData.subscription_status || 'active',
+        trialEndsAt: bizData.trial_ends_at,
+        subData
+      });
+    } catch (e) {
+      console.error('Failed to load plan details:', e);
+    }
+  }, []);
+
 
 
   // Load business profile and stats
@@ -267,14 +332,85 @@ export default function AdminSettingsPage() {
   }, []);
 
   useEffect(() => {
-    // Calculate dynamic order link
     if (typeof window !== 'undefined') {
       const timer = setTimeout(() => {
-        setOrderLink(`${window.location.origin}/order`);
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+        setOrderLink(businessSlug ? `${appUrl}/order/${businessSlug}` : '');
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [businessSlug]);
+
+  useEffect(() => {
+    if (!currentBusiness) return;
+
+    const timer = setTimeout(() => {
+      const type = currentBusiness.business_type || '';
+      setBusinessName(currentBusiness.name || '');
+      if (BUSINESS_CATEGORY_OPTIONS.includes(type)) {
+        setBusinessType(type);
+        setCustomBusinessType('');
+      } else {
+        setBusinessType('Lainnya');
+        setCustomBusinessType(type);
+      }
+      setBusinessSlug(currentBusiness.slug || '');
+      setDescription(currentBusiness.description || '');
+      setLogoUrl(currentBusiness.logo_url || '');
+      setAddress(currentBusiness.address || '');
+      setWhatsappNumber(currentBusiness.whatsapp_number || '');
+      setOpeningHours(currentBusiness.opening_hours || '');
+      setTaxEnabled(currentBusiness.tax_enabled ?? false);
+      setTaxPercentage(Number(currentBusiness.tax_percentage ?? 10));
+      setServiceChargeEnabled(currentBusiness.service_charge_enabled ?? false);
+      setServiceChargePercentage(Number(currentBusiness.service_charge_percentage ?? 5));
+
+      const delivery = (currentBusiness.delivery_settings || {}) as Record<string, unknown>;
+      setDeliveryEnabled((delivery.deliveryEnabled as boolean | undefined) ?? true);
+      setDeliveryFeeEnabled((delivery.deliveryFeeEnabled as boolean | undefined) ?? true);
+      setDeliveryFeeAmount(Number(delivery.deliveryFeeAmount ?? 10000));
+      setFreeDeliveryEnabled((delivery.freeDeliveryEnabled as boolean | undefined) ?? false);
+      setFreeDeliveryMinimumAmount(Number(delivery.freeDeliveryMinimumAmount ?? 50000));
+      setDeliveryAdminFeeEnabled((delivery.deliveryAdminFeeEnabled as boolean | undefined) ?? false);
+      setDeliveryAdminFeeType((delivery.deliveryAdminFeeType as 'fixed' | 'percentage' | undefined) ?? 'fixed');
+      setDeliveryAdminFeeValue(Number(delivery.deliveryAdminFeeValue ?? 0));
+      setDeliveryInstruction((delivery.deliveryInstruction as string | undefined) ?? '');
+      setDeliveryFeeCalculationType((delivery.deliveryFeeCalculationType as 'fixed' | 'distance_based' | undefined) ?? 'fixed');
+      setBaseDeliveryFee(Number(delivery.baseDeliveryFee ?? 8000));
+      setBaseDeliveryDistanceKm(Number(delivery.baseDeliveryDistanceKm ?? 2));
+      setDeliveryFeePerKm(Number(delivery.deliveryFeePerKm ?? 2500));
+      setMaxDeliveryDistanceKm(Number(delivery.maxDeliveryDistanceKm ?? 10));
+      setDistanceRoundingMode((delivery.distanceRoundingMode as 'ceil' | 'round' | 'floor' | undefined) ?? 'ceil');
+      setDistanceCalculationMode((delivery.distanceCalculationMode as 'manual' | 'mock' | 'maps_api_later' | undefined) ?? 'manual');
+
+      const eta = (currentBusiness.eta_settings || {}) as Record<string, unknown>;
+      setEtaEnabled((eta.etaEnabled as boolean | undefined) ?? true);
+      setDefaultPreparationMinutes(Number(eta.defaultPreparationMinutes ?? 15));
+      setRushHourBufferMinutes(Number(eta.rushHourBufferMinutes ?? 5));
+      setDineInServingBufferMinutes(Number(eta.dineInServingBufferMinutes ?? 3));
+      setPickupBufferMinutes(Number(eta.pickupBufferMinutes ?? 5));
+      setDeliveryBaseMinutes(Number(eta.deliveryBaseMinutes ?? 5));
+      setDeliveryMinutesPerKm(Number(eta.deliveryMinutesPerKm ?? 4));
+      setEtaDisplayMode((eta.etaDisplayMode as EtaDisplayMode | undefined) ?? 'both');
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [currentBusiness]);
+
+  const ensureUniqueSlug = async (name: string, currentId: string, existingSlug?: string) => {
+    const preferred = slugifyBusinessName(existingSlug || name) || 'bisnis';
+    let candidate = preferred;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const { data } = await supabaseClient
+        .from('businesses')
+        .select('id')
+        .eq('slug', candidate)
+        .maybeSingle();
+
+      if (!data || data.id === currentId) return candidate;
+      candidate = generateBusinessSlug(name);
+    }
+    return generateBusinessSlug(name);
+  };
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -363,12 +499,26 @@ export default function AdminSettingsPage() {
       showToast('error', 'Nomor WhatsApp wajib diisi.');
       return;
     }
+    const finalBusinessType = businessType === 'Lainnya' ? customBusinessType.trim() : businessType;
+    if (!finalBusinessType) {
+      showToast('error', 'Kategori Usaha Lainnya wajib diisi.');
+      return;
+    }
+    if (isSupabaseActive && !currentBusiness?.id) {
+      showToast('error', 'Konteks bisnis aktif belum ditemukan. Silakan masuk ulang.');
+      return;
+    }
 
     setIsActionLoading(true);
     try {
+      const nextSlug = currentBusiness?.id
+        ? await ensureUniqueSlug(businessName, currentBusiness.id, businessSlug || businessName)
+        : businessSlug;
       await businessService.updateProfile({
         businessName,
-        businessType,
+        businessType: finalBusinessType,
+        slug: nextSlug,
+        publicOrderEnabled: true,
         description,
         logoUrl,
         address,
@@ -406,7 +556,7 @@ export default function AdminSettingsPage() {
           deliveryMinutesPerKm: Number(deliveryMinutesPerKm),
           etaDisplayMode,
         },
-      });
+      }, isSupabaseActive ? 'supabase' : undefined, currentBusiness?.id);
 
       // Sync user session businessName
       const sessionKey = 'umkm_pilot_user_session';
@@ -423,10 +573,12 @@ export default function AdminSettingsPage() {
         }
       }
 
-      showToast('success', 'Pengaturan bisnis berhasil disimpan! Memuat ulang halaman...');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      const isPresetType = BUSINESS_CATEGORY_OPTIONS.includes(finalBusinessType);
+      setBusinessType(isPresetType ? finalBusinessType : 'Lainnya');
+      setCustomBusinessType(isPresetType ? '' : finalBusinessType);
+      setBusinessSlug(nextSlug);
+      await refreshAuth();
+      showToast('success', 'Pengaturan bisnis berhasil disimpan!');
     } catch {
       showToast('error', 'Gagal menyimpan pengaturan bisnis.');
     } finally {
@@ -517,11 +669,38 @@ export default function AdminSettingsPage() {
   // ── QR Code Utilities ───────────────────────────────────────────────────
 
   const handleCopyLink = () => {
+    if (!orderLink) {
+      showToast('error', 'Link order belum tersedia. Buat link order terlebih dahulu.');
+      return;
+    }
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(orderLink);
       showToast('success', 'Link QR Menu berhasil disalin ke clipboard!');
     } else {
       showToast('error', 'Browser Anda tidak mendukung penyalinan otomatis.');
+    }
+  };
+
+  const handleCreateOrderLink = async () => {
+    if (!currentBusiness?.id) {
+      showToast('error', 'Konteks bisnis aktif belum ditemukan. Silakan masuk ulang.');
+      return;
+    }
+
+    setIsActionLoading(true);
+    try {
+      const nextSlug = await ensureUniqueSlug(businessName || currentBusiness.name, currentBusiness.id, businessName || currentBusiness.name);
+      await businessService.updateProfile({
+        slug: nextSlug,
+        publicOrderEnabled: true,
+      }, 'supabase', currentBusiness.id);
+      setBusinessSlug(nextSlug);
+      await refreshAuth();
+      showToast('success', 'Link order publik berhasil dibuat.');
+    } catch {
+      showToast('error', 'Gagal membuat link order publik.');
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -766,6 +945,7 @@ export default function AdminSettingsPage() {
           onClick={() => {
             setActiveTab('payment');
             fetchPaymentHealth();
+            loadPlanDetails();
           }}
           className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all relative ${
             activeTab === 'payment'
@@ -808,12 +988,38 @@ export default function AdminSettingsPage() {
                 {/* Business Type */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Kategori / Tipe Bisnis</label>
-                  <input
-                    type="text"
+                  <select
                     value={businessType}
                     onChange={(e) => setBusinessType(e.target.value)}
-                    placeholder="Contoh: Kedai Kopi & Makanan"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all"
+                  >
+                    {BUSINESS_CATEGORY_OPTIONS.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {businessType === 'Lainnya' && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Kategori Usaha Lainnya</label>
+                    <input
+                      type="text"
+                      required
+                      value={customBusinessType}
+                      onChange={(e) => setCustomBusinessType(e.target.value)}
+                      placeholder="Contoh: Barbershop, Bengkel Motor, Katering Rumahan"
+                      className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Link Order Publik</label>
+                  <input
+                    type="text"
+                    value={businessSlug ? `/order/${businessSlug}` : 'Buat Link Order'}
+                    readOnly
+                    className="w-full px-3.5 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-emerald-300 font-mono focus:outline-none"
                   />
                 </div>
 
@@ -1502,21 +1708,36 @@ export default function AdminSettingsPage() {
                 </div>
                 <div className="text-center mt-4">
                   <h4 className="text-xs font-black text-white">{businessName}</h4>
-                  <p className="text-[9px] text-slate-500 font-mono mt-0.5 truncate max-w-xs">{orderLink}</p>
+                  <p className="text-[9px] text-slate-500 font-mono mt-0.5 truncate max-w-xs">{orderLink || 'Link order belum dibuat'}</p>
                 </div>
               </div>
 
               {/* Copy / Download Buttons */}
               <div className="flex flex-col gap-2.5">
+                {!orderLink && (
+                  <button
+                    type="button"
+                    onClick={handleCreateOrderLink}
+                    disabled={isActionLoading}
+                    className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Buat Link Order</span>
+                  </button>
+                )}
                 <button
+                  type="button"
                   onClick={handleCopyLink}
+                  disabled={!orderLink}
                   className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   <span>Salin Link Order</span>
                 </button>
                 <button
+                  type="button"
                   onClick={handleDownloadQR}
+                  disabled={!orderLink}
                   className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -1900,6 +2121,99 @@ export default function AdminSettingsPage() {
       )}
       {activeTab === 'payment' && (
         <div className="space-y-6 animate-fade-in">
+          {/* Paket Bisnis Panel */}
+          <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 shadow-xl flex flex-col gap-6">
+            <div className="border-b border-slate-800 pb-3 flex justify-between items-center">
+              <div>
+                <h2 className="text-sm font-extrabold text-white flex items-center gap-2">
+                  <Award className="w-5 h-5 text-emerald-450" />
+                  <span>Paket Bisnis UMKM Anda</span>
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Detail paket berlangganan SaaS yang aktif untuk pengelolaan limitasi dan fitur.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUpgradeModalOpen(true)}
+                className="flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-black text-slate-950 transition-all cursor-pointer shadow-md hover:shadow-emerald-500/10 border-none"
+              >
+                <span>Upgrade Paket</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Plan Info Card */}
+              <div className="bg-slate-950/40 border border-slate-850 rounded-xl p-4 flex flex-col justify-between">
+                <div>
+                  <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider block">Paket Aktif</span>
+                  <h3 className="text-base font-black text-white mt-1 capitalize">
+                    {activePlan ? activePlan.name : 'Free / Trial'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                    {activePlan ? activePlan.description : 'Mencoba fitur dasar UMKM Pilot'}
+                  </p>
+                </div>
+                <div className="border-t border-slate-850 pt-3 mt-4 flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 font-bold">Status subscription:</span>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    subDetails?.status === 'active' 
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {subDetails?.status || 'active'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Limits Card */}
+              <div className="bg-slate-950/40 border border-slate-850 rounded-xl p-4 space-y-2.5">
+                <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider block">Batasan Kuota / Limit</span>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Limit Produk:</span>
+                  <span className="text-white font-bold">{activePlan ? activePlan.productLimit : 20} Produk</span>
+                </div>
+                <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2">
+                  <span className="text-slate-400">Limit Pesanan:</span>
+                  <span className="text-white font-bold">{activePlan ? activePlan.orderLimitMonthly : 100} / bln</span>
+                </div>
+                <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2">
+                  <span className="text-slate-400">Limit Staf/Kasir:</span>
+                  <span className="text-white font-bold">{activePlan ? activePlan.cashierLimit : 1} Akun</span>
+                </div>
+              </div>
+
+              {/* Gating Status Card */}
+              <div className="bg-slate-950/40 border border-slate-850 rounded-xl p-4 space-y-2.5">
+                <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider block">Akses Fitur Utama</span>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Analisis AI Insights:</span>
+                  <span className={activePlan?.aiEnabled ? 'text-emerald-400 font-bold' : 'text-slate-500 font-semibold'}>
+                    {activePlan?.aiEnabled ? 'Tersedia' : 'Tidak Tersedia'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2">
+                  <span className="text-slate-400">Midtrans Online Payment:</span>
+                  <span className={activePlan?.midtransEnabled ? 'text-emerald-400 font-bold' : 'text-slate-500 font-semibold'}>
+                    {activePlan?.midtransEnabled ? 'Tersedia' : 'Tidak Tersedia'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2">
+                  <span className="text-slate-400">Ekspor Laporan (Excel/PDF):</span>
+                  <span className={activePlan?.reportExportEnabled ? 'text-emerald-400 font-bold' : 'text-slate-500 font-semibold'}>
+                    {activePlan?.reportExportEnabled ? 'Tersedia' : 'Tidak Tersedia'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {subDetails?.trialEndsAt && (
+              <div className="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/10 text-xs text-indigo-300">
+                ⌛ Masa percobaan trial paket Anda akan berakhir pada tanggal <strong>{new Date(subDetails.trialEndsAt).toLocaleDateString('id-ID', { dateStyle: 'long' })}</strong>.
+              </div>
+            )}
+          </div>
+
           {/* Health check header panel */}
           <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 shadow-xl flex flex-col gap-6">
             <div className="border-b border-slate-800 pb-3 flex justify-between items-center">
@@ -2105,6 +2419,38 @@ export default function AdminSettingsPage() {
                 {confirm.confirmLabel}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Upgrade Plan Modal */}
+      {upgradeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col gap-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
+                  <Award className="w-5 h-5 text-indigo-400" />
+                </div>
+                <h3 className="text-sm font-extrabold text-white">Upgrade Paket</h3>
+              </div>
+              <button
+                onClick={() => setUpgradeModalOpen(false)}
+                className="text-slate-500 hover:text-white transition-colors cursor-pointer border-none bg-transparent"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-400 leading-relaxed text-center py-4">
+              Upgrade paket akan tersedia setelah versi production.
+            </p>
+            
+            <button
+              onClick={() => setUpgradeModalOpen(false)}
+              className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all cursor-pointer border-none"
+            >
+              Tutup
+            </button>
           </div>
         </div>
       )}
