@@ -7,7 +7,8 @@ import { orderService } from '../../../services/orderService';
 import { businessService } from '../../../services/businessService';
 import { realtimeService } from '../../../lib/services/realtimeService';
 import { Order, BusinessProfile } from '../../../types';
-import { formatPaymentMethod, formatRupiah, formatDate, formatOrderStatus } from '../../../utils/format';
+import { formatRupiah, formatDate, formatOrderStatus } from '../../../utils/format';
+import { formatPaymentMethod, formatPaymentProvider, formatMidtransPaymentType, PaymentMetadata } from '../../../utils/paymentHelpers';
 import { formatEtaMinutes, formatEstimatedTime, getEtaLabel } from '../../../utils/etaHelpers';
 
 export default function ReceiptPage() {
@@ -17,6 +18,7 @@ export default function ReceiptPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [latestPayment, setLatestPayment] = useState<PaymentMetadata | null>(null);
 
   useEffect(() => {
     if (!orderId) return;
@@ -44,6 +46,15 @@ export default function ReceiptPage() {
         setBusinessProfile(profile);
       } catch (err) {
         console.error('Error loading business profile:', err);
+      }
+      try {
+        const response = await fetch(`/api/payments/midtrans/latest?orderId=${encodeURIComponent(orderId)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setLatestPayment(data.payment || null);
+        }
+      } catch (err) {
+        console.warn('Error loading latest payment metadata:', err);
       }
     };
 
@@ -234,12 +245,52 @@ export default function ReceiptPage() {
             </span>
           </div>
           <div className="flex justify-between">
-            <span>STATUS:</span>
-            <span className="font-bold">{order.paymentStatus === 'Paid' ? 'LUNAS' : 'BELUM BAYAR'}</span>
-          </div>
-          <div className="flex justify-between">
             <span>STATUS PESANAN:</span>
             <span className="font-bold uppercase text-black">{formatOrderStatus(order.status)}</span>
+          </div>
+
+          {/* Detailed Payment Section */}
+          <div className="border-t border-dashed border-slate-300 pt-1.5 mt-1 flex flex-col gap-1 text-[10px]">
+            <div className="flex justify-between">
+              <span>METODE PEMBAYARAN:</span>
+              <span className="font-bold text-black">{formatPaymentMethod(order.paymentMethod).toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>STATUS PEMBAYARAN:</span>
+              <span className="font-bold text-black">
+                {order.paymentStatus === 'Paid'
+                  ? 'SUDAH DIBAYAR'
+                  : order.paymentStatus === 'Failed'
+                    ? 'GAGAL DIBAYAR'
+                    : order.paymentStatus === 'Refunded'
+                      ? 'DIKEMBALIKAN'
+                      : 'MENUNGGU PEMBAYARAN'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>PROVIDER:</span>
+              <span className="font-bold text-black">
+                {formatPaymentProvider(latestPayment?.provider, order.paymentMethod).toUpperCase()}
+              </span>
+            </div>
+            {latestPayment?.paymentType && (
+              <div className="flex justify-between">
+                <span>CHANNEL PEMBAYARAN:</span>
+                <span className="font-bold text-black">{formatMidtransPaymentType(latestPayment.paymentType).toUpperCase()}</span>
+              </div>
+            )}
+            {order.paymentStatus === 'Paid' && (order.paidAt || latestPayment?.paidAt) && (
+              <div className="flex justify-between">
+                <span>WAKTU PEMBAYARAN:</span>
+                <span>{formatDate(order.paidAt || latestPayment?.paidAt || '')}</span>
+              </div>
+            )}
+            <div className="text-[9px] mt-1 text-slate-600 font-sans italic leading-tight">
+              {order.paymentMethod?.toLowerCase() === 'cash' && order.paymentStatus !== 'Paid' && '* Belum dibayar — bayar di kasir'}
+              {order.paymentMethod?.toLowerCase() === 'cash' && order.paymentStatus === 'Paid' && '* Sudah dibayar secara Tunai'}
+              {order.paymentMethod?.toLowerCase() === 'non_cash' && order.paymentStatus === 'Paid' && '* Sudah dibayar melalui Midtrans'}
+              {order.paymentMethod?.toLowerCase() === 'non_cash' && order.paymentStatus !== 'Paid' && '* Menunggu pembayaran Midtrans'}
+            </div>
           </div>
           {/* ETA rows (Phase 6.8) */}
           {businessProfile?.etaSettings?.etaEnabled && order.estimatedTotalMinutes !== undefined && (

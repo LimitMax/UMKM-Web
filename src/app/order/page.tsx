@@ -80,6 +80,7 @@ export default function CustomerOrderPage() {
   const [deliveryDistanceSource, setDeliveryDistanceSource] = useState<string>('manual');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadingMessage, setLoadingMessage] = useState<string>('');
 
   // Load products on mount
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
@@ -298,6 +299,7 @@ export default function CustomerOrderPage() {
   // Handle Checkout submission
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setErrorMsg('');
 
     if (!customerName.trim()) {
@@ -358,6 +360,7 @@ export default function CustomerOrderPage() {
     }
 
     setIsLoading(true);
+    setLoadingMessage('Membuat pesanan...');
 
     try {
       // Structure the order item list
@@ -393,12 +396,14 @@ export default function CustomerOrderPage() {
         return;
       }
 
+      setLoadingMessage('Membuka pembayaran Midtrans...');
       const payment = await createMidtransPayment(order.id);
       await openMidtransPayment(payment);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Terjadi kesalahan saat memproses pesanan.');
     } finally {
       setIsLoading(false);
+      setLoadingMessage('');
     }
   };
 
@@ -993,7 +998,7 @@ export default function CustomerOrderPage() {
                   disabled={isCheckoutDisabled}
                   className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-500 text-slate-950 font-black rounded-xl transition-all shadow-lg hover:shadow-emerald-500/20 text-xs uppercase tracking-wider cursor-pointer"
                 >
-                  {isLoading ? 'Memproses...' : paymentMethod === 'Cash' ? 'Konfirmasi Pesanan' : 'Bayar via Midtrans'}
+                  {isLoading ? (loadingMessage || 'Memproses...') : paymentMethod === 'Cash' ? 'Konfirmasi Pesanan' : 'Bayar via Midtrans'}
                 </button>
               </div>
             </form>
@@ -1310,7 +1315,7 @@ export default function CustomerOrderPage() {
                     disabled={isCheckoutDisabled}
                     className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800 disabled:text-slate-500 text-slate-950 font-black rounded-xl transition-all shadow-lg text-xs uppercase tracking-wider cursor-pointer"
                   >
-                    {isLoading ? 'Memproses...' : paymentMethod === 'Cash' ? 'Konfirmasi Pesanan' : 'Bayar via Midtrans'}
+                    {isLoading ? (loadingMessage || 'Memproses...') : paymentMethod === 'Cash' ? 'Konfirmasi Pesanan' : 'Bayar via Midtrans'}
                   </button>
                 </div>
               </form>

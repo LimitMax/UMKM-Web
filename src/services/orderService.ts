@@ -41,7 +41,8 @@ export const orderService = {
         .from('orders')
         .select(`
           *,
-          items:order_items(*)
+          items:order_items(*),
+          payments(*)
         `)
         .eq('business_id', businessId)
         .order('created_at', { ascending: false });
@@ -79,7 +80,8 @@ export const orderService = {
         .from('orders')
         .select(`
           *,
-          items:order_items(*)
+          items:order_items(*),
+          payments(*)
         `)
         .eq('id', id)
         .maybeSingle();
@@ -419,7 +421,8 @@ export const orderService = {
         .from('orders')
         .select(`
           *,
-          items:order_items(*)
+          items:order_items(*),
+          payments(*)
         `)
         .or('order_status.eq.completed,payment_status.eq.paid');
       

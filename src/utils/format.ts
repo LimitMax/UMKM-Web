@@ -43,13 +43,22 @@ export function formatOrderStatus(status: string): string {
 export function formatPaymentStatus(status: string): string {
   switch (status) {
     case 'Pending':
+    case 'pending':
+    case 'Waiting for Payment':
       return 'Belum Bayar';
     case 'Paid':
+    case 'paid':
       return 'Lunas';
     case 'Failed':
+    case 'failed':
       return 'Gagal';
     case 'Refunded':
+    case 'refunded':
       return 'Refund';
+    case 'expired':
+      return 'Kedaluwarsa';
+    case 'cancelled':
+      return 'Dibatalkan';
     default:
       return status;
   }
@@ -62,11 +71,13 @@ export function formatPaymentMethod(method: string): string {
       return 'Tunai';
     case 'Non-Cash':
     case 'non_cash':
+      return 'Non-Tunai';
     case 'QRIS':
     case 'qris':
+      return 'QRIS';
     case 'Bank Transfer':
     case 'bank_transfer':
-      return 'Non-Tunai';
+      return 'Transfer Bank';
     default:
       return method;
   }

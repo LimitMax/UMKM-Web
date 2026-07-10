@@ -43,10 +43,21 @@ export async function GET(
       });
     }
 
+    // 2.5. Fetch payments
+    const { data: payments, error: paymentsError } = await supabaseAdmin
+      .from('payments')
+      .select('*')
+      .eq('order_id', orderId);
+
+    if (paymentsError) {
+      console.error(`API GET Order ${orderId} payments error:`, paymentsError.message);
+    }
+
     // 3. Return combined order details safely
     return NextResponse.json({
       ...order,
-      items
+      items,
+      payments: payments || []
     });
   } catch (error) {
     console.error('API GET Order exception:', error);

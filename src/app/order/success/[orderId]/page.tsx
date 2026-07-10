@@ -20,6 +20,8 @@ import { businessService } from '@/services/businessService';
 import { realtimeService } from '@/lib/services/realtimeService';
 import { Order, BusinessProfile } from '@/types';
 import { formatPaymentMethod, formatRupiah, formatDate, formatOrderStatus, formatPaymentStatus } from '@/utils/format';
+import PaymentSummaryCard from '@/components/payments/PaymentSummaryCard';
+import { canRetryPayment, getPaymentStatusDescription } from '@/utils/paymentHelpers';
 import { getEtaLabel, formatEstimatedTime, formatEtaDisplay } from '@/utils/etaHelpers';
 
 interface LatestMidtransPayment {
@@ -29,9 +31,26 @@ interface LatestMidtransPayment {
   paymentMethod: string;
   amount: number;
   status: string;
+  paymentType?: string | null;
+  snapToken?: string | null;
   redirectUrl?: string | null;
   createdAt: string;
   paidAt?: string | null;
+}
+
+type SnapCallbacks = {
+  onSuccess?: (result: unknown) => void;
+  onPending?: (result: unknown) => void;
+  onError?: (result: unknown) => void;
+  onClose?: () => void;
+};
+
+declare global {
+  interface Window {
+    snap?: {
+      pay: (token: string, callbacks?: SnapCallbacks) => void;
+    };
+  }
 }
 
 export default function OrderSuccessPage() {
@@ -42,6 +61,7 @@ export default function OrderSuccessPage() {
   const [whatsappNumber, setWhatsappNumber] = useState<string>('');
   const [latestPayment, setLatestPayment] = useState<LatestMidtransPayment | null>(null);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [paymentOpenLoading, setPaymentOpenLoading] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -113,6 +133,16 @@ export default function OrderSuccessPage() {
           if (found.status === 'Completed' || found.status === 'Cancelled') {
             clearInterval(interval);
           }
+        }
+        // Refetch latest payment details to update details instantly
+        try {
+          const res = await fetch(`/api/payments/midtrans/latest?orderId=${encodeURIComponent(orderId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            setLatestPayment(data.payment || null);
+          }
+        } catch (err) {
+          console.warn('Failed to load latest Midtrans payment in realtime listener:', err);
         }
       }
     });
@@ -194,10 +224,93 @@ export default function OrderSuccessPage() {
 
   const isCancelled = order.status === 'Cancelled';
   const isMidtransOrder = order.paymentMethod === 'Non-Cash';
-  const isWaitingMidtransPayment = isMidtransOrder && order.paymentStatus === 'Waiting for Payment';
+  const paymentDescription = getPaymentStatusDescription(order);
+
+  const loadMidtransSnapScript = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (typeof window === 'undefined') {
+        reject(new Error('Snap hanya tersedia di browser.'));
+        return;
+      }
+
+      if (window.snap) {
+        resolve();
+        return;
+      }
+
+      const existingScript = document.getElementById('midtrans-snap-script') as HTMLScriptElement | null;
+      if (existingScript) {
+        existingScript.addEventListener('load', () => resolve(), { once: true });
+        existingScript.addEventListener('error', () => reject(new Error('Gagal memuat Snap Midtrans.')), { once: true });
+        return;
+      }
+
+      const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
+      if (!clientKey) {
+        reject(new Error('Client key Midtrans belum dikonfigurasi.'));
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.id = 'midtrans-snap-script';
+      script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
+      script.async = true;
+      script.setAttribute('data-client-key', clientKey);
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Gagal memuat Snap Midtrans.'));
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleContinuePayment = async () => {
+    if (paymentOpenLoading || syncLoading) return;
+    if (!latestPayment) {
+      setSyncMessage('Payment metadata belum tersedia.');
+      return;
+    }
+
+    setPaymentOpenLoading(true);
+    setSyncMessage(null);
+
+    try {
+      if (latestPayment.snapToken) {
+        await loadMidtransSnapScript();
+        if (!window.snap) throw new Error('Snap token tidak ditemukan.');
+        window.snap.pay(latestPayment.snapToken, {
+          onSuccess: handleSyncPaymentStatus,
+          onPending: handleSyncPaymentStatus,
+          onClose: () => setPaymentOpenLoading(false),
+          onError: () => {
+            if (latestPayment.redirectUrl) {
+              window.location.assign(latestPayment.redirectUrl);
+              return;
+            }
+            setSyncMessage('Gagal membuka halaman pembayaran.');
+            setPaymentOpenLoading(false);
+          },
+        });
+        return;
+      }
+
+      if (latestPayment.redirectUrl) {
+        window.location.assign(latestPayment.redirectUrl);
+        return;
+      }
+
+      setSyncMessage('Snap token tidak ditemukan.');
+    } catch {
+      if (latestPayment.redirectUrl) {
+        window.location.assign(latestPayment.redirectUrl);
+        return;
+      }
+      setSyncMessage('Gagal membuka halaman pembayaran.');
+    } finally {
+      setPaymentOpenLoading(false);
+    }
+  };
 
   const handleSyncPaymentStatus = async () => {
-    if (!order) return;
+    if (!order || syncLoading || paymentOpenLoading) return;
     setSyncLoading(true);
     setSyncMessage(null);
 
@@ -215,11 +328,21 @@ export default function OrderSuccessPage() {
         throw new Error(data?.message || 'Gagal cek status pembayaran.');
       }
 
+      const oldStatus = order.paymentStatus;
       const found = await orderService.getOrderById(order.id);
+      let isChanged = false;
       if (found) {
+        isChanged = found.paymentStatus !== oldStatus;
         setOrder(found);
       }
-      setSyncMessage(data?.orderPaymentStatus === 'paid' ? 'Pembayaran sudah lunas.' : 'Status pembayaran diperbarui.');
+      
+      if (found?.paymentStatus?.toLowerCase() === 'paid') {
+        setSyncMessage('Pembayaran berhasil diperbarui');
+      } else if (isChanged) {
+        setSyncMessage('Pembayaran berhasil diperbarui');
+      } else {
+        setSyncMessage('Status pembayaran belum berubah');
+      }
     } catch (err) {
       setSyncMessage(err instanceof Error ? err.message : 'Gagal cek status pembayaran.');
     } finally {
@@ -317,55 +440,87 @@ export default function OrderSuccessPage() {
           </div>
         </div>
 
-        {isWaitingMidtransPayment && (
-          <div className="glass rounded-3xl p-5 border border-amber-500/25 bg-amber-500/5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-col gap-2">
-                <div className="inline-flex w-fit items-center gap-2 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Menunggu Pembayaran Non-Tunai</span>
-                </div>
-                <div>
-                  <h2 className="text-base font-black text-white">Pembayaran Midtrans Sandbox</h2>
-                  <p className="text-xs text-slate-350 leading-relaxed mt-1">
-                    Silakan selesaikan pembayaran melalui Midtrans. Order tetap pending sampai webhook pembayaran mengubah status menjadi lunas.
-                  </p>
-                </div>
-                <div className="text-[11px] text-slate-400 flex flex-col gap-1">
-                  <span>Provider: <strong className="text-slate-200">Midtrans Sandbox</strong></span>
-                  {latestPayment?.providerReferenceId && (
-                    <span>Reference: <strong className="text-slate-200">{latestPayment.providerReferenceId}</strong></span>
-                  )}
-                </div>
+        {/* Payment Summary Panel */}
+        <div className={`glass rounded-3xl p-5 border ${
+          order.paymentStatus?.toLowerCase() === 'paid'
+            ? 'border-emerald-500/25 bg-emerald-500/5'
+            : order.paymentStatus?.toLowerCase() === 'failed' || order.paymentStatus?.toLowerCase() === 'expired' || order.paymentStatus?.toLowerCase() === 'cancelled'
+              ? 'border-rose-500/25 bg-rose-500/5'
+              : 'border-amber-500/25 bg-amber-500/5'
+        }`}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-2">
+              <div className={`inline-flex w-fit items-center gap-2 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                order.paymentStatus?.toLowerCase() === 'paid'
+                  ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300'
+                  : order.paymentStatus?.toLowerCase() === 'failed' || order.paymentStatus?.toLowerCase() === 'expired' || order.paymentStatus?.toLowerCase() === 'cancelled'
+                    ? 'bg-rose-500/10 border border-rose-500/20 text-rose-300'
+                    : 'bg-amber-500/10 border border-amber-500/20 text-amber-300'
+              }`}>
+                <Clock className="w-3.5 h-3.5" />
+                <span>
+                  {order.paymentStatus?.toLowerCase() === 'paid'
+                    ? 'Sudah Dibayar'
+                    : order.paymentStatus?.toLowerCase() === 'failed'
+                      ? 'Pembayaran Gagal'
+                      : order.paymentStatus?.toLowerCase() === 'expired'
+                        ? 'Pembayaran Kedaluwarsa'
+                        : order.paymentStatus?.toLowerCase() === 'cancelled'
+                          ? 'Pembayaran Dibatalkan'
+                          : order.paymentMethod?.toLowerCase() === 'cash'
+                            ? 'Menunggu Pembayaran Tunai'
+                            : 'Menunggu Pembayaran Non-Tunai'}
+                </span>
               </div>
-              <CreditCard className="w-8 h-8 text-amber-300 flex-shrink-0" />
+              <div>
+                <h2 className="text-base font-black text-white">
+                  {order.paymentMethod?.toLowerCase() === 'cash' ? 'Pembayaran Tunai' : 'Pembayaran Midtrans Sandbox'}
+                </h2>
+                <p className="text-xs text-slate-350 leading-relaxed mt-1">
+                  {paymentDescription}
+                </p>
+              </div>
             </div>
-
-            <button
-              type="button"
-              disabled={!latestPayment?.redirectUrl}
-              onClick={() => {
-                if (latestPayment?.redirectUrl) {
-                  window.location.href = latestPayment.redirectUrl;
-                }
-              }}
-              className="mt-4 w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-black text-xs uppercase tracking-wider transition-all"
-            >
-              {latestPayment?.redirectUrl ? 'Lanjutkan Pembayaran' : 'Link Pembayaran Belum Tersedia'}
-            </button>
-            <button
-              type="button"
-              disabled={syncLoading}
-              onClick={handleSyncPaymentStatus}
-              className="mt-2 w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 font-black text-xs uppercase tracking-wider transition-all"
-            >
-              {syncLoading ? 'Mengecek...' : 'Cek Status Pembayaran'}
-            </button>
-            {syncMessage && (
-              <p className="mt-2 text-center text-[11px] text-slate-350">{syncMessage}</p>
-            )}
+            <CreditCard className={`w-8 h-8 flex-shrink-0 ${
+              order.paymentStatus?.toLowerCase() === 'paid' ? 'text-emerald-300' : 'text-amber-300'
+            }`} />
           </div>
-        )}
+
+          <div className="mt-4">
+            <PaymentSummaryCard
+              method={order.paymentMethod}
+              status={order.paymentStatus}
+              totalAmount={order.totalAmount}
+              payment={latestPayment}
+              compact
+            />
+          </div>
+
+          {/* Action buttons (only show if not Cash and not Paid/Expired/Cancelled) */}
+          {isMidtransOrder && canRetryPayment(order, latestPayment) && (
+            <button
+              type="button"
+              disabled={paymentOpenLoading || syncLoading}
+              onClick={handleContinuePayment}
+              className="mt-4 w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-black text-xs uppercase tracking-wider transition-all animate-fade-in"
+            >
+              {paymentOpenLoading ? 'Membuka pembayaran Midtrans...' : 'Lanjutkan Pembayaran'}
+            </button>
+          )}
+          {isMidtransOrder && ['pending', 'failed'].includes(order.paymentStatus?.toLowerCase() || '') && (
+            <button
+              type="button"
+              disabled={syncLoading || paymentOpenLoading}
+              onClick={handleSyncPaymentStatus}
+              className="mt-2 w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 font-black text-xs uppercase tracking-wider transition-all animate-fade-in"
+            >
+              {syncLoading ? 'Mengecek status pembayaran...' : 'Cek Status Pembayaran'}
+            </button>
+          )}
+          {syncMessage && (
+            <p className="mt-2 text-center text-[11px] text-slate-350 animate-pulse">{syncMessage}</p>
+          )}
+        </div>
 
         {/* ETA Card — Phase 6.8 */}
         {!isCancelled && businessProfile?.etaSettings?.etaEnabled && order.estimatedTotalMinutes !== undefined && (

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const supabaseAdmin = createSupabaseAdminClient();
     const { data, error } = await supabaseAdmin
       .from('payments')
-      .select('id, provider, provider_reference_id, payment_method, amount, status, snap_redirect_url, created_at, paid_at')
+      .select('id, provider, provider_reference_id, payment_method, payment_type, amount, status, snap_token, snap_redirect_url, created_at, paid_at')
       .eq('order_id', orderId)
       .in('provider', ['midtrans', 'midtrans_snap_sandbox'])
       .order('created_at', { ascending: false })
@@ -38,6 +38,8 @@ export async function GET(request: NextRequest) {
         paymentMethod: data.payment_method,
         amount: Number(data.amount),
         status: data.status,
+        paymentType: data.payment_type,
+        snapToken: data.snap_token,
         redirectUrl: data.snap_redirect_url,
         createdAt: data.created_at,
         paidAt: data.paid_at,

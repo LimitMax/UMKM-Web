@@ -112,6 +112,9 @@ export interface Order {
   paidAt?: string;               // ISO string
   completedAt?: string;          // ISO string
   cancelledAt?: string;          // ISO string
+  paymentProvider?: string;
+  paymentChannel?: string;
+  providerReferenceId?: string;
 }
 
 export interface BusinessProfile {

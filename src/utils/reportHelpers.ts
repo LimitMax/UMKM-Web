@@ -1,5 +1,5 @@
 import { Order, BusinessProfile } from '../types';
-import { formatPaymentMethod } from './format';
+import { formatPaymentMethod, formatPaymentProvider, formatMidtransPaymentType } from './paymentHelpers';
 
 export interface ReportFilters {
   startDate: string; // YYYY-MM-DD
@@ -158,12 +158,24 @@ export function generateCSVReport(orders: Order[], businessProfile: BusinessProf
     'Estimasi Sampai',
     'Disesuaikan Manual',
     'Alasan Penyesuaian',
+    'payment_method_label',
+    'payment_provider',
+    'payment_channel',
+    'provider_reference_id',
+    'paid_at',
   ];
 
   const rows = orders.map((order) => {
     const itemNames = order.items.map((item) => `${item.name} x${item.quantity}`).join(', ');
     const totalQty = order.items.reduce((sum, item) => sum + item.quantity, 0);
     const subtotal = order.subtotal ?? order.totalAmount;
+
+    const paymentMethodLabel = formatPaymentMethod(order.paymentMethod);
+    const paymentProvider = formatPaymentProvider(order.paymentProvider, order.paymentMethod);
+    const rawChannel = order.paymentChannel || (order.paymentMethod?.toLowerCase() === 'qris' ? 'qris' : order.paymentMethod?.toLowerCase() === 'bank_transfer' ? 'bank_transfer' : '');
+    const paymentChannel = rawChannel ? formatMidtransPaymentType(rawChannel) : (order.paymentMethod?.toLowerCase() === 'non_cash' ? '-' : '');
+    const providerReferenceId = order.providerReferenceId || '';
+    const paidAt = order.paidAt ? new Date(order.paidAt).toLocaleString('id-ID') : '';
 
     return [
       escapeCsvValue(order.id),
@@ -199,6 +211,11 @@ export function generateCSVReport(orders: Order[], businessProfile: BusinessProf
       escapeCsvValue(order.estimatedArrivalAt || ''),
       escapeCsvValue(order.etaManuallyAdjusted ? 'true' : 'false'),
       escapeCsvValue(order.etaAdjustmentReason || ''),
+      escapeCsvValue(paymentMethodLabel),
+      escapeCsvValue(paymentProvider),
+      escapeCsvValue(paymentChannel),
+      escapeCsvValue(providerReferenceId),
+      escapeCsvValue(paidAt),
     ];
   });
 

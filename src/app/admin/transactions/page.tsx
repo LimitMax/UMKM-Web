@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import { orderService } from '../../../services/orderService';
 import { Order } from '../../../types';
-import { formatPaymentMethod, formatRupiah, formatDate } from '../../../utils/format';
+import { formatRupiah, formatDate } from '../../../utils/format';
+import { formatPaymentMethod, formatPaymentProvider, formatMidtransPaymentType } from '../../../utils/paymentHelpers';
 
 import { useAuth } from '../../../components/AuthProvider';
 import { realtimeService } from '../../../lib/services/realtimeService';
@@ -260,10 +261,26 @@ export default function AdminTransactionsPage() {
                   <CreditCard className="w-3.5 h-3.5 text-slate-500" />
                   <span>Metode: <strong className="text-white">{formatPaymentMethod(selectedTx.paymentMethod)}</strong></span>
                 </div>
-                {selectedTx.paymentMethod !== 'Cash' && (
+                <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
+                  <Briefcase className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Provider: <strong className="text-white">{formatPaymentProvider(selectedTx.paymentProvider, selectedTx.paymentMethod)}</strong></span>
+                </div>
+                {selectedTx.paymentChannel && (
                   <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
-                    <Briefcase className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Provider: <strong className="text-white">Midtrans Sandbox</strong></span>
+                    <CreditCard className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Channel: <strong className="text-white">{formatMidtransPaymentType(selectedTx.paymentChannel)}</strong></span>
+                  </div>
+                )}
+                {selectedTx.providerReferenceId && (
+                  <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
+                    <FileText className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="text-[10px] truncate max-w-[280px]">Ref ID: <strong className="text-slate-300 font-mono text-[9.5px]">{selectedTx.providerReferenceId}</strong></span>
+                  </div>
+                )}
+                {selectedTx.paidAt && (
+                  <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Waktu Bayar: <strong className="text-white">{formatDate(selectedTx.paidAt)}</strong></span>
                   </div>
                 )}
                 <div className="flex items-center gap-2 text-slate-400 border-t border-slate-900 pt-1.5 mt-0.5">

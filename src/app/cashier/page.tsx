@@ -20,7 +20,8 @@ import {
   CheckCircle2,
   LogOut,
   Printer,
-  X
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { orderService } from '../../services/orderService';
 import { businessService } from '../../services/businessService';
@@ -52,6 +53,11 @@ export default function CashierDashboard() {
   const [etaAdjustSuccess, setEtaAdjustSuccess] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [paymentSyncLoading, setPaymentSyncLoading] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  } | null>(null);
   
   // Track previous order count to play notification chime on new order
   const prevOrdersCountRef = useRef<number | null>(null);
@@ -859,17 +865,17 @@ export default function CashierDashboard() {
                   {/* State-Machine buttons */}
                   <div className="flex flex-col gap-2">
                     {selectedOrder.status === 'Waiting for Payment' && (
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2 animate-fade-in">
                         {selectedOrder.paymentMethod === 'Non-Cash' ? (
                           <>
-                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-3 py-2.5 text-xs text-amber-300 leading-relaxed">
-                              <span className="font-bold">Non-Tunai</span> &bull; Provider Midtrans Sandbox. Status: Menunggu Pembayaran.
+                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-3 py-2.5 text-xs text-amber-300 leading-relaxed font-semibold">
+                              ⚠️ Menunggu pembayaran otomatis dari Midtrans.
                             </div>
                             <button
                               type="button"
                               disabled={paymentSyncLoading}
                               onClick={() => handleSyncMidtransStatus(selectedOrder.id)}
-                              className="w-full py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-60 text-amber-300 border border-amber-500/20 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
+                              className="w-full py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-60 text-amber-300 border border-amber-500/20 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
                             >
                               <CreditCard className="w-4 h-4" />
                               <span>{paymentSyncLoading ? 'Mengecek...' : 'Cek Status Midtrans'}</span>
@@ -877,11 +883,13 @@ export default function CashierDashboard() {
                             <button
                               type="button"
                               onClick={() => {
-                                if (window.confirm('Tandai pembayaran non-tunai ini lunas secara manual?')) {
-                                  handleUpdateStatus(selectedOrder.id, 'Paid');
-                                }
+                                setConfirmModal({
+                                  title: 'Tandai pembayaran sebagai lunas?',
+                                  description: 'Gunakan hanya jika pembayaran sudah diverifikasi manual.',
+                                  onConfirm: () => handleUpdateStatus(selectedOrder.id, 'Paid')
+                                });
                               }}
-                              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
+                              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white border border-slate-750 font-bold transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
                             >
                               <Check className="w-4 h-4 stroke-[2.5]" />
                               <span>Tandai Manual Lunas</span>
@@ -909,14 +917,22 @@ export default function CashierDashboard() {
                     )}
 
                     {selectedOrder.status === 'Paid' && (
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateStatus(selectedOrder.id, 'Processing')}
-                        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-500/10 cursor-pointer"
-                      >
-                        <Play className="w-4 h-4" />
-                        <span>Mulai Proses</span>
-                      </button>
+                      <div className="flex flex-col gap-2 animate-fade-in">
+                        {selectedOrder.paymentMethod === 'Non-Cash' && (
+                          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-3 py-2.5 text-xs text-emerald-350 leading-relaxed font-bold flex items-center gap-1.5 mb-1">
+                            <Check className="w-4 h-4 text-emerald-450 stroke-[3]" />
+                            <span>Pembayaran Midtrans berhasil</span>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus(selectedOrder.id, 'Processing')}
+                          className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all flex items-center justify-center gap-2 text-xs shadow-lg shadow-indigo-500/10 cursor-pointer"
+                        >
+                          <Play className="w-4 h-4" />
+                          <span>Mulai Proses</span>
+                        </button>
+                      </div>
                     )}
 
                     {selectedOrder.status === 'Processing' && (
@@ -1009,6 +1025,38 @@ export default function CashierDashboard() {
         })()}
       </div>
       </main>
+
+      {/* Custom Confirmation Modal */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-4 text-amber-450">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-extrabold text-white mb-2">{confirmModal.title}</h3>
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">{confirmModal.description}</p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white border border-slate-750 text-xs font-bold transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition-all cursor-pointer"
+              >
+                Ya, Lunas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification Popup */}
       {toastMessage && (

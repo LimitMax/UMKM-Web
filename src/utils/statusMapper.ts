@@ -75,6 +75,11 @@ export function mapDbOrderToOrder(dbOrder: any): Order {
     quantity: item.quantity
   }));
 
+  const payments = dbOrder.payments || [];
+  const latestPayment = payments.length > 0 
+    ? [...payments].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).pop() 
+    : null;
+
   return {
     id: dbOrder.id,
     businessId: dbOrder.business_id,
@@ -112,6 +117,15 @@ export function mapDbOrderToOrder(dbOrder: any): Order {
     etaUpdatedAt: dbOrder.eta_updated_at || undefined,
     etaManuallyAdjusted: dbOrder.eta_manually_adjusted !== null && dbOrder.eta_manually_adjusted !== undefined ? dbOrder.eta_manually_adjusted : false,
     etaAdjustmentReason: dbOrder.eta_adjustment_reason || undefined,
+    
+    // Payment details
+    paymentProvider: latestPayment ? latestPayment.provider : undefined,
+    paymentChannel: latestPayment ? latestPayment.payment_type : undefined,
+    providerReferenceId: latestPayment ? latestPayment.provider_reference_id : undefined,
+    paidAt: dbOrder.paid_at || (latestPayment ? latestPayment.paid_at : undefined),
+    completedAt: dbOrder.completed_at || undefined,
+    cancelledAt: dbOrder.cancelled_at || undefined,
+
     itemsError: dbOrder.items_error || undefined,
     items
   };
