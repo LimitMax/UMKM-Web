@@ -74,6 +74,7 @@ export interface Order {
   businessId?: string;
   itemsError?: string;
   queueNumber: string;
+  trackingCode?: string;
   customerName: string;
   customerPhone: string;
   notes?: string;

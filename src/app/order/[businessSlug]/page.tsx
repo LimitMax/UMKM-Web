@@ -591,7 +591,16 @@ export default function CustomerOrderPage() {
               <h1 className="font-bold text-lg text-white">
                 {businessProfile ? businessProfile.businessName : 'Menu Pesanan'}
               </h1>
-              <p className="text-xs text-emerald-400 font-mono">Pesan Mandiri & Cepat</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs text-emerald-400 font-mono">Pesan Mandiri & Cepat</p>
+                <span className="text-slate-700 text-xs">•</span>
+                <Link
+                  href={`/order/${businessSlug}/track`}
+                  className="text-xs text-slate-450 hover:text-emerald-400 font-medium transition-colors underline decoration-slate-600 hover:decoration-emerald-400"
+                >
+                  Cek Status Pesanan
+                </Link>
+              </div>
             </div>
           </div>
           

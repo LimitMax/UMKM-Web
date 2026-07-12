@@ -84,6 +84,7 @@ export function mapDbOrderToOrder(dbOrder: any): Order {
     id: dbOrder.id,
     businessId: dbOrder.business_id,
     queueNumber: dbOrder.queue_number,
+    trackingCode: dbOrder.tracking_code || undefined,
     customerName: dbOrder.customer_name,
     customerPhone: dbOrder.customer_phone,
     notes: dbOrder.notes || undefined,

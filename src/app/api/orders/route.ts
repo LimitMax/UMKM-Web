@@ -147,11 +147,48 @@ export async function POST(request: Request) {
     const orderId = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const createdAt = new Date().toISOString();
 
+    // Generate unique 6-character alphanumeric tracking code (excluding confusing characters: 0, 1, O, I)
+    const generateTrackingCode = (): string => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let result = '';
+      for (let i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    };
+
+    let trackingCode = '';
+    let isUnique = false;
+    let retries = 0;
+    const maxRetries = 10;
+
+    while (!isUnique && retries < maxRetries) {
+      trackingCode = generateTrackingCode();
+      const { data: existing, error: checkError } = await supabaseAdmin
+        .from('orders')
+        .select('id')
+        .eq('business_id', finalBusinessId)
+        .eq('tracking_code', trackingCode)
+        .maybeSingle();
+
+      if (!checkError && !existing) {
+        isUnique = true;
+      } else {
+        retries++;
+      }
+    }
+
+    if (!isUnique) {
+      console.warn('Failed to generate unique tracking code after max retries, using timestamp fallback.');
+      trackingCode = generateTrackingCode();
+    }
+
     // 8. Construct database order row
     const orderRow = {
       id: orderId,
       business_id: finalBusinessId,
       queue_number: queueNumber,
+      tracking_code: trackingCode,
       customer_name: body.customerName,
       customer_phone: body.customerPhone || '',
       notes: body.notes || '',
@@ -243,7 +280,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       id: orderId,
-      queueNumber
+      queueNumber,
+      trackingCode
     });
   } catch (error) {
     console.error('Checkout API error:', error);

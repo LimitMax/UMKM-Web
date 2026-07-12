@@ -7,18 +7,50 @@ export const runtime = 'nodejs';
 
 interface SyncBody {
   orderId?: string;
+  trackingCode?: string;
+  businessSlug?: string;
 }
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as SyncBody;
-    const orderId = body.orderId?.trim();
+    let orderId = body.orderId?.trim();
+    const trackingCode = body.trackingCode?.trim();
+    const businessSlug = body.businessSlug?.trim();
 
-    if (!orderId) {
-      return NextResponse.json({ message: 'Order ID wajib diisi.' }, { status: 400 });
+    if (!orderId && (!trackingCode || !businessSlug)) {
+      return NextResponse.json({ message: 'Order ID atau Kode Cek + Slug wajib diisi.' }, { status: 400 });
     }
 
     const supabaseAdmin = createSupabaseAdminClient();
+
+    if (!orderId && trackingCode && businessSlug) {
+      // 1. Resolve business by slug
+      const { data: business } = await supabaseAdmin
+        .from('businesses')
+        .select('id')
+        .eq('slug', businessSlug.toLowerCase().trim())
+        .single();
+      
+      if (business) {
+        // 2. Find order by business_id and tracking_code
+        const { data: order } = await supabaseAdmin
+          .from('orders')
+          .select('id')
+          .eq('business_id', business.id)
+          .eq('tracking_code', trackingCode.toUpperCase().trim())
+          .single();
+        
+        if (order) {
+          orderId = order.id;
+        }
+      }
+    }
+
+    if (!orderId) {
+      return NextResponse.json({ message: 'Pesanan tidak ditemukan.' }, { status: 404 });
+    }
+
     const { data: payment, error } = await supabaseAdmin
       .from('payments')
       .select('id, provider_reference_id')

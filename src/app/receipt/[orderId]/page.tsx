@@ -273,6 +273,10 @@ export default function ReceiptPage() {
             <span className="font-bold text-black">{order.id.slice(6, 14).toUpperCase()}</span>
           </div>
           <div className="flex justify-between">
+            <span>KODE CEK PESANAN:</span>
+            <span className="font-bold text-black text-xs uppercase">{order.trackingCode || 'BELUM TERSEDIA'}</span>
+          </div>
+          <div className="flex justify-between">
             <span>TANGGAL:</span>
             <span>{formatDate(order.createdAt)}</span>
           </div>
@@ -332,6 +336,11 @@ export default function ReceiptPage() {
               {order.paymentMethod?.toLowerCase() === 'cash' && order.paymentStatus === 'Paid' && '* Sudah dibayar secara Tunai'}
               {order.paymentMethod?.toLowerCase() === 'non_cash' && order.paymentStatus === 'Paid' && '* Sudah dibayar melalui Midtrans'}
               {order.paymentMethod?.toLowerCase() === 'non_cash' && order.paymentStatus !== 'Paid' && '* Menunggu pembayaran Midtrans'}
+            </div>
+            <div className="text-[9px] mt-1.5 text-slate-600 font-sans italic leading-tight border-t border-dashed border-slate-200 pt-1">
+              {order.trackingCode 
+                ? '* Simpan kode cek ini untuk memantau status pesanan.'
+                : '* Kode cek belum tersedia untuk pesanan ini.'}
             </div>
           </div>
           {/* ETA rows (Phase 6.8) */}

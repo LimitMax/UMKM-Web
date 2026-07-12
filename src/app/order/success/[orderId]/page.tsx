@@ -423,6 +423,26 @@ export default function OrderSuccessPage() {
             </span>
           </div>
 
+          <div className="mb-6 py-4 bg-slate-950/60 rounded-2xl border border-slate-900 flex flex-col items-center">
+            <span className="text-[10px] font-mono tracking-widest text-slate-500 uppercase">Kode Cek Pesanan</span>
+            {order.trackingCode ? (
+              <>
+                <span className="text-3xl font-black text-amber-450 tracking-wider my-1 select-all">{order.trackingCode}</span>
+                <span className="text-[10px] text-slate-400 px-4 mt-1">
+                  Gunakan kode cek ini untuk melihat status pesanan Anda.
+                </span>
+                <Link
+                  href={`/order/${businessProfile?.slug || 'unknown'}/track?code=${order.trackingCode}`}
+                  className="mt-3.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-xl transition-all"
+                >
+                  Cek Status Pesanan
+                </Link>
+              </>
+            ) : (
+              <span className="text-xs text-slate-500 py-2">Kode cek belum tersedia untuk pesanan ini.</span>
+            )}
+          </div>
+
           {/* Alert for Next Step Guide */}
           <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-left text-xs flex flex-col gap-2.5 mt-4">
             <div className="flex items-center gap-2 text-emerald-400 font-bold border-b border-slate-850 pb-2">
