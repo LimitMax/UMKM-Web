@@ -1,7 +1,7 @@
-/* eslint-disable @next/next/no-img-element */
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { 
   Search, 
   Plus, 
@@ -214,9 +214,12 @@ export default function AdminStockPage() {
                         <div className="flex items-center gap-3">
                           <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0">
                             {prod.imageUrl ? (
-                              <img 
+                              <Image
                                 src={prod.imageUrl} 
                                 alt={prod.name} 
+                                fill
+                                sizes="40px"
+                                unoptimized
                                 onError={(e) => {
                                   (e.currentTarget as HTMLImageElement).style.opacity = '0';
                                 }}

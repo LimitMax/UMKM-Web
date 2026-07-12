@@ -1,5 +1,65 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Order, OrderStatus, PaymentStatus, PaymentMethod, OrderItem } from '../types';
+
+interface DbOrderItem {
+  product_id?: string;
+  product_name?: string;
+  name?: string;
+  price: number | string;
+  quantity: number;
+}
+
+interface DbPayment {
+  provider?: string;
+  payment_type?: string;
+  provider_reference_id?: string;
+  paid_at?: string;
+  created_at: string;
+}
+
+interface DbOrder {
+  id: string;
+  business_id?: string;
+  queue_number: string;
+  tracking_code?: string | null;
+  customer_name: string;
+  customer_phone: string;
+  notes?: string | null;
+  subtotal?: number | string | null;
+  service_charge_amount?: number | string | null;
+  tax_amount?: number | string | null;
+  total_amount: number | string;
+  payment_method: string;
+  payment_status: string;
+  order_status?: string | null;
+  status?: string | null;
+  created_at: string;
+  fulfillment_type?: Order['fulfillmentType'] | null;
+  recipient_name?: string | null;
+  delivery_phone?: string | null;
+  delivery_address?: string | null;
+  delivery_notes?: string | null;
+  delivery_fee_amount?: number | string | null;
+  delivery_admin_fee_amount?: number | string | null;
+  free_delivery_applied?: boolean | null;
+  delivery_distance_km?: number | string | null;
+  delivery_distance_source?: string | null;
+  delivery_fee_calculation_type?: Order['deliveryFeeCalculationType'] | null;
+  estimated_preparation_minutes?: number | null;
+  estimated_delivery_minutes?: number | null;
+  estimated_total_minutes?: number | null;
+  estimated_ready_at?: string | null;
+  estimated_arrival_at?: string | null;
+  eta_label?: string | null;
+  eta_updated_at?: string | null;
+  eta_manually_adjusted?: boolean | null;
+  eta_adjustment_reason?: string | null;
+  paid_at?: string | null;
+  completed_at?: string | null;
+  cancelled_at?: string | null;
+  items_error?: string | null;
+  items?: DbOrderItem[];
+  payments?: DbPayment[];
+}
 
 export function mapDbStatusToFrontend(dbStatus: string): OrderStatus {
   switch (dbStatus) {
@@ -65,19 +125,19 @@ export function mapFrontendPaymentMethodToDb(fePaymentMethod: string): string {
   }
 }
 
-export function mapDbOrderToOrder(dbOrder: any): Order {
+export function mapDbOrderToOrder(dbOrder: DbOrder): Order {
   if (!dbOrder) return dbOrder;
   
-  const items: OrderItem[] = (dbOrder.items || []).map((item: any) => ({
-    productId: item.product_id,
-    name: item.product_name || item.name,
+  const items: OrderItem[] = (dbOrder.items || []).map((item) => ({
+    productId: item.product_id || '',
+    name: item.product_name || item.name || '',
     price: Number(item.price),
     quantity: item.quantity
   }));
 
   const payments = dbOrder.payments || [];
   const latestPayment = payments.length > 0 
-    ? [...payments].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).pop() 
+    ? [...payments].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).pop()
     : null;
 
   return {
@@ -94,7 +154,7 @@ export function mapDbOrderToOrder(dbOrder: any): Order {
     totalAmount: Number(dbOrder.total_amount),
     paymentMethod: mapDbPaymentMethodToFrontend(dbOrder.payment_method),
     paymentStatus: mapDbPaymentStatusToFrontend(dbOrder.payment_status),
-    status: mapDbStatusToFrontend(dbOrder.order_status || dbOrder.status),
+    status: mapDbStatusToFrontend(dbOrder.order_status || dbOrder.status || 'pending'),
     createdAt: dbOrder.created_at,
     fulfillmentType: (dbOrder.fulfillment_type || 'dine_in') as Order['fulfillmentType'],
     recipientName: dbOrder.recipient_name || undefined,

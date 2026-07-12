@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   ArrowLeft, 
   Clock, 
@@ -429,9 +430,12 @@ export default function OrderTrackingPage() {
         <div className="glass rounded-3xl p-5 border border-slate-800/80 flex items-center gap-4 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
           {business?.logoUrl ? (
-            <img 
+            <Image
               src={business.logoUrl} 
               alt={business.name} 
+              width={48}
+              height={48}
+              unoptimized
               className="w-12 h-12 rounded-xl object-cover bg-slate-950 border border-slate-850"
             />
           ) : (

@@ -1,9 +1,9 @@
-/* eslint-disable @next/next/no-img-element, @typescript-eslint/no-unused-vars */
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   Search, 
   ShoppingBag, 
@@ -12,9 +12,7 @@ import {
   Trash2, 
   ArrowLeft,
   ArrowRight,
-  Sparkles, 
   AlertCircle,
-  CheckCircle,
   Wallet,
   DollarSign,
   MapPin,
@@ -26,7 +24,7 @@ import { orderService } from '../../../services/orderService';
 import { realtimeService } from '../../../lib/services/realtimeService';
 import DemoRoleSwitcher from '../../../components/DemoRoleSwitcher';
 import { isSupabaseConfigured } from '../../../lib/supabase/client';
-import { Product, ProductCategory, OrderItem, PaymentMethod, BusinessProfile, FulfillmentType } from '../../../types';
+import { Product, OrderItem, PaymentMethod, BusinessProfile, FulfillmentType } from '../../../types';
 import { formatRupiah } from '../../../utils/format';
 import { calculateOrderTotals } from '../../../utils/calculations';
 import { previewOrderEta, getEtaLabel, formatEtaDisplay } from '../../../utils/etaHelpers';
@@ -634,9 +632,12 @@ export default function CustomerOrderPage() {
               
               {/* Logo */}
               {businessProfile.logoUrl ? (
-                <img 
+                <Image
                   src={businessProfile.logoUrl} 
                   alt={businessProfile.businessName} 
+                  width={96}
+                  height={96}
+                  unoptimized
                   className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl object-cover bg-slate-950 border border-slate-850 flex-shrink-0"
                 />
               ) : (
@@ -741,9 +742,12 @@ export default function CustomerOrderPage() {
                   {/* Image container */}
                   <div className="relative aspect-square w-full bg-slate-950 overflow-hidden">
                     {prod.imageUrl ? (
-                      <img 
+                      <Image
                         src={prod.imageUrl} 
                         alt={prod.name}
+                        fill
+                        sizes="(min-width: 1024px) 33vw, 50vw"
+                        unoptimized
                         onError={(e) => {
                           (e.currentTarget as HTMLImageElement).style.opacity = '0';
                         }}
