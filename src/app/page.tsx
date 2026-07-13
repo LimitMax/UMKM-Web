@@ -72,8 +72,7 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-slate-400 text-center max-w-2xl text-base md:text-lg mb-12 leading-relaxed">
-          Platform all-in-one untuk toko kelontong, kafe, laundry, dan rumah makan. 
-          Kelola pemesanan meja mandiri, kasir pintar, kontrol stok real-time, dan dapatkan analisis bisnis bertenaga AI.
+          Ikuti ribuan pemilik usaha yang sukses bareng UMKM Pilot. Atur kasir pintar, stok otomatis, dan e-menu mandiri tanpa ribet. Biarkan AI kami yang analisis keuntungan, sementara Anda fokus buka cabang baru!
           <span className="block text-xs text-emerald-450 font-bold mt-3 bg-emerald-500/5 py-1 px-3.5 rounded-full border border-emerald-500/10 w-fit mx-auto animate-pulse">
             ✨ Mulai dari paket Free/Trial untuk mencoba.
           </span>
@@ -150,7 +149,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="w-full border-t border-slate-900 bg-black/40 py-6 text-center text-xs text-slate-500 relative z-10">
-        <p>© 2026 UMKM Pilot. Dibuat dengan cinta untuk pertumbuhan UMKM Indonesia.</p>
+        <p>© 2026 LimitMax. Dibuat dengan cinta untuk pertumbuhan UMKM Indonesia.</p>
       </footer>
     </div>
   );
