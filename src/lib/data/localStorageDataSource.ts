@@ -1,6 +1,6 @@
 import { Product, Order, BusinessProfile } from '../../types';
 import { DataSource } from './dataSource';
-import { getStorageItem, setStorageItem, STORAGE_KEYS, initializeDB } from '../../services/db';
+import { getStorageItem, setStorageItem, STORAGE_KEYS } from '../../services/db';
 import { BUSINESS_PROFILE_KEY, DEFAULT_BUSINESS_PROFILE, DEFAULT_DELIVERY_SETTINGS, DEFAULT_ETA_SETTINGS } from '../../services/businessService';
 
 /**
@@ -35,12 +35,7 @@ export const localStorageDataSource: DataSource = {
   },
 
   async getProducts(): Promise<Product[]> {
-    const products = getStorageItem<Product[]>(STORAGE_KEYS.PRODUCTS, []);
-    if (products.length === 0) {
-      initializeDB();
-      return getStorageItem<Product[]>(STORAGE_KEYS.PRODUCTS, []);
-    }
-    return products;
+    return getStorageItem<Product[]>(STORAGE_KEYS.PRODUCTS, []);
   },
 
   async getProductById(id: string): Promise<Product | undefined> {

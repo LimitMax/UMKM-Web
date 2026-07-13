@@ -1,5 +1,5 @@
 import { Product } from '../types';
-import { getStorageItem, setStorageItem, STORAGE_KEYS, initializeDB } from './db';
+import { getStorageItem, setStorageItem, STORAGE_KEYS } from './db';
 import { isSupabaseConfigured } from '../lib/supabase/client';
 import { supabaseDataSource } from '../lib/data/supabaseDataSource';
 import { DataSourceMode } from '../config/dataSourceConfig';
@@ -21,19 +21,10 @@ export const productService = {
   async getProducts(mode?: DataSourceMode, businessId?: string): Promise<Product[]> {
     const activeMode = this.resolveMode(mode);
     if (activeMode === 'supabase') {
-      try {
-        return await supabaseDataSource.getProducts(businessId);
-      } catch (err) {
-        console.error('Failed to get products from Supabase, falling back to localStorage:', err);
-      }
+      return supabaseDataSource.getProducts(businessId);
     }
 
-    const products = getStorageItem<Product[]>(STORAGE_KEYS.PRODUCTS, []);
-    if (products.length === 0) {
-      initializeDB();
-      return getStorageItem<Product[]>(STORAGE_KEYS.PRODUCTS, []);
-    }
-    return products;
+    return getStorageItem<Product[]>(STORAGE_KEYS.PRODUCTS, []);
   },
 
   async getActiveProducts(mode?: DataSourceMode, businessId?: string): Promise<Product[]> {
@@ -41,14 +32,10 @@ export const productService = {
     return products.filter((p) => p.isActive);
   },
 
-  async getProductById(id: string, mode?: DataSourceMode): Promise<Product | undefined> {
+  async getProductById(id: string, mode?: DataSourceMode, businessId?: string): Promise<Product | undefined> {
     const activeMode = this.resolveMode(mode);
     if (activeMode === 'supabase') {
-      try {
-        return await supabaseDataSource.getProductById(id);
-      } catch (err) {
-        console.error('Failed to get product by ID from Supabase, falling back to localStorage:', err);
-      }
+      return supabaseDataSource.getProductById(id, businessId);
     }
     return (await this.getProducts(mode)).find((p) => p.id === id);
   },
@@ -56,11 +43,7 @@ export const productService = {
   async createProduct(productData: Omit<Product, 'id'>, mode?: DataSourceMode, businessId?: string): Promise<Product> {
     const activeMode = this.resolveMode(mode);
     if (activeMode === 'supabase') {
-      try {
-        return await supabaseDataSource.createProduct(productData, businessId);
-      } catch (err) {
-        console.error('Failed to create product in Supabase, falling back to localStorage:', err);
-      }
+      return supabaseDataSource.createProduct(productData, businessId);
     }
 
     const products = await this.getProducts(mode);
@@ -76,11 +59,7 @@ export const productService = {
   async updateProduct(id: string, productData: Partial<Omit<Product, 'id'>>, mode?: DataSourceMode, businessId?: string): Promise<Product> {
     const activeMode = this.resolveMode(mode);
     if (activeMode === 'supabase') {
-      try {
-        return await supabaseDataSource.updateProduct(id, productData, businessId);
-      } catch (err) {
-        console.error('Failed to update product in Supabase, falling back to localStorage:', err);
-      }
+      return supabaseDataSource.updateProduct(id, productData, businessId);
     }
 
     const products = await this.getProducts(mode);
@@ -94,31 +73,27 @@ export const productService = {
     return updatedProduct;
   },
 
-  async deactivateProduct(id: string, mode?: DataSourceMode): Promise<void> {
+  async deactivateProduct(id: string, mode?: DataSourceMode, businessId?: string): Promise<void> {
     const activeMode = this.resolveMode(mode);
     if (activeMode === 'supabase') {
-      try {
-        await supabaseDataSource.deleteProduct(id);
-        return;
-      } catch (err) {
-        console.error('Failed to deactivate product in Supabase, falling back to localStorage:', err);
-      }
+      await supabaseDataSource.deleteProduct(id, businessId);
+      return;
     }
-    await this.updateProduct(id, { isActive: false }, mode);
+    await this.updateProduct(id, { isActive: false }, mode, businessId);
   },
 
-  async deleteProduct(id: string, mode?: DataSourceMode): Promise<void> {
-    await this.deactivateProduct(id, mode);
+  async deleteProduct(id: string, mode?: DataSourceMode, businessId?: string): Promise<void> {
+    await this.deactivateProduct(id, mode, businessId);
   },
 
-  async updateStock(id: string, newStock: number, mode?: DataSourceMode): Promise<void> {
-    await this.updateProduct(id, { stock: Math.max(0, newStock) }, mode);
+  async updateStock(id: string, newStock: number, mode?: DataSourceMode, businessId?: string): Promise<void> {
+    await this.updateProduct(id, { stock: Math.max(0, newStock) }, mode, businessId);
   },
 
-  async adjustStock(id: string, difference: number, mode?: DataSourceMode): Promise<void> {
-    const product = await this.getProductById(id, mode);
+  async adjustStock(id: string, difference: number, mode?: DataSourceMode, businessId?: string): Promise<void> {
+    const product = await this.getProductById(id, mode, businessId);
     if (product) {
-      await this.updateStock(id, product.stock + difference, mode);
+      await this.updateStock(id, product.stock + difference, mode, businessId);
     }
   },
 
@@ -129,6 +104,5 @@ export const productService = {
       return;
     }
     setStorageItem(STORAGE_KEYS.PRODUCTS, []);
-    initializeDB();
   }
 };

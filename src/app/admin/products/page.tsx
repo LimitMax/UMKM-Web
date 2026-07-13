@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { startTransition, useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { 
   Plus, 
@@ -49,21 +49,33 @@ export default function AdminProductsPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const loadProducts = async () => {
-    const data = await productService.getProducts();
-    setTimeout(() => {
-      setProducts(data);
-    }, 0);
-  };
-
   const { profile } = useAuth();
+  const businessId = profile?.business_id;
+
+  const loadProducts = useCallback(async () => {
+    if (!businessId) {
+      startTransition(() => {
+        setProducts([]);
+      });
+      return;
+    }
+    const data = await productService.getProducts('supabase', businessId);
+    startTransition(() => {
+      setProducts(data);
+    });
+  }, [businessId]);
 
   useEffect(() => {
-    loadProducts();
+    const initialLoadTimer = setTimeout(() => {
+      void loadProducts();
+    }, 0);
 
-    if (!profile) return;
-    if (!profile.business_id) return;
-    const bizId = profile.business_id;
+    if (!businessId) {
+      return () => {
+        clearTimeout(initialLoadTimer);
+      };
+    }
+    const bizId = businessId;
     let debounceTimer: NodeJS.Timeout;
 
     const triggerReload = () => {
@@ -80,10 +92,11 @@ export default function AdminProductsPage() {
     });
 
     return () => {
+      clearTimeout(initialLoadTimer);
       clearTimeout(debounceTimer);
       realtimeService.unsubscribeChannel(channel);
     };
-  }, [profile]);
+  }, [businessId, loadProducts]);
 
   // Open modal for creating product
   const openCreateModal = () => {
@@ -135,6 +148,10 @@ export default function AdminProductsPage() {
     const finalImageUrl = imageUrl.trim() || CATEGORY_IMAGES[category];
 
     try {
+      if (!businessId) {
+        throw new Error('Business ID tidak ditemukan untuk sesi aktif.');
+      }
+
       if (modalMode === 'create') {
         await productService.createProduct({
           name,
@@ -143,7 +160,7 @@ export default function AdminProductsPage() {
           stock,
           imageUrl: finalImageUrl,
           isActive,
-        });
+        }, 'supabase', businessId);
         setSuccessMsg('Produk baru berhasil ditambahkan!');
       } else if (modalMode === 'edit' && currentId) {
         await productService.updateProduct(currentId, {
@@ -153,7 +170,7 @@ export default function AdminProductsPage() {
           stock,
           imageUrl: finalImageUrl,
           isActive,
-        });
+        }, 'supabase', businessId);
         setSuccessMsg('Detail produk berhasil diperbarui!');
       }
 
@@ -170,14 +187,16 @@ export default function AdminProductsPage() {
 
   // Toggle active status directly
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
-    await productService.updateProduct(id, { isActive: !currentStatus });
+    if (!businessId) return;
+    await productService.updateProduct(id, { isActive: !currentStatus }, 'supabase', businessId);
     await loadProducts();
   };
 
   // Delete product
   const handleDeleteProduct = async (id: string) => {
+    if (!businessId) return;
     if (confirm('Apakah Anda yakin ingin menghapus produk ini secara permanen?')) {
-      await productService.deleteProduct(id);
+      await productService.deleteProduct(id, 'supabase', businessId);
       await loadProducts();
     }
   };
@@ -207,44 +226,58 @@ export default function AdminProductsPage() {
         </button>
       </div>
 
-      {/* Filter and Search actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md w-full">
-          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-            <Search className="w-4.5 h-4.5" />
-          </span>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari nama produk..."
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-850 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-          />
-        </div>
+      {products.length > 0 && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md w-full">
+            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+              <Search className="w-4.5 h-4.5" />
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari nama produk..."
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-850 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none flex-shrink-0">
-          {['Semua', 'Makanan', 'Minuman', 'Snack', 'Paket Promo'].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                selectedCategory === cat
-                  ? 'bg-slate-800 text-emerald-400 border border-emerald-500/25'
-                  : 'bg-slate-900/50 text-slate-450 border border-slate-850 hover:text-white'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+          <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none flex-shrink-0">
+            {['Semua', 'Makanan', 'Minuman', 'Snack', 'Paket Promo'].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  selectedCategory === cat
+                    ? 'bg-slate-800 text-emerald-400 border border-emerald-500/25'
+                    : 'bg-slate-900/50 text-slate-450 border border-slate-850 hover:text-white'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Products Table/Grid list */}
       {products.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-slate-850 rounded-2xl flex flex-col items-center justify-center gap-3">
-          <AlertCircle className="w-8 h-8 text-slate-700" />
-          <p className="text-slate-500 text-xs font-semibold">Belum ada produk dalam katalog.</p>
-          <p className="text-[11px] text-slate-600 max-w-sm">Silakan klik tombol &ldquo;Tambah Produk&rdquo; di atas untuk memasukkan menu makanan atau minuman pertama Anda.</p>
+        <div className="text-center py-16 border border-dashed border-slate-800 rounded-2xl bg-slate-900/35 flex flex-col items-center justify-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/15 text-emerald-400 flex items-center justify-center">
+            <Plus className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-base font-black text-white">Belum ada produk</h2>
+            <p className="text-xs text-slate-400 mt-1">Tambahkan produk pertama Anda untuk mulai menerima pesanan.</p>
+          </div>
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-all text-xs flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>Tambah Produk</span>
+          </button>
+          <p className="text-[11px] text-slate-600">Produk yang Anda tambahkan akan muncul di sini.</p>
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-slate-850 rounded-2xl flex flex-col items-center justify-center gap-3">

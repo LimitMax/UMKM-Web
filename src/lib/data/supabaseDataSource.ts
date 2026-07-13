@@ -95,11 +95,14 @@ export const supabaseDataSource: DataSource = {
     return (data || []).map(mapSupabaseProductToProduct);
   },
 
-  async getProductById(id: string): Promise<Product | undefined> {
+  async getProductById(id: string, businessId?: string): Promise<Product | undefined> {
+    const resolvedId = await resolveBusinessId(businessId);
+
     const { data, error } = await supabaseClient
       .from('products')
       .select('*')
       .eq('id', id)
+      .eq('business_id', resolvedId)
       .maybeSingle();
 
     if (error) {
@@ -129,14 +132,15 @@ export const supabaseDataSource: DataSource = {
     return mapSupabaseProductToProduct(data);
   },
 
-  async updateProduct(id: string, productData: Partial<Omit<Product, 'id'>>, _businessId?: string): Promise<Product> {
-    // _businessId is intentionally unused — we locate by primary key, but the param keeps method signatures compatible
+  async updateProduct(id: string, productData: Partial<Omit<Product, 'id'>>, businessId?: string): Promise<Product> {
+    const resolvedId = await resolveBusinessId(businessId);
     const updatePayload = mapProductToSupabaseUpdate(productData);
 
     const { data, error } = await supabaseClient
       .from('products')
       .update(updatePayload)
       .eq('id', id)
+      .eq('business_id', resolvedId)
       .select()
       .single();
 
@@ -148,12 +152,13 @@ export const supabaseDataSource: DataSource = {
     return mapSupabaseProductToProduct(data);
   },
 
-  async deleteProduct(id: string): Promise<void> {
-    // Use is_active instead of hard delete by default as requested
+  async deleteProduct(id: string, businessId?: string): Promise<void> {
+    const resolvedId = await resolveBusinessId(businessId);
     const { error } = await supabaseClient
       .from('products')
       .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('business_id', resolvedId);
 
     if (error) {
       console.error('Supabase deleteProduct error:', error.message);

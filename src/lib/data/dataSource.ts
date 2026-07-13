@@ -10,10 +10,10 @@ export interface DataSource {
 
   // Product operations
   getProducts(businessId?: string): Promise<Product[]>;
-  getProductById(id: string): Promise<Product | undefined>;
+  getProductById(id: string, businessId?: string): Promise<Product | undefined>;
   createProduct(productData: Omit<Product, 'id'>, businessId?: string): Promise<Product>;
   updateProduct(id: string, productData: Partial<Omit<Product, 'id'>>, businessId?: string): Promise<Product>;
-  deleteProduct(id: string): Promise<void>;
+  deleteProduct(id: string, businessId?: string): Promise<void>;
 
   // Order operations
   getOrders(): Promise<Order[]>;
@@ -26,9 +26,8 @@ export interface DataSource {
 /**
  * Unified switchboard for the application's active data driver.
  *
- * NOTE: Currently, localStorageDataSource remains the active driver by default
- * to preserve full offline demo mode. supabaseDataSource will be fully activated
- * in subsequent phases (Phase 7C/7D).
+ * Unified data access should use Supabase in production UAT. The localStorage
+ * driver is kept only as an explicit development adapter.
  */
 export const activeDataSource: DataSource = USE_SUPABASE
   ? supabaseDataSource

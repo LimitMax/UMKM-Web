@@ -96,7 +96,7 @@ export function initializeDB(): void {
   if (typeof window === 'undefined') return;
   const products = window.localStorage.getItem(STORAGE_KEYS.PRODUCTS);
   if (!products) {
-    setStorageItem(STORAGE_KEYS.PRODUCTS, SEED_PRODUCTS);
+    setStorageItem(STORAGE_KEYS.PRODUCTS, []);
   }
   const orders = window.localStorage.getItem(STORAGE_KEYS.ORDERS);
   if (!orders) {
@@ -110,7 +110,7 @@ export function initializeDB(): void {
 
 export function resetDB(): void {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(SEED_PRODUCTS));
+  window.localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify([]));
   window.localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify([]));
   window.localStorage.setItem(STORAGE_KEYS.QUEUE, JSON.stringify(0));
 }
