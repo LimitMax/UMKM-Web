@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Settings as SettingsIcon,
   QrCode,
@@ -24,18 +25,20 @@ import {
   ChevronRight,
   Sparkles,
   Clock,
+  Upload,
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { demoService, DemoStats, GenerateResult } from '../../../services/demoService';
-import { businessService, DEFAULT_ETA_SETTINGS } from '../../../services/businessService';
+import { businessService, DEFAULT_DELIVERY_SETTINGS, DEFAULT_ETA_SETTINGS } from '../../../services/businessService';
 import { productService } from '../../../services/productService';
 import { useAuth } from '../../../components/AuthProvider';
 import { formatRupiah } from '../../../utils/format';
-import type { EtaDisplayMode, Plan } from '../../../types';
+import type { BusinessProfile, EtaDisplayMode, Plan } from '../../../types';
 import { Database } from 'lucide-react';
 import { supabaseClient } from '../../../lib/supabase/client';
 import { planService } from '../../../lib/services/planService';
 import { generateBusinessSlug, slugifyBusinessName } from '../../../lib/utils/slug';
+import { readImageFileAsDataUrl } from '../../../utils/imageUpload';
 
 interface ConfirmConfig {
   title: string;
@@ -76,6 +79,11 @@ const BUSINESS_CATEGORY_OPTIONS = [
   'Jasa / Dagang Lainnya',
   'Lainnya',
 ];
+
+const DEVELOPER_EMAILS = (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
 
 export default function AdminSettingsPage() {
   // Tab state: 'profile' | 'demo' | 'payment'
@@ -228,6 +236,8 @@ export default function AdminSettingsPage() {
     if (typeof window === 'undefined') return 'both';
     return businessService.getProfileSync().etaSettings?.etaDisplayMode ?? 'both';
   });
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [isLogoUploading, setIsLogoUploading] = useState(false);
 
   // Dynamic order link state
   const [orderLink, setOrderLink] = useState('');
@@ -245,6 +255,9 @@ export default function AdminSettingsPage() {
   // Auth & data source mode
   const { isSupabaseConfigured, user: supabaseUser, currentBusiness, refreshAuth } = useAuth();
   const isSupabaseActive = isSupabaseConfigured && !!supabaseUser;
+  const isDeveloperAccount = Boolean(
+    supabaseUser?.email && DEVELOPER_EMAILS.includes(supabaseUser.email.toLowerCase())
+  );
   const [isMigrationLoading, setIsMigrationLoading] = useState(false);
 
   // Payment integration health checks state
@@ -342,59 +355,13 @@ export default function AdminSettingsPage() {
   }, [businessSlug]);
 
   useEffect(() => {
-    if (!currentBusiness) return;
-
-    const timer = setTimeout(() => {
-      const type = currentBusiness.business_type || '';
-      setBusinessName(currentBusiness.name || '');
-      if (BUSINESS_CATEGORY_OPTIONS.includes(type)) {
-        setBusinessType(type);
-        setCustomBusinessType('');
-      } else {
-        setBusinessType('Lainnya');
-        setCustomBusinessType(type);
-      }
-      setBusinessSlug(currentBusiness.slug || '');
-      setDescription(currentBusiness.description || '');
-      setLogoUrl(currentBusiness.logo_url || '');
-      setAddress(currentBusiness.address || '');
-      setWhatsappNumber(currentBusiness.whatsapp_number || '');
-      setOpeningHours(currentBusiness.opening_hours || '');
-      setTaxEnabled(currentBusiness.tax_enabled ?? false);
-      setTaxPercentage(Number(currentBusiness.tax_percentage ?? 10));
-      setServiceChargeEnabled(currentBusiness.service_charge_enabled ?? false);
-      setServiceChargePercentage(Number(currentBusiness.service_charge_percentage ?? 5));
-
-      const delivery = (currentBusiness.delivery_settings || {}) as Record<string, unknown>;
-      setDeliveryEnabled((delivery.deliveryEnabled as boolean | undefined) ?? true);
-      setDeliveryFeeEnabled((delivery.deliveryFeeEnabled as boolean | undefined) ?? true);
-      setDeliveryFeeAmount(Number(delivery.deliveryFeeAmount ?? 10000));
-      setFreeDeliveryEnabled((delivery.freeDeliveryEnabled as boolean | undefined) ?? false);
-      setFreeDeliveryMinimumAmount(Number(delivery.freeDeliveryMinimumAmount ?? 50000));
-      setDeliveryAdminFeeEnabled((delivery.deliveryAdminFeeEnabled as boolean | undefined) ?? false);
-      setDeliveryAdminFeeType((delivery.deliveryAdminFeeType as 'fixed' | 'percentage' | undefined) ?? 'fixed');
-      setDeliveryAdminFeeValue(Number(delivery.deliveryAdminFeeValue ?? 0));
-      setDeliveryInstruction((delivery.deliveryInstruction as string | undefined) ?? '');
-      setDeliveryFeeCalculationType((delivery.deliveryFeeCalculationType as 'fixed' | 'distance_based' | undefined) ?? 'fixed');
-      setBaseDeliveryFee(Number(delivery.baseDeliveryFee ?? 8000));
-      setBaseDeliveryDistanceKm(Number(delivery.baseDeliveryDistanceKm ?? 2));
-      setDeliveryFeePerKm(Number(delivery.deliveryFeePerKm ?? 2500));
-      setMaxDeliveryDistanceKm(Number(delivery.maxDeliveryDistanceKm ?? 10));
-      setDistanceRoundingMode((delivery.distanceRoundingMode as 'ceil' | 'round' | 'floor' | undefined) ?? 'ceil');
-      setDistanceCalculationMode((delivery.distanceCalculationMode as 'manual' | 'mock' | 'maps_api_later' | undefined) ?? 'manual');
-
-      const eta = (currentBusiness.eta_settings || {}) as Record<string, unknown>;
-      setEtaEnabled((eta.etaEnabled as boolean | undefined) ?? true);
-      setDefaultPreparationMinutes(Number(eta.defaultPreparationMinutes ?? 15));
-      setRushHourBufferMinutes(Number(eta.rushHourBufferMinutes ?? 5));
-      setDineInServingBufferMinutes(Number(eta.dineInServingBufferMinutes ?? 3));
-      setPickupBufferMinutes(Number(eta.pickupBufferMinutes ?? 5));
-      setDeliveryBaseMinutes(Number(eta.deliveryBaseMinutes ?? 5));
-      setDeliveryMinutesPerKm(Number(eta.deliveryMinutesPerKm ?? 4));
-      setEtaDisplayMode((eta.etaDisplayMode as EtaDisplayMode | undefined) ?? 'both');
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [currentBusiness]);
+    if (activeTab === 'demo' && !isDeveloperAccount) {
+      const timer = setTimeout(() => {
+        setActiveTab('profile');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, isDeveloperAccount]);
 
   const ensureUniqueSlug = async (name: string, currentId: string, existingSlug?: string) => {
     const preferred = slugifyBusinessName(existingSlug || name) || 'bisnis';
@@ -417,10 +384,105 @@ export default function AdminSettingsPage() {
     setTimeout(() => setToast(null), 5000);
   };
 
+  function applyProfileState(profile: Partial<BusinessProfile>) {
+    const type = profile.businessType || '';
+    if (BUSINESS_CATEGORY_OPTIONS.includes(type)) {
+      setBusinessType(type);
+      setCustomBusinessType('');
+    } else {
+      setBusinessType(type ? 'Lainnya' : BUSINESS_CATEGORY_OPTIONS[0]);
+      setCustomBusinessType(type);
+    }
+
+    setBusinessName(profile.businessName || '');
+    setBusinessSlug(profile.slug || '');
+    setDescription(profile.description || '');
+    setLogoUrl(profile.logoUrl || '');
+    setAddress(profile.address || '');
+    setWhatsappNumber(profile.whatsappNumber || '');
+    setOpeningHours(profile.openingHours || '');
+    setTaxEnabled(profile.taxEnabled ?? false);
+    setTaxPercentage(Number(profile.taxPercentage ?? 10));
+    setServiceChargeEnabled(profile.serviceChargeEnabled ?? false);
+    setServiceChargePercentage(Number(profile.serviceChargePercentage ?? 5));
+
+    const delivery = profile.deliverySettings || DEFAULT_DELIVERY_SETTINGS;
+    setDeliveryEnabled(delivery.deliveryEnabled ?? DEFAULT_DELIVERY_SETTINGS.deliveryEnabled);
+    setDeliveryFeeEnabled(delivery.deliveryFeeEnabled ?? DEFAULT_DELIVERY_SETTINGS.deliveryFeeEnabled);
+    setDeliveryFeeAmount(Number(delivery.deliveryFeeAmount ?? DEFAULT_DELIVERY_SETTINGS.deliveryFeeAmount));
+    setFreeDeliveryEnabled(delivery.freeDeliveryEnabled ?? DEFAULT_DELIVERY_SETTINGS.freeDeliveryEnabled);
+    setFreeDeliveryMinimumAmount(Number(delivery.freeDeliveryMinimumAmount ?? DEFAULT_DELIVERY_SETTINGS.freeDeliveryMinimumAmount));
+    setDeliveryAdminFeeEnabled(delivery.deliveryAdminFeeEnabled ?? DEFAULT_DELIVERY_SETTINGS.deliveryAdminFeeEnabled);
+    setDeliveryAdminFeeType(delivery.deliveryAdminFeeType ?? DEFAULT_DELIVERY_SETTINGS.deliveryAdminFeeType);
+    setDeliveryAdminFeeValue(Number(delivery.deliveryAdminFeeValue ?? DEFAULT_DELIVERY_SETTINGS.deliveryAdminFeeValue));
+    setDeliveryInstruction(delivery.deliveryInstruction ?? DEFAULT_DELIVERY_SETTINGS.deliveryInstruction);
+    setDeliveryFeeCalculationType(delivery.deliveryFeeCalculationType ?? DEFAULT_DELIVERY_SETTINGS.deliveryFeeCalculationType ?? 'fixed');
+    setBaseDeliveryFee(Number(delivery.baseDeliveryFee ?? DEFAULT_DELIVERY_SETTINGS.baseDeliveryFee ?? 8000));
+    setBaseDeliveryDistanceKm(Number(delivery.baseDeliveryDistanceKm ?? DEFAULT_DELIVERY_SETTINGS.baseDeliveryDistanceKm ?? 2));
+    setDeliveryFeePerKm(Number(delivery.deliveryFeePerKm ?? DEFAULT_DELIVERY_SETTINGS.deliveryFeePerKm ?? 2500));
+    setMaxDeliveryDistanceKm(Number(delivery.maxDeliveryDistanceKm ?? DEFAULT_DELIVERY_SETTINGS.maxDeliveryDistanceKm ?? 10));
+    setDistanceRoundingMode(delivery.distanceRoundingMode ?? DEFAULT_DELIVERY_SETTINGS.distanceRoundingMode ?? 'ceil');
+    setDistanceCalculationMode(delivery.distanceCalculationMode ?? DEFAULT_DELIVERY_SETTINGS.distanceCalculationMode ?? 'manual');
+
+    const eta = profile.etaSettings || DEFAULT_ETA_SETTINGS;
+    setEtaEnabled(eta.etaEnabled ?? DEFAULT_ETA_SETTINGS.etaEnabled);
+    setDefaultPreparationMinutes(Number(eta.defaultPreparationMinutes ?? DEFAULT_ETA_SETTINGS.defaultPreparationMinutes));
+    setRushHourBufferMinutes(Number(eta.rushHourBufferMinutes ?? DEFAULT_ETA_SETTINGS.rushHourBufferMinutes));
+    setDineInServingBufferMinutes(Number(eta.dineInServingBufferMinutes ?? DEFAULT_ETA_SETTINGS.dineInServingBufferMinutes));
+    setPickupBufferMinutes(Number(eta.pickupBufferMinutes ?? DEFAULT_ETA_SETTINGS.pickupBufferMinutes));
+    setDeliveryBaseMinutes(Number(eta.deliveryBaseMinutes ?? DEFAULT_ETA_SETTINGS.deliveryBaseMinutes));
+    setDeliveryMinutesPerKm(Number(eta.deliveryMinutesPerKm ?? DEFAULT_ETA_SETTINGS.deliveryMinutesPerKm));
+    setEtaDisplayMode(eta.etaDisplayMode ?? DEFAULT_ETA_SETTINGS.etaDisplayMode);
+  }
+
+  useEffect(() => {
+    if (!currentBusiness) return;
+
+    const timer = setTimeout(() => {
+      applyProfileState({
+        id: currentBusiness.id,
+        businessName: currentBusiness.name || '',
+        businessType: currentBusiness.business_type || '',
+        slug: currentBusiness.slug || '',
+        publicOrderEnabled: currentBusiness.public_order_enabled ?? true,
+        description: currentBusiness.description || '',
+        logoUrl: currentBusiness.logo_url || '',
+        address: currentBusiness.address || '',
+        whatsappNumber: currentBusiness.whatsapp_number || '',
+        openingHours: currentBusiness.opening_hours || '',
+        orderLink: '',
+        currency: 'IDR',
+        taxEnabled: currentBusiness.tax_enabled ?? false,
+        taxPercentage: Number(currentBusiness.tax_percentage ?? 10),
+        serviceChargeEnabled: currentBusiness.service_charge_enabled ?? false,
+        serviceChargePercentage: Number(currentBusiness.service_charge_percentage ?? 5),
+        deliverySettings: (currentBusiness.delivery_settings || {}) as unknown as BusinessProfile['deliverySettings'],
+        etaSettings: (currentBusiness.eta_settings || {}) as unknown as BusinessProfile['etaSettings'],
+      });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [currentBusiness]);
+
   const handleRefreshStats = () => {
     setIsRefreshing(true);
     loadStats();
     setTimeout(() => setIsRefreshing(false), 500);
+  };
+
+  const handleLogoFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setIsLogoUploading(true);
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file, { maxSizeMB: 2 });
+      setLogoUrl(dataUrl);
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Gagal mengunggah logo bisnis.');
+    } finally {
+      setIsLogoUploading(false);
+    }
   };
 
   const runAction = (action: () => void | GenerateResult, successMsg: string) => {
@@ -514,7 +576,7 @@ export default function AdminSettingsPage() {
       const nextSlug = currentBusiness?.id
         ? await ensureUniqueSlug(businessName, currentBusiness.id, businessSlug || businessName)
         : businessSlug;
-      await businessService.updateProfile({
+      const savedProfile = await businessService.updateProfile({
         businessName,
         businessType: finalBusinessType,
         slug: nextSlug,
@@ -557,6 +619,7 @@ export default function AdminSettingsPage() {
           etaDisplayMode,
         },
       }, isSupabaseActive ? 'supabase' : undefined, currentBusiness?.id);
+      applyProfileState(savedProfile);
 
       // Sync user session businessName
       const sessionKey = 'umkm_pilot_user_session';
@@ -576,7 +639,6 @@ export default function AdminSettingsPage() {
       const isPresetType = BUSINESS_CATEGORY_OPTIONS.includes(finalBusinessType);
       setBusinessType(isPresetType ? finalBusinessType : 'Lainnya');
       setCustomBusinessType(isPresetType ? '' : finalBusinessType);
-      setBusinessSlug(nextSlug);
       await refreshAuth();
       showToast('success', 'Pengaturan bisnis berhasil disimpan!');
     } catch {
@@ -602,46 +664,11 @@ export default function AdminSettingsPage() {
         setIsActionLoading(true);
         setConfirm(null);
         try {
-          const defaults = await businessService.resetProfile();
-          setBusinessName(defaults.businessName);
-          setBusinessType(defaults.businessType);
-          setDescription(defaults.description);
-          setLogoUrl(defaults.logoUrl);
-          setAddress(defaults.address);
-          setWhatsappNumber(defaults.whatsappNumber);
-          setOpeningHours(defaults.openingHours);
-          setTaxEnabled(defaults.taxEnabled);
-          setTaxPercentage(defaults.taxPercentage);
-          setServiceChargeEnabled(defaults.serviceChargeEnabled);
-          setServiceChargePercentage(defaults.serviceChargePercentage);
-
-          // Reset delivery settings states
-          setDeliveryEnabled(defaults.deliverySettings?.deliveryEnabled ?? true);
-          setDeliveryFeeEnabled(defaults.deliverySettings?.deliveryFeeEnabled ?? true);
-          setDeliveryFeeAmount(defaults.deliverySettings?.deliveryFeeAmount ?? 10000);
-          setFreeDeliveryEnabled(defaults.deliverySettings?.freeDeliveryEnabled ?? false);
-          setFreeDeliveryMinimumAmount(defaults.deliverySettings?.freeDeliveryMinimumAmount ?? 50000);
-          setDeliveryAdminFeeEnabled(defaults.deliverySettings?.deliveryAdminFeeEnabled ?? false);
-          setDeliveryAdminFeeType(defaults.deliverySettings?.deliveryAdminFeeType ?? 'fixed');
-          setDeliveryAdminFeeValue(defaults.deliverySettings?.deliveryAdminFeeValue ?? 0);
-          setDeliveryInstruction(defaults.deliverySettings?.deliveryInstruction ?? '');
-          setDeliveryFeeCalculationType(defaults.deliverySettings?.deliveryFeeCalculationType ?? 'fixed');
-          setBaseDeliveryFee(defaults.deliverySettings?.baseDeliveryFee ?? 8000);
-          setBaseDeliveryDistanceKm(defaults.deliverySettings?.baseDeliveryDistanceKm ?? 2);
-          setDeliveryFeePerKm(defaults.deliverySettings?.deliveryFeePerKm ?? 2500);
-          setMaxDeliveryDistanceKm(defaults.deliverySettings?.maxDeliveryDistanceKm ?? 10);
-          setDistanceRoundingMode(defaults.deliverySettings?.distanceRoundingMode ?? 'ceil');
-          setDistanceCalculationMode(defaults.deliverySettings?.distanceCalculationMode ?? 'manual');
-
-          // Reset ETA settings states (Phase 6.8)
-          setEtaEnabled(DEFAULT_ETA_SETTINGS.etaEnabled);
-          setDefaultPreparationMinutes(DEFAULT_ETA_SETTINGS.defaultPreparationMinutes);
-          setRushHourBufferMinutes(DEFAULT_ETA_SETTINGS.rushHourBufferMinutes);
-          setDineInServingBufferMinutes(DEFAULT_ETA_SETTINGS.dineInServingBufferMinutes);
-          setPickupBufferMinutes(DEFAULT_ETA_SETTINGS.pickupBufferMinutes);
-          setDeliveryBaseMinutes(DEFAULT_ETA_SETTINGS.deliveryBaseMinutes);
-          setDeliveryMinutesPerKm(DEFAULT_ETA_SETTINGS.deliveryMinutesPerKm);
-          setEtaDisplayMode(DEFAULT_ETA_SETTINGS.etaDisplayMode);
+          const defaults = await businessService.resetProfile(
+            isSupabaseActive ? 'supabase' : undefined,
+            currentBusiness?.id
+          );
+          applyProfileState(defaults);
 
           // Reset user session businessName
           const sessionKey = 'umkm_pilot_user_session';
@@ -654,12 +681,11 @@ export default function AdminSettingsPage() {
             }
           }
 
-          showToast('success', 'Pengaturan bisnis berhasil direset! Memuat ulang...');
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
+          await refreshAuth();
+          showToast('success', 'Pengaturan bisnis berhasil direset!');
         } catch {
           showToast('error', 'Gagal mereset pengaturan bisnis.');
+        } finally {
           setIsActionLoading(false);
         }
       }
@@ -930,17 +956,19 @@ export default function AdminSettingsPage() {
           <QrCode className="w-4.5 h-4.5" />
           <span>Profil Toko &amp; QR Menu</span>
         </button>
-        <button
-          onClick={() => setActiveTab('demo')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all relative ${
-            activeTab === 'demo'
-              ? 'text-emerald-400 border-b-2 border-emerald-500'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Zap className="w-4.5 h-4.5" />
-          <span>Alat Demo &amp; Developer</span>
-        </button>
+        {isDeveloperAccount && (
+          <button
+            onClick={() => setActiveTab('demo')}
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all relative ${
+              activeTab === 'demo'
+                ? 'text-emerald-400 border-b-2 border-emerald-500'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Zap className="w-4.5 h-4.5" />
+            <span>Alat Demo &amp; Developer</span>
+          </button>
+        )}
         <button
           onClick={() => {
             setActiveTab('payment');
@@ -1023,16 +1051,61 @@ export default function AdminSettingsPage() {
                   />
                 </div>
 
-                {/* Logo URL */}
+                {/* Logo Upload */}
                 <div className="flex flex-col gap-1.5 md:col-span-2">
-                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">URL Logo Bisnis (Gambar Online)</label>
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Logo Bisnis</label>
                   <input
-                    type="url"
-                    value={logoUrl}
-                    onChange={(e) => setLogoUrl(e.target.value)}
-                    placeholder="Masukkan tautan gambar URL logomu..."
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoFileChange}
+                    className="hidden"
                   />
+                  <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+                        {logoUrl ? (
+                          <Image
+                            src={logoUrl}
+                            alt="Logo bisnis"
+                            fill
+                            sizes="80px"
+                            unoptimized
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase text-slate-500">
+                            Logo
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-white">Upload logo dari perangkat</p>
+                        <p className="mt-1 text-[10px] text-slate-500">Format PNG, JPG, atau WEBP. Maksimal 2 MB.</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        disabled={isLogoUploading}
+                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3.5 py-2 text-xs font-bold text-slate-950 transition-all hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>{isLogoUploading ? 'Mengunggah...' : 'Upload Logo'}</span>
+                      </button>
+                      {logoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setLogoUrl('')}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs font-bold text-slate-300 transition-all hover:text-white"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Hapus Logo</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Description */}
@@ -1760,7 +1833,7 @@ export default function AdminSettingsPage() {
       )}
 
       {/* ── Tab Content: DEVELOPER DEMO TOOLS ────────────────────────────────── */}
-      {activeTab === 'demo' && (
+      {activeTab === 'demo' && isDeveloperAccount && (
         <div className="flex flex-col gap-6 animate-in fade-in duration-100">
           
           {/* Stats Summary */}

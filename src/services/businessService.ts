@@ -1,6 +1,7 @@
 import { BusinessProfile, OrderEtaSettings, DeliverySettings } from '../types';
 import { getStorageItem, setStorageItem } from './db';
 import { isSupabaseConfigured } from '../lib/supabase/client';
+import { supabaseClient } from '../lib/supabase/client';
 import { supabaseDataSource } from '../lib/data/supabaseDataSource';
 import { DataSourceMode } from '../config/dataSourceConfig';
 
@@ -55,6 +56,40 @@ export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
 };
 
 export const businessService = {
+  async updateProfileViaApi(profile: Partial<BusinessProfile>, businessId?: string): Promise<BusinessProfile> {
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const token = sessionData.session?.access_token || '';
+
+    if (!token) {
+      throw new Error('Sesi login tidak ditemukan.');
+    }
+
+    const response = await fetch('/api/admin/business-profile', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        businessId,
+        profile,
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok || !payload?.profile) {
+      throw new Error(payload?.message || 'Gagal memperbarui profil bisnis.');
+    }
+
+    return payload.profile as BusinessProfile;
+  },
+
+  resolveMode(mode?: DataSourceMode): DataSourceMode {
+    if (mode) return mode;
+    return isSupabaseConfigured() ? 'supabase' : 'localStorage';
+  },
+
   getProfileSync(): BusinessProfile {
     const profile = getStorageItem<BusinessProfile>(BUSINESS_PROFILE_KEY, DEFAULT_BUSINESS_PROFILE);
     return {
@@ -72,27 +107,22 @@ export const businessService = {
   },
 
   async getProfile(mode?: DataSourceMode, businessId?: string): Promise<BusinessProfile> {
-    const activeMode = mode || (isSupabaseConfigured() && typeof window !== 'undefined' && window.localStorage.getItem('umkm_pilot_user_session') ? 'supabase' : 'localStorage');
+    const activeMode = this.resolveMode(mode);
     
     if (activeMode === 'supabase') {
-      try {
-        return await supabaseDataSource.getBusinessProfile(businessId);
-      } catch (err) {
-        console.error('Failed to get business profile from Supabase, falling back to localStorage:', err);
-      }
+      return supabaseDataSource.getBusinessProfile(businessId);
     }
     return this.getProfileSync();
   },
 
   async updateProfile(profile: Partial<BusinessProfile>, mode?: DataSourceMode, businessId?: string): Promise<BusinessProfile> {
-    const activeMode = mode || (isSupabaseConfigured() && typeof window !== 'undefined' && window.localStorage.getItem('umkm_pilot_user_session') ? 'supabase' : 'localStorage');
+    const activeMode = this.resolveMode(mode);
 
     if (activeMode === 'supabase') {
-      try {
-        return await supabaseDataSource.updateBusinessProfile(profile, businessId);
-      } catch (err) {
-        console.error('Failed to update business profile in Supabase, falling back to localStorage:', err);
+      if (typeof window !== 'undefined') {
+        return this.updateProfileViaApi(profile, businessId);
       }
+      return supabaseDataSource.updateBusinessProfile(profile, businessId);
     }
 
     const current = this.getProfileSync();
@@ -105,14 +135,13 @@ export const businessService = {
   },
 
   async resetProfile(mode?: DataSourceMode, businessId?: string): Promise<BusinessProfile> {
-    const activeMode = mode || (isSupabaseConfigured() && typeof window !== 'undefined' && window.localStorage.getItem('umkm_pilot_user_session') ? 'supabase' : 'localStorage');
+    const activeMode = this.resolveMode(mode);
 
     if (activeMode === 'supabase') {
-      try {
-        return await supabaseDataSource.updateBusinessProfile(DEFAULT_BUSINESS_PROFILE, businessId);
-      } catch (err) {
-        console.error('Failed to reset business profile in Supabase, falling back to localStorage:', err);
+      if (typeof window !== 'undefined') {
+        return this.updateProfileViaApi(DEFAULT_BUSINESS_PROFILE, businessId);
       }
+      return supabaseDataSource.updateBusinessProfile(DEFAULT_BUSINESS_PROFILE, businessId);
     }
 
     setStorageItem(BUSINESS_PROFILE_KEY, DEFAULT_BUSINESS_PROFILE);

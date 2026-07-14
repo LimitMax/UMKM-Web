@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useCallback, useEffect, useState } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { 
   Plus, 
@@ -12,13 +12,15 @@ import {
   X, 
   Sparkles,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Upload
 } from 'lucide-react';
 import { productService } from '../../../services/productService';
 import { Product, ProductCategory } from '../../../types';
 import { formatRupiah } from '../../../utils/format';
 import { useAuth } from '../../../components/AuthProvider';
 import { realtimeService } from '../../../lib/services/realtimeService';
+import { readImageFileAsDataUrl } from '../../../utils/imageUpload';
 
 const CATEGORY_IMAGES = {
   Makanan: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80',
@@ -44,6 +46,8 @@ export default function AdminProductsPage() {
   const [stock, setStock] = useState<number>(0);
   const [imageUrl, setImageUrl] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const [isImageUploading, setIsImageUploading] = useState(false);
 
   // Error/Success States
   const [errorMsg, setErrorMsg] = useState('');
@@ -123,6 +127,23 @@ export default function AdminProductsPage() {
     setModalMode('edit');
     setErrorMsg('');
     setIsModalOpen(true);
+  };
+
+  const handleImageFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setIsImageUploading(true);
+    setErrorMsg('');
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file, { maxSizeMB: 2 });
+      setImageUrl(dataUrl);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Gagal mengunggah foto produk.');
+    } finally {
+      setIsImageUploading(false);
+    }
   };
 
   // Submit form
@@ -497,15 +518,60 @@ export default function AdminProductsPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">URL Gambar (Opsional)</label>
+              <div className="flex flex-col gap-2">
+                <label className="block text-[10px] font-mono text-slate-400 uppercase">Foto Produk (Opsional)</label>
                 <input
-                  type="text"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="Kosongkan untuk menggunakan gambar default kategori"
-                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                  className="hidden"
                 />
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-16 w-16 overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+                      {imageUrl ? (
+                        <Image
+                          src={imageUrl}
+                          alt="Preview produk"
+                          fill
+                          sizes="64px"
+                          unoptimized
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase text-slate-500">
+                          Foto
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-white">Upload foto dari perangkat</p>
+                      <p className="mt-1 text-[10px] text-slate-500">Kosongkan untuk menggunakan gambar default kategori. Maksimal 2 MB.</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={isImageUploading}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-slate-950 transition-all hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>{isImageUploading ? 'Mengunggah...' : 'Upload Foto'}</span>
+                    </button>
+                    {imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setImageUrl('')}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-bold text-slate-300 transition-all hover:text-white"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Hapus Foto</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Status messages */}

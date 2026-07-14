@@ -63,19 +63,17 @@ export const supabaseDataSource: DataSource = {
     const resolvedId = await resolveBusinessId(businessId);
     const dbPayload = mapBusinessProfileToSupabaseBusinessUpdate(profile);
 
-    const { data, error } = await supabaseClient
+    const { error } = await supabaseClient
       .from('businesses')
       .update(dbPayload)
-      .eq('id', resolvedId)
-      .select()
-      .single();
+      .eq('id', resolvedId);
 
     if (error) {
       console.error('Supabase updateBusinessProfile error:', error.message);
       throw error;
     }
 
-    return mapSupabaseBusinessToBusinessProfile(data);
+    return this.getBusinessProfile(resolvedId);
   },
 
   async getProducts(businessId?: string): Promise<Product[]> {
