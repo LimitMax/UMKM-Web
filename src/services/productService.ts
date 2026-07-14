@@ -1,20 +1,58 @@
 import { Product } from '../types';
 import { getStorageItem, setStorageItem, STORAGE_KEYS } from './db';
-import { isSupabaseConfigured } from '../lib/supabase/client';
+import { isSupabaseConfigured, supabaseClient } from '../lib/supabase/client';
 import { supabaseDataSource } from '../lib/data/supabaseDataSource';
 import { DataSourceMode } from '../config/dataSourceConfig';
 
+interface ProductApiResponse {
+  product: Product;
+}
+
+function getApiErrorMessage(payload: unknown): string | undefined {
+  if (payload && typeof payload === 'object' && 'message' in payload) {
+    const message = (payload as { message?: unknown }).message;
+    return typeof message === 'string' ? message : undefined;
+  }
+
+  return undefined;
+}
+
+async function requestAdminProductApi<T>(method: 'POST' | 'PATCH' | 'DELETE', body: unknown): Promise<T> {
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const token = sessionData.session?.access_token;
+
+  if (!token) {
+    throw new Error('Sesi login tidak ditemukan.');
+  }
+
+  const response = await fetch('/api/admin/products', {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = (await response.json().catch(() => null)) as { message?: string } | T | null;
+
+  if (!response.ok) {
+    const message = getApiErrorMessage(payload);
+    throw new Error(message || 'Gagal memproses produk.');
+  }
+
+  return payload as T;
+}
+
 export const productService = {
-  // Check active mode dynamically based on Supabase setup and local session
+  // Check active mode dynamically based on Supabase setup.
   resolveMode(mode?: DataSourceMode): DataSourceMode {
     if (mode) return mode;
-    
-    if (typeof window !== 'undefined') {
-      const session = window.localStorage.getItem('umkm_pilot_user_session');
-      if (isSupabaseConfigured() && session) {
-        return 'supabase';
-      }
+
+    if (isSupabaseConfigured()) {
+      return 'supabase';
     }
+
     return 'localStorage';
   },
 
@@ -43,6 +81,14 @@ export const productService = {
   async createProduct(productData: Omit<Product, 'id'>, mode?: DataSourceMode, businessId?: string): Promise<Product> {
     const activeMode = this.resolveMode(mode);
     if (activeMode === 'supabase') {
+      if (typeof window !== 'undefined') {
+        const payload = await requestAdminProductApi<ProductApiResponse>('POST', {
+          businessId,
+          product: productData,
+        });
+        return payload.product;
+      }
+
       return supabaseDataSource.createProduct(productData, businessId);
     }
 
@@ -59,6 +105,15 @@ export const productService = {
   async updateProduct(id: string, productData: Partial<Omit<Product, 'id'>>, mode?: DataSourceMode, businessId?: string): Promise<Product> {
     const activeMode = this.resolveMode(mode);
     if (activeMode === 'supabase') {
+      if (typeof window !== 'undefined') {
+        const payload = await requestAdminProductApi<ProductApiResponse>('PATCH', {
+          businessId,
+          productId: id,
+          product: productData,
+        });
+        return payload.product;
+      }
+
       return supabaseDataSource.updateProduct(id, productData, businessId);
     }
 
@@ -76,6 +131,14 @@ export const productService = {
   async deactivateProduct(id: string, mode?: DataSourceMode, businessId?: string): Promise<void> {
     const activeMode = this.resolveMode(mode);
     if (activeMode === 'supabase') {
+      if (typeof window !== 'undefined') {
+        await requestAdminProductApi<{ ok: boolean }>('DELETE', {
+          businessId,
+          productId: id,
+        });
+        return;
+      }
+
       await supabaseDataSource.deleteProduct(id, businessId);
       return;
     }
