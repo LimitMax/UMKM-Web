@@ -23,6 +23,7 @@ import { GeneratedBusinessInsight, GeneratedPromoRecommendation, Order } from '.
 import { formatRupiah } from '../../../utils/format';
 import { FloatingAIChatAssistant } from '../../../components/ai/FloatingAIChatAssistant';
 import { AI_DATE_RANGE_LABELS, AiDateRangeKey, buildAiDateRange } from '../../../lib/ai/dateRange';
+import UpgradeAlertModal from '../../../components/payments/UpgradeAlertModal';
 
 type CaptionTab = 'whatsapp' | 'instagram' | 'short';
 type RangeKey = AiDateRangeKey;
@@ -117,6 +118,7 @@ export default function AdminInsightsPage() {
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
   const [range, setRange] = useState<RangeKey>('7d');
   const [planCode, setPlanCode] = useState<string>('free');
+  const [upgradeAlertOpen, setUpgradeAlertOpen] = useState(false);
 
   const businessId = profile?.business_id;
 
@@ -210,7 +212,7 @@ export default function AdminInsightsPage() {
 
   const generateBusinessInsight = async () => {
     if (planCode !== 'pro' && !isDeveloperAccount) {
-      alert('Fitur AI Insights hanya tersedia pada paket Pro. Silakan upgrade paket Anda di halaman Pengaturan Bisnis.');
+      setUpgradeAlertOpen(true);
       return;
     }
     if (!businessId) return;
@@ -246,7 +248,7 @@ export default function AdminInsightsPage() {
 
   const generatePromo = async () => {
     if (planCode !== 'pro' && !isDeveloperAccount) {
-      alert('Fitur AI Promo hanya tersedia pada paket Pro. Silakan upgrade paket Anda di halaman Pengaturan Bisnis.');
+      setUpgradeAlertOpen(true);
       return;
     }
     if (!businessId) return;
@@ -365,6 +367,13 @@ export default function AdminInsightsPage() {
         aiReady={Boolean(aiStatus?.configured)}
         planCode={planCode}
         isDeveloperAccount={isDeveloperAccount}
+      />
+
+      <UpgradeAlertModal
+        isOpen={upgradeAlertOpen}
+        onClose={() => setUpgradeAlertOpen(false)}
+        featureName="Analisis & Asisten AI"
+        description="Fitur AI Business Insights dan Promo hanya tersedia pada paket Pro. Silakan upgrade paket Anda untuk mendapatkan analisis premium."
       />
     </div>
   );

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, Check, Loader2, MessageSquare, Send, Sparkles, X } from 'lucide-react';
 import { supabaseClient } from '../../lib/supabase/client';
 import { AiDateRangeKey } from '../../lib/ai/dateRange';
+import UpgradeAlertModal from '../payments/UpgradeAlertModal';
 
 interface OwnerChatMessage {
   role: 'user' | 'assistant';
@@ -49,6 +50,7 @@ export function FloatingAIChatAssistant({
   isDeveloperAccount = false,
 }: FloatingAIChatAssistantProps) {
   const [open, setOpen] = useState(false);
+  const [upgradeAlertOpen, setUpgradeAlertOpen] = useState(false);
   const [messages, setMessages] = useState<OwnerChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -296,7 +298,7 @@ export function FloatingAIChatAssistant({
       <button
         onClick={() => {
           if (planCode !== 'pro' && !isDeveloperAccount) {
-            alert('Fitur Tanya AI Pilot hanya tersedia pada paket Pro. Silakan upgrade paket Anda di halaman Pengaturan Bisnis.');
+            setUpgradeAlertOpen(true);
             return;
           }
           setOpen(true);
@@ -316,6 +318,13 @@ export function FloatingAIChatAssistant({
           </span>
         </span>
       </button>
+
+      <UpgradeAlertModal
+        isOpen={upgradeAlertOpen}
+        onClose={() => setUpgradeAlertOpen(false)}
+        featureName="Tanya AI Pilot"
+        description="Fitur Tanya AI Pilot hanya tersedia pada paket Pro. Silakan upgrade paket Anda untuk mendapatkan asisten AI interaktif."
+      />
     </>
   );
 }
