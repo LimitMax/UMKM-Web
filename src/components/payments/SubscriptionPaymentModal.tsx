@@ -66,6 +66,7 @@ export default function SubscriptionPaymentModal({
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountType: string; discountValue: number } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const [openedAtMs, setOpenedAtMs] = useState(0);
 
   const isProduction = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === 'true';
   const snapJsUrl = isProduction
@@ -148,10 +149,12 @@ export default function SubscriptionPaymentModal({
     if (!isOpen) return;
     // Schedule all state updates asynchronously to avoid calling setState
     // (directly or indirectly) synchronously within an effect body.
+    const t0 = setTimeout(() => setOpenedAtMs(Date.now()), 0);
     const t1 = setTimeout(() => setStep('select_plan'), 0);
     const t2 = setTimeout(() => setErrorMsg(''), 0);
     const t3 = setTimeout(() => loadPlans(), 0);
     return () => {
+      clearTimeout(t0);
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
@@ -287,13 +290,18 @@ export default function SubscriptionPaymentModal({
   };
 
   const selectedPlan = plans.find((p) => p.code === selectedPlanCode);
-  // Compute trial expiry once — avoids calling impure Date.now() during JSX render
-  const nowMs = trialEndsAt ? new Date(trialEndsAt).getTime() : 0;
+  const trialEndMs = trialEndsAt ? new Date(trialEndsAt).getTime() : null;
+  const hasValidTrialEnd = trialEndMs !== null && !Number.isNaN(trialEndMs);
+  const hasActiveTrialWindow = hasValidTrialEnd && openedAtMs > 0 && trialEndMs > openedAtMs;
   const isTrialExpired =
-    subscriptionStatus === 'past_due' ||
+    openedAtMs > 0 &&
+    !hasActiveTrialWindow &&
+    (subscriptionStatus === 'past_due' ||
     (subscriptionStatus === 'trialing' &&
-      trialEndsAt &&
-      nowMs <= new Date().getTime());
+      hasValidTrialEnd &&
+      trialEndMs <= openedAtMs));
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">

@@ -37,13 +37,21 @@ export function getSubscriptionAccessState(
   input?: SubscriptionStateInput | null,
   now = new Date()
 ): SubscriptionAccessState {
-  const status = input?.subscription_status || 'past_due';
+  const hasSubscriptionInput = Boolean(
+    input?.plan_code || input?.subscription_status || input?.trial_ends_at
+  );
+  const status = input?.subscription_status || (hasSubscriptionInput ? 'past_due' : 'active');
   const planCode = input?.plan_code || 'starter';
   const trialEndsAt = input?.trial_ends_at || null;
   const trialEndDate = parseDate(trialEndsAt);
-  const isTrialing = status === 'trialing';
-  const isTrialExpired = Boolean(isTrialing && trialEndDate && trialEndDate.getTime() <= now.getTime());
-  const isLocked = status === 'past_due' || status === 'cancelled' || isTrialExpired;
+  const hasActiveTrialWindow = Boolean(trialEndDate && trialEndDate.getTime() > now.getTime());
+  const isTrialing = status === 'trialing' || (status === 'past_due' && hasActiveTrialWindow);
+  const isTrialExpired = Boolean(
+    (status === 'trialing' || status === 'past_due') &&
+      trialEndDate &&
+      trialEndDate.getTime() <= now.getTime()
+  );
+  const isLocked = status === 'cancelled' || (!hasActiveTrialWindow && (status === 'past_due' || isTrialExpired));
   const daysRemaining = trialEndDate
     ? Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)))
     : null;
@@ -51,7 +59,7 @@ export function getSubscriptionAccessState(
   return {
     planCode,
     status,
-    effectiveStatus: isTrialExpired ? 'past_due' : status,
+    effectiveStatus: isTrialExpired ? 'past_due' : isTrialing ? 'trialing' : status,
     isLocked,
     isTrialing,
     isTrialExpired,
