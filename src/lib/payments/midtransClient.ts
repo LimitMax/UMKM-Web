@@ -73,8 +73,9 @@ export function getMidtransServerKey(): string {
   return serverKey;
 }
 
-function getBasicAuthHeader(): string {
-  const encoded = Buffer.from(`${getMidtransServerKey()}:`).toString('base64');
+function getBasicAuthHeader(customServerKey?: string): string {
+  const key = customServerKey || getMidtransServerKey();
+  const encoded = Buffer.from(`${key}:`).toString('base64');
   return `Basic ${encoded}`;
 }
 
@@ -88,7 +89,8 @@ async function readSafeError(response: Response): Promise<string> {
 }
 
 export async function createSnapTransaction(
-  payload: MidtransSnapTransactionPayload
+  payload: MidtransSnapTransactionPayload,
+  customServerKey?: string
 ): Promise<MidtransSnapTransactionResponse> {
   assertServerOnly();
 
@@ -96,7 +98,7 @@ export async function createSnapTransaction(
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
-      Authorization: getBasicAuthHeader(),
+      Authorization: getBasicAuthHeader(customServerKey),
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
@@ -133,15 +135,17 @@ export async function createSnapTransaction(
   return data;
 }
 
-export function verifyMidtransNotification(payload: MidtransNotificationPayload): boolean {
+export function verifyMidtransNotification(payload: MidtransNotificationPayload, customServerKey?: string): boolean {
   assertServerOnly();
 
   if (!payload.order_id || !payload.status_code || !payload.gross_amount || !payload.signature_key) {
     return false;
   }
 
+  const key = customServerKey || getMidtransServerKey();
+
   const signature = createHash('sha512')
-    .update(`${payload.order_id}${payload.status_code}${payload.gross_amount}${getMidtransServerKey()}`)
+    .update(`${payload.order_id}${payload.status_code}${payload.gross_amount}${key}`)
     .digest('hex');
 
   return signature === payload.signature_key;

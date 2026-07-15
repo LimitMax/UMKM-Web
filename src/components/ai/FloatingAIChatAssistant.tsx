@@ -19,6 +19,8 @@ interface FloatingAIChatAssistantProps {
   dateRange: AiDateRangeKey;
   dateRangeLabel: string;
   aiReady: boolean;
+  planCode?: string;
+  isDeveloperAccount?: boolean;
 }
 
 const suggestedQuestions = [
@@ -38,7 +40,14 @@ function formatDateTime(value?: string) {
   }).format(new Date(value));
 }
 
-export function FloatingAIChatAssistant({ businessId, dateRange, dateRangeLabel, aiReady }: FloatingAIChatAssistantProps) {
+export function FloatingAIChatAssistant({
+  businessId,
+  dateRange,
+  dateRangeLabel,
+  aiReady,
+  planCode = 'free',
+  isDeveloperAccount = false,
+}: FloatingAIChatAssistantProps) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<OwnerChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -285,7 +294,13 @@ export function FloatingAIChatAssistant({ businessId, dateRange, dateRangeLabel,
       )}
 
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          if (planCode !== 'pro' && !isDeveloperAccount) {
+            alert('Fitur Tanya AI Pilot hanya tersedia pada paket Pro. Silakan upgrade paket Anda di halaman Pengaturan Bisnis.');
+            return;
+          }
+          setOpen(true);
+        }}
         className="fixed bottom-5 right-5 z-[70] flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-slate-900 px-4 py-3 text-left shadow-2xl shadow-emerald-500/15 transition-all hover:-translate-y-0.5 hover:border-emerald-400/50 hover:bg-slate-850"
         aria-label="Buka Tanya AI Pilot"
       >

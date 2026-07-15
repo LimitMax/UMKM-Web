@@ -139,6 +139,9 @@ export interface BusinessProfile {
   etaSettings?: OrderEtaSettings;
   planCode?: string;
   subscriptionStatus?: string;
+  midtransServerKey?: string;
+  midtransClientKey?: string;
+  midtransMerchantId?: string;
 }
 
 export interface SalesSummary {

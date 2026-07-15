@@ -168,11 +168,20 @@ export async function POST(request: Request) {
       });
     }
 
+    // Fetch business to get individual midtrans key
+    const { data: business } = await supabaseAdmin
+      .from('businesses')
+      .select('midtrans_server_key')
+      .eq('id', typedOrder.business_id)
+      .maybeSingle();
+
+    const customServerKey = business?.midtrans_server_key || undefined;
+
     // Do not force enabled_payments, payment_type, or channel-specific fields during sandbox testing.
     // Let Snap show all channels enabled in the merchant dashboard Snap Preferences.
     // Re-enable enabled_payments later only after confirming the exact channel names
     // supported by this Midtrans merchant account.
-    const snap = await createSnapTransaction(snapPayload);
+    const snap = await createSnapTransaction(snapPayload, customServerKey);
     const now = new Date().toISOString();
     const paymentId = `pay-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 

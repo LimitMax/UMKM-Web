@@ -21,6 +21,9 @@ interface SupabaseBusinessRow {
   eta_settings?: Partial<OrderEtaSettings>;
   plan_code?: string;
   subscription_status?: string;
+  midtrans_server_key?: string;
+  midtrans_client_key?: string;
+  midtrans_merchant_id?: string;
 }
 
 interface SupabaseBusinessUpdatePayload {
@@ -40,6 +43,9 @@ interface SupabaseBusinessUpdatePayload {
   service_charge_percentage?: number;
   delivery_settings?: Partial<DeliverySettings>;
   eta_settings?: Partial<OrderEtaSettings>;
+  midtrans_server_key?: string;
+  midtrans_client_key?: string;
+  midtrans_merchant_id?: string;
 }
 
 interface SupabaseProductRow {
@@ -96,6 +102,9 @@ export function mapSupabaseBusinessToBusinessProfile(data: SupabaseBusinessRow):
     etaSettings: (data.eta_settings || {}) as OrderEtaSettings,
     planCode: data.plan_code || 'free',
     subscriptionStatus: data.subscription_status || 'active',
+    midtransServerKey: data.midtrans_server_key || '',
+    midtransClientKey: data.midtrans_client_key || '',
+    midtransMerchantId: data.midtrans_merchant_id || '',
   };
 }
 
@@ -117,6 +126,9 @@ export function mapBusinessProfileToSupabaseBusinessUpdate(profile: Partial<Busi
   if (profile.serviceChargePercentage !== undefined) dbPayload.service_charge_percentage = profile.serviceChargePercentage;
   if (profile.deliverySettings !== undefined) dbPayload.delivery_settings = profile.deliverySettings;
   if (profile.etaSettings !== undefined) dbPayload.eta_settings = profile.etaSettings;
+  if (profile.midtransServerKey !== undefined) dbPayload.midtrans_server_key = profile.midtransServerKey;
+  if (profile.midtransClientKey !== undefined) dbPayload.midtrans_client_key = profile.midtransClientKey;
+  if (profile.midtransMerchantId !== undefined) dbPayload.midtrans_merchant_id = profile.midtransMerchantId;
   return dbPayload;
 }
 

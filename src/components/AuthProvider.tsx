@@ -27,6 +27,9 @@ export interface CurrentBusiness {
   plan_code?: string | null;
   subscription_status?: string | null;
   trial_ends_at?: string | null;
+  midtrans_server_key?: string | null;
+  midtrans_client_key?: string | null;
+  midtrans_merchant_id?: string | null;
 }
 
 interface AuthContextType {

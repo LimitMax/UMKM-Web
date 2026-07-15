@@ -2,14 +2,48 @@ import { NextResponse } from 'next/server';
 import { processMidtransPaymentNotification } from '@/lib/payments/midtransStatusProcessor';
 import { MidtransNotificationPayload, verifyMidtransNotification } from '@/lib/payments/midtransClient';
 import { processMidtransSubscriptionNotification } from '@/lib/payments/subscriptionPaymentProcessor';
+import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as MidtransNotificationPayload;
+    let customServerKey: string | undefined = undefined;
 
-    if (!verifyMidtransNotification(payload)) {
+    const orderIdStr = payload.order_id || '';
+    if (!orderIdStr.startsWith('SUB-') && orderIdStr.startsWith('UMKM-')) {
+      try {
+        const lastHyphenIndex = orderIdStr.lastIndexOf('-');
+        if (lastHyphenIndex > 5) {
+          const dbOrderId = orderIdStr.slice(5, lastHyphenIndex);
+          const supabaseAdmin = createSupabaseAdminClient();
+          
+          // Fetch order to get business_id
+          const { data: order } = await supabaseAdmin
+            .from('orders')
+            .select('business_id')
+            .eq('id', dbOrderId)
+            .maybeSingle();
+
+          if (order?.business_id) {
+            const { data: business } = await supabaseAdmin
+              .from('businesses')
+              .select('midtrans_server_key')
+              .eq('id', order.business_id)
+              .maybeSingle();
+
+            if (business?.midtrans_server_key) {
+              customServerKey = business.midtrans_server_key;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Midtrans webhook] Error fetching individual merchant key:', err);
+      }
+    }
+
+    if (!verifyMidtransNotification(payload, customServerKey)) {
       console.warn('[Midtrans webhook] Invalid signature', {
         orderId: payload.order_id,
         transactionStatus: payload.transaction_status,

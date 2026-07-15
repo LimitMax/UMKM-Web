@@ -120,6 +120,17 @@ export default function AdminInsightsPage() {
 
   const businessId = profile?.business_id;
 
+  const DEVELOPER_EMAILS = useMemo(() => {
+    return (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean);
+  }, []);
+
+  const isDeveloperAccount = useMemo(() => {
+    return Boolean(profile?.email && DEVELOPER_EMAILS.includes(profile.email.toLowerCase()));
+  }, [profile, DEVELOPER_EMAILS]);
+
   useEffect(() => {
     async function fetchPlan() {
       if (businessId) {
@@ -198,6 +209,10 @@ export default function AdminInsightsPage() {
   };
 
   const generateBusinessInsight = async () => {
+    if (planCode !== 'pro' && !isDeveloperAccount) {
+      alert('Fitur AI Insights hanya tersedia pada paket Pro. Silakan upgrade paket Anda di halaman Pengaturan Bisnis.');
+      return;
+    }
     if (!businessId) return;
     setBusinessInsightLoading(true);
     setErrorMessage('');
@@ -230,6 +245,10 @@ export default function AdminInsightsPage() {
   };
 
   const generatePromo = async () => {
+    if (planCode !== 'pro' && !isDeveloperAccount) {
+      alert('Fitur AI Promo hanya tersedia pada paket Pro. Silakan upgrade paket Anda di halaman Pengaturan Bisnis.');
+      return;
+    }
     if (!businessId) return;
     setPromoLoading(true);
     setErrorMessage('');
@@ -344,6 +363,8 @@ export default function AdminInsightsPage() {
         dateRange={range}
         dateRangeLabel={AI_DATE_RANGE_LABELS[range]}
         aiReady={Boolean(aiStatus?.configured)}
+        planCode={planCode}
+        isDeveloperAccount={isDeveloperAccount}
       />
     </div>
   );

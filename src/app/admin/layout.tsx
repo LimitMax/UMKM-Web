@@ -92,6 +92,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const currentRole = profile?.role || 'admin';
 
+  const DEVELOPER_EMAILS = (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  const isDeveloperAccount = Boolean(
+    supabaseUser?.email && DEVELOPER_EMAILS.includes(supabaseUser.email.toLowerCase())
+  );
+
   // --- Subscription Access State ---
   const subState = getSubscriptionAccessState({
     plan_code: currentBusiness?.plan_code,
@@ -101,7 +109,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Feature lock: locked AND not on settings page (so they can always pay from settings)
   const isSettingsPage = pathname === '/admin/settings';
-  const showFeatureLock = subState.isLocked && !isSettingsPage;
+  const showFeatureLock = subState.isLocked && !isSettingsPage && !isDeveloperAccount;
 
   let navItems = [
     { href: '/admin', label: 'Ringkasan', icon: BarChart3 },
@@ -169,7 +177,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           {/* Subscription status pill in sidebar */}
-          {subState.isTrialing && !subState.isTrialExpired && (
+          {subState.isTrialing && !subState.isTrialExpired && !isDeveloperAccount && (
             <div className="px-3 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
               <div>
@@ -181,7 +189,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           )}
 
-          {subState.isLocked && (
+          {subState.isLocked && !isDeveloperAccount && (
             <div className="px-3 py-2 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
               <Lock className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
               <div>
@@ -196,7 +204,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
-              const isLockedItem = subState.isLocked && item.href !== '/admin/settings';
+              const isLockedItem = subState.isLocked && item.href !== '/admin/settings' && !isDeveloperAccount;
               return (
                 <Link
                   key={item.href}
@@ -265,7 +273,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex-1 overflow-x-hidden flex flex-col">
 
         {/* ── Trial Countdown Banner ── */}
-        {subState.isTrialing && !subState.isTrialExpired && subState.daysRemaining !== null && (
+        {subState.isTrialing && !subState.isTrialExpired && subState.daysRemaining !== null && !isDeveloperAccount && (
           <div className="bg-indigo-900/40 border-b border-indigo-500/20 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 text-indigo-200">
               <Clock className="w-4 h-4 text-indigo-400 flex-shrink-0" />
@@ -291,7 +299,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
 
         {/* ── Trial Expired / Past Due Banner ── */}
-        {subState.isLocked && (
+        {subState.isLocked && !isDeveloperAccount && (
           <div className="bg-rose-900/30 border-b border-rose-500/25 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 text-rose-200">
               <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />

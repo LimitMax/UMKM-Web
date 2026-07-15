@@ -28,6 +28,7 @@ import {
   Upload,
   CreditCard,
   Lock,
+  User,
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { demoService, DemoStats, GenerateResult } from '../../../services/demoService';
@@ -90,8 +91,15 @@ const DEVELOPER_EMAILS = (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || '')
   .filter(Boolean);
 
 export default function AdminSettingsPage() {
-  // Tab state: 'profile' | 'demo' | 'payment'
-  const [activeTab, setActiveTab] = useState<'profile' | 'demo' | 'payment'>('profile');
+  // Auth & data source mode
+  const { isSupabaseConfigured, user: supabaseUser, currentBusiness, refreshAuth } = useAuth();
+  const isSupabaseActive = isSupabaseConfigured && !!supabaseUser;
+  const isDeveloperAccount = Boolean(
+    supabaseUser?.email && DEVELOPER_EMAILS.includes(supabaseUser.email.toLowerCase())
+  );
+
+  // Tab state: 'profile' | 'demo' | 'payment' | 'cashier'
+  const [activeTab, setActiveTab] = useState<'profile' | 'demo' | 'payment' | 'cashier'>('profile');
 
   // Business Profile states
   const [businessName, setBusinessName] = useState(() => {
@@ -246,6 +254,124 @@ export default function AdminSettingsPage() {
   // Dynamic order link state
   const [orderLink, setOrderLink] = useState('');
 
+  // Individual Midtrans Credentials states
+  const [midtransServerKey, setMidtransServerKey] = useState('');
+  const [midtransClientKey, setMidtransClientKey] = useState('');
+  const [midtransMerchantId, setMidtransMerchantId] = useState('');
+
+  // Cashier management states
+  interface CashierProfile {
+    id: string;
+    full_name: string | null;
+    email: string;
+    role: string;
+    created_at?: string;
+  }
+
+  const [cashiers, setCashiers] = useState<CashierProfile[]>([]);
+  const [cashiersLoading, setCashiersLoading] = useState(false);
+  const [newCashierName, setNewCashierName] = useState('');
+  const [newCashierEmail, setNewCashierEmail] = useState('');
+  const [newCashierPassword, setNewCashierPassword] = useState('');
+  const [cashierSubmitting, setCashierSubmitting] = useState(false);
+
+  const loadCashiers = useCallback(async () => {
+    if (!isSupabaseActive) return;
+    setCashiersLoading(true);
+    try {
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      const token = sessionData.session?.access_token || '';
+      const res = await fetch('/api/admin/cashiers', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCashiers(data.cashiers || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch cashiers:', err);
+    } finally {
+      setCashiersLoading(false);
+    }
+  }, [isSupabaseActive]);
+
+  const handleAddCashier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCashierName.trim() || !newCashierEmail.trim() || !newCashierPassword.trim()) {
+      showToast('error', 'Semua kolom registrasi kasir wajib diisi.');
+      return;
+    }
+    setCashierSubmitting(true);
+    try {
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      const token = sessionData.session?.access_token || '';
+      const res = await fetch('/api/admin/cashiers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newCashierName,
+          email: newCashierEmail,
+          password: newCashierPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Gagal mendaftarkan kasir.');
+      }
+
+      showToast('success', 'Kasir baru berhasil didaftarkan!');
+      setNewCashierName('');
+      setNewCashierEmail('');
+      setNewCashierPassword('');
+      loadCashiers();
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Gagal mendaftarkan kasir.');
+    } finally {
+      setCashierSubmitting(false);
+    }
+  };
+
+  const handleDeleteCashier = (id: string, name: string) => {
+    setConfirm({
+      title: 'Hapus Akun Kasir',
+      description: `Apakah Anda yakin ingin menghapus akun kasir "${name}"? Tindakan ini tidak dapat dibatalkan.`,
+      consequences: [
+        'Akses login kasir tersebut akan dinonaktifkan secara permanen.',
+        'Data profil kasir akan dihapus dari database.'
+      ],
+      confirmLabel: 'Ya, Hapus Kasir',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirm(null);
+        setIsActionLoading(true);
+        try {
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const token = sessionData.session?.access_token || '';
+          const res = await fetch(`/api/admin/cashiers?id=${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Gagal menghapus kasir.');
+          showToast('success', 'Kasir berhasil dihapus!');
+          loadCashiers();
+        } catch (err) {
+          showToast('error', err instanceof Error ? err.message : 'Gagal menghapus kasir.');
+        } finally {
+          setIsActionLoading(false);
+        }
+      }
+    });
+  };
+
   // Demo stats states
   const [stats, setStats] = useState<DemoStats | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -256,12 +382,6 @@ export default function AdminSettingsPage() {
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Auth & data source mode
-  const { isSupabaseConfigured, user: supabaseUser, currentBusiness, refreshAuth } = useAuth();
-  const isSupabaseActive = isSupabaseConfigured && !!supabaseUser;
-  const isDeveloperAccount = Boolean(
-    supabaseUser?.email && DEVELOPER_EMAILS.includes(supabaseUser.email.toLowerCase())
-  );
   const [isMigrationLoading, setIsMigrationLoading] = useState(false);
 
   // Payment integration health checks state
@@ -437,6 +557,10 @@ export default function AdminSettingsPage() {
     setDeliveryBaseMinutes(Number(eta.deliveryBaseMinutes ?? DEFAULT_ETA_SETTINGS.deliveryBaseMinutes));
     setDeliveryMinutesPerKm(Number(eta.deliveryMinutesPerKm ?? DEFAULT_ETA_SETTINGS.deliveryMinutesPerKm));
     setEtaDisplayMode(eta.etaDisplayMode ?? DEFAULT_ETA_SETTINGS.etaDisplayMode);
+
+    setMidtransServerKey(profile.midtransServerKey || '');
+    setMidtransClientKey(profile.midtransClientKey || '');
+    setMidtransMerchantId(profile.midtransMerchantId || '');
   }
 
   useEffect(() => {
@@ -462,6 +586,9 @@ export default function AdminSettingsPage() {
         serviceChargePercentage: Number(currentBusiness.service_charge_percentage ?? 5),
         deliverySettings: (currentBusiness.delivery_settings || {}) as unknown as BusinessProfile['deliverySettings'],
         etaSettings: (currentBusiness.eta_settings || {}) as unknown as BusinessProfile['etaSettings'],
+        midtransServerKey: currentBusiness.midtrans_server_key || '',
+        midtransClientKey: currentBusiness.midtrans_client_key || '',
+        midtransMerchantId: currentBusiness.midtrans_merchant_id || '',
       });
     }, 0);
     return () => clearTimeout(timer);
@@ -622,6 +749,9 @@ export default function AdminSettingsPage() {
           deliveryMinutesPerKm: Number(deliveryMinutesPerKm),
           etaDisplayMode,
         },
+        midtransServerKey,
+        midtransClientKey,
+        midtransMerchantId,
       }, isSupabaseActive ? 'supabase' : undefined, currentBusiness?.id);
       applyProfileState(savedProfile);
 
@@ -988,6 +1118,22 @@ export default function AdminSettingsPage() {
           <ShoppingCart className="w-4.5 h-4.5 text-indigo-400" />
           <span>Status Pembayaran</span>
         </button>
+        {isSupabaseActive && (
+          <button
+            onClick={() => {
+              setActiveTab('cashier');
+              loadCashiers();
+            }}
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all relative ${
+              activeTab === 'cashier'
+                ? 'text-emerald-400 border-b-2 border-emerald-500'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <User className="w-4.5 h-4.5 text-emerald-450" />
+            <span>Kelola Kasir</span>
+          </button>
+        )}
       </div>
 
       {/* ── Tab Content: PROFILE & QR MENU ──────────────────────────────────── */}
@@ -2478,6 +2624,199 @@ export default function AdminSettingsPage() {
             ) : (
               <div className="text-rose-400 text-xs font-semibold py-8 text-center border border-rose-500/20 bg-rose-500/5 rounded-xl">
                 Gagal memuat status kesehatan sistem pembayaran. Silakan periksa koneksi atau role login.
+              </div>
+            )}
+          </div>
+
+          {/* Midtrans Merchant credentials config card */}
+          <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 shadow-xl flex flex-col gap-6 animate-fade-in">
+            <div className="border-b border-slate-800 pb-3">
+              <h2 className="text-sm font-extrabold text-white flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-emerald-450" />
+                <span>Pengaturan Rekening Midtrans Toko Anda</span>
+              </h2>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Isi kredensial Midtrans toko Anda untuk menerima pembayaran pesanan langsung dari pelanggan ke rekening Anda sendiri. Pembayaran biaya SaaS langganan tetap ditagih secara terpisah.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Midtrans Merchant ID</label>
+                  <input
+                    type="text"
+                    value={midtransMerchantId}
+                    onChange={(e) => setMidtransMerchantId(e.target.value)}
+                    placeholder="Contoh: G123456789"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Midtrans Client Key (Public Key)</label>
+                  <input
+                    type="text"
+                    value={midtransClientKey}
+                    onChange={(e) => setMidtransClientKey(e.target.value)}
+                    placeholder="Contoh: SB-Mid-client-..."
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Midtrans Server Key (Secret Key)</label>
+                  <input
+                    type="password"
+                    value={midtransServerKey}
+                    onChange={(e) => setMidtransServerKey(e.target.value)}
+                    placeholder="Contoh: SB-Mid-server-..."
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end mt-4">
+                <button
+                  type="submit"
+                  disabled={isActionLoading}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition-all disabled:opacity-50 cursor-pointer border-none"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Simpan Kredensial Toko</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'cashier' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Add Cashier form */}
+          <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 shadow-xl flex flex-col gap-6">
+            <div className="border-b border-slate-800 pb-3">
+              <h2 className="text-sm font-extrabold text-white flex items-center gap-2">
+                <User className="w-5 h-5 text-emerald-450" />
+                <span>Tambah Kasir Baru</span>
+              </h2>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Daftarkan akun kasir baru untuk mengelola transaksi di kasir UMKM Anda.
+              </p>
+            </div>
+
+            <form onSubmit={handleAddCashier} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Nama Lengkap *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newCashierName}
+                    onChange={(e) => setNewCashierName(e.target.value)}
+                    placeholder="Nama Kasir"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Email Login *</label>
+                  <input
+                    type="email"
+                    required
+                    value={newCashierEmail}
+                    onChange={(e) => setNewCashierEmail(e.target.value)}
+                    placeholder="email@bisnis.com"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Kata Sandi *</label>
+                  <input
+                    type="password"
+                    required
+                    value={newCashierPassword}
+                    onChange={(e) => setNewCashierPassword(e.target.value)}
+                    placeholder="Minimal 6 karakter"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end mt-4">
+                <button
+                  type="submit"
+                  disabled={cashierSubmitting}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition-all disabled:opacity-50 cursor-pointer border-none"
+                >
+                  {cashierSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  <span>Daftarkan Kasir</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Cashier List */}
+          <div className="bg-slate-900 border border-slate-850 rounded-2xl p-6 shadow-xl flex flex-col gap-6">
+            <div className="border-b border-slate-800 pb-3 flex justify-between items-center">
+              <div>
+                <h2 className="text-sm font-extrabold text-white flex items-center gap-2">
+                  <User className="w-5 h-5 text-emerald-450" />
+                  <span>Daftar Kasir Terdaftar</span>
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Akun kasir aktif yang dapat masuk ke dashboard kasir UMKM Anda.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadCashiers}
+                disabled={cashiersLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 disabled:opacity-50 text-xs font-bold text-slate-300 transition-all cursor-pointer border border-slate-750"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${cashiersLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {cashiersLoading ? (
+              <div className="text-slate-500 text-xs font-mono py-12 text-center animate-pulse">
+                Memuat daftar kasir...
+              </div>
+            ) : cashiers.length === 0 ? (
+              <div className="text-slate-500 text-xs py-8 text-center border border-dashed border-slate-800 rounded-xl">
+                Belum ada kasir terdaftar. Gunakan formulir di atas untuk menambahkan.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 font-mono uppercase tracking-wider text-[10px]">
+                      <th className="py-3 px-4 font-bold">Nama</th>
+                      <th className="py-3 px-4 font-bold">Email</th>
+                      <th className="py-3 px-4 font-bold">Tanggal Registrasi</th>
+                      <th className="py-3 px-4 text-right font-bold">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cashiers.map((c) => (
+                      <tr key={c.id} className="border-b border-slate-855/60 hover:bg-slate-950/20 transition-all text-slate-200">
+                        <td className="py-3.5 px-4 font-bold text-white">{c.full_name || '-'}</td>
+                        <td className="py-3.5 px-4 font-mono">{c.email}</td>
+                        <td className="py-3.5 px-4 text-slate-400">
+                          {c.created_at ? new Date(c.created_at).toLocaleDateString('id-ID', { dateStyle: 'medium' }) : '-'}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCashier(c.id, c.full_name || c.email)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[10px] font-bold transition-all border-none cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Hapus</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
