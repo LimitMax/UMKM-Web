@@ -21,6 +21,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../components/AuthProvider';
+import { BillingCycleToggle } from '../../components/payments/BillingCycleToggle';
 import { supabaseClient } from '../../lib/supabase/client';
 import { profileService } from '../../lib/services/profileService';
 import { generateBusinessSlug, slugifyBusinessName } from '../../lib/utils/slug';
@@ -423,32 +424,7 @@ export default function RegisterPage() {
               </div>
 
               {/* Billing Cycle Toggle */}
-              <div className="flex justify-center mb-1">
-                <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle('monthly')}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
-                      billingCycle === 'monthly'
-                        ? 'bg-indigo-600 text-white'
-                        : 'text-slate-400 hover:text-white bg-transparent'
-                    }`}
-                  >
-                    Bayar Bulanan
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle('annual')}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
-                      billingCycle === 'annual'
-                        ? 'bg-indigo-600 text-white'
-                        : 'text-slate-400 hover:text-white bg-transparent'
-                    }`}
-                  >
-                    Bayar Tahunan (Diskon 2 Bulan)
-                  </button>
-                </div>
-              </div>
+              <BillingCycleToggle value={billingCycle} onChange={setBillingCycle} />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {packagePlans.map((plan) => {

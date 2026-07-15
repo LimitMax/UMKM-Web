@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { supabaseClient } from '../../lib/supabase/client';
 import { Plan } from '../../types';
+import { BillingCycleToggle } from './BillingCycleToggle';
 
 // Extend window for Midtrans Snap JS SDK
 type SnapCallbacks = {
@@ -338,32 +339,7 @@ export default function SubscriptionPaymentModal({
         {step === 'select_plan' && (
           <>
             {/* Billing Cycle Toggle */}
-            <div className="flex justify-center mb-1">
-              <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => setBillingCycle('monthly')}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
-                    billingCycle === 'monthly'
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-slate-400 hover:text-white bg-transparent'
-                  }`}
-                >
-                  Bayar Bulanan
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBillingCycle('annual')}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
-                    billingCycle === 'annual'
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-slate-400 hover:text-white bg-transparent'
-                  }`}
-                >
-                  Bayar Tahunan
-                </button>
-              </div>
-            </div>
+            <BillingCycleToggle value={billingCycle} onChange={setBillingCycle} />
 
             {isLoadingPlans ? (
               <div className="flex items-center justify-center py-12 text-slate-500">
