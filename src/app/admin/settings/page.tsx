@@ -1214,20 +1214,14 @@ export default function AdminSettingsPage() {
                   <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950 p-4">
                     <div className="flex items-center gap-4">
                       <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
-                        {logoUrl ? (
-                          <Image
-                            src={logoUrl}
-                            alt="Logo bisnis"
-                            fill
-                            sizes="80px"
-                            unoptimized
-                            className="object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase text-slate-500">
-                            Logo
-                          </div>
-                        )}
+                        <Image
+                          src={logoUrl || 'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?auto=format&fit=crop&w=200&q=80'}
+                          alt="Logo bisnis"
+                          fill
+                          sizes="80px"
+                          unoptimized
+                          className="object-cover"
+                        />
                       </div>
                       <div className="flex-1">
                         <p className="text-xs font-semibold text-white">Upload logo dari perangkat</p>

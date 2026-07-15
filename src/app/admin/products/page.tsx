@@ -328,22 +328,14 @@ export default function AdminProductsPage() {
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0">
-                          {prod.imageUrl ? (
-                            <Image
-                              src={prod.imageUrl} 
-                              alt={prod.name} 
-                              fill
-                              sizes="40px"
-                              unoptimized
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).style.opacity = '0';
-                              }}
-                              className="w-full h-full object-cover transition-opacity duration-300" 
-                            />
-                          ) : null}
-                          <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex items-center justify-center text-slate-550 font-bold text-xs uppercase pointer-events-none -z-10">
-                            {prod.name.substring(0, 2).toUpperCase()}
-                          </div>
+                          <Image
+                            src={prod.imageUrl || CATEGORY_IMAGES[prod.category as keyof typeof CATEGORY_IMAGES] || CATEGORY_IMAGES.Makanan} 
+                            alt={prod.name} 
+                            fill
+                            sizes="40px"
+                            unoptimized
+                            className="w-full h-full object-cover" 
+                          />
                         </div>
                         <div>
                           <p className="font-bold text-white text-xs max-w-[180px] md:max-w-[220px] truncate" title={prod.name}>

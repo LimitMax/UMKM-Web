@@ -51,6 +51,13 @@ interface MidtransCreateResponse {
   paymentId: string;
 }
 
+const CATEGORY_IMAGES = {
+  Makanan: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80',
+  Minuman: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=600&q=80',
+  Snack: 'https://images.unsplash.com/photo-1584776296984-48cd02b0c497?auto=format&fit=crop&w=600&q=80',
+  'Paket Promo': 'https://images.unsplash.com/photo-1626132647523-66f5bf380027?auto=format&fit=crop&w=600&q=80',
+};
+
 export default function CustomerOrderPage() {
   const router = useRouter();
   const { businessSlug } = useParams() as { businessSlug: string };
@@ -631,20 +638,14 @@ export default function CustomerOrderPage() {
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
               
               {/* Logo */}
-              {businessProfile.logoUrl ? (
-                <Image
-                  src={businessProfile.logoUrl} 
-                  alt={businessProfile.businessName} 
-                  width={96}
-                  height={96}
-                  unoptimized
-                  className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl object-cover bg-slate-950 border border-slate-850 flex-shrink-0"
-                />
-              ) : (
-                <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-tr from-emerald-400 to-teal-500 flex items-center justify-center text-slate-950 font-black text-xl sm:text-2xl flex-shrink-0">
-                  {businessProfile.businessName.substring(0, 2).toUpperCase()}
-                </div>
-              )}
+              <Image
+                src={businessProfile.logoUrl || 'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?auto=format&fit=crop&w=200&q=80'} 
+                alt={businessProfile.businessName} 
+                width={96}
+                height={96}
+                unoptimized
+                className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl object-cover bg-slate-950 border border-slate-850 flex-shrink-0"
+              />
 
               {/* Info details */}
               <div className="flex-1 text-center sm:text-left flex flex-col gap-2">
@@ -741,22 +742,14 @@ export default function CustomerOrderPage() {
                 >
                   {/* Image container */}
                   <div className="relative aspect-square w-full bg-slate-950 overflow-hidden">
-                    {prod.imageUrl ? (
-                      <Image
-                        src={prod.imageUrl} 
-                        alt={prod.name}
-                        fill
-                        sizes="(min-width: 1024px) 33vw, 50vw"
-                        unoptimized
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.opacity = '0';
-                        }}
-                        className="object-cover w-full h-full transform hover:scale-105 transition-all duration-500" 
-                      />
-                    ) : null}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex items-center justify-center text-slate-500 font-black text-xl uppercase pointer-events-none -z-10">
-                      {prod.name.substring(0, 2).toUpperCase()}
-                    </div>
+                    <Image
+                      src={prod.imageUrl || CATEGORY_IMAGES[prod.category as keyof typeof CATEGORY_IMAGES] || CATEGORY_IMAGES.Makanan} 
+                      alt={prod.name}
+                      fill
+                      sizes="(min-width: 1024px) 33vw, 50vw"
+                      unoptimized
+                      className="object-cover w-full h-full transform hover:scale-105 transition-all duration-500" 
+                    />
                     <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 text-[10px] font-semibold text-slate-350">
                       {prod.category}
                     </span>

@@ -15,6 +15,13 @@ import { Product } from '../../../types';
 import { useAuth } from '../../../components/AuthProvider';
 import { realtimeService } from '../../../lib/services/realtimeService';
 
+const CATEGORY_IMAGES = {
+  Makanan: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80',
+  Minuman: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=600&q=80',
+  Snack: 'https://images.unsplash.com/photo-1584776296984-48cd02b0c497?auto=format&fit=crop&w=600&q=80',
+  'Paket Promo': 'https://images.unsplash.com/photo-1626132647523-66f5bf380027?auto=format&fit=crop&w=600&q=80',
+};
+
 export default function AdminStockPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -247,22 +254,14 @@ export default function AdminStockPage() {
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0">
-                            {prod.imageUrl ? (
-                              <Image
-                                src={prod.imageUrl} 
-                                alt={prod.name} 
-                                fill
-                                sizes="40px"
-                                unoptimized
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLImageElement).style.opacity = '0';
-                                }}
-                                className="w-full h-full object-cover transition-opacity duration-300" 
-                              />
-                            ) : null}
-                            <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex items-center justify-center text-slate-550 font-bold text-xs uppercase pointer-events-none -z-10">
-                              {prod.name.substring(0, 2).toUpperCase()}
-                            </div>
+                            <Image
+                              src={prod.imageUrl || CATEGORY_IMAGES[prod.category as keyof typeof CATEGORY_IMAGES] || CATEGORY_IMAGES.Makanan} 
+                              alt={prod.name} 
+                              fill
+                              sizes="40px"
+                              unoptimized
+                              className="w-full h-full object-cover" 
+                            />
                           </div>
                           <div>
                             <p className="font-bold text-white text-xs">{prod.name}</p>

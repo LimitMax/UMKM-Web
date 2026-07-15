@@ -429,20 +429,14 @@ export default function OrderTrackingPage() {
         {/* Brand Banner */}
         <div className="glass rounded-3xl p-5 border border-slate-800/80 flex items-center gap-4 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
-          {business?.logoUrl ? (
-            <Image
-              src={business.logoUrl} 
-              alt={business.name} 
-              width={48}
-              height={48}
-              unoptimized
-              className="w-12 h-12 rounded-xl object-cover bg-slate-950 border border-slate-850"
-            />
-          ) : (
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-400 to-teal-500 flex items-center justify-center text-slate-950 font-black text-lg">
-              {business?.name.substring(0, 2).toUpperCase() || 'UB'}
-            </div>
-          )}
+          <Image
+            src={business?.logoUrl || 'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?auto=format&fit=crop&w=200&q=80'} 
+            alt={business?.name || 'Toko UMKM'} 
+            width={48}
+            height={48}
+            unoptimized
+            className="w-12 h-12 rounded-xl object-cover bg-slate-950 border border-slate-850"
+          />
           <div>
             <h1 className="text-base font-bold text-white leading-tight">{business?.name || 'Toko UMKM'}</h1>
             <p className="text-[10px] text-emerald-400 font-mono">Pelacakan Pesanan Mandiri</p>
