@@ -10,6 +10,7 @@ export interface MidtransSnapTransactionPayload {
   };
   customer_details?: {
     first_name?: string;
+    email?: string;
     phone?: string;
   };
   item_details?: Array<{

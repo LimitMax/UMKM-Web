@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { processMidtransPaymentNotification } from '@/lib/payments/midtransStatusProcessor';
 import { MidtransNotificationPayload, verifyMidtransNotification } from '@/lib/payments/midtransClient';
+import { processMidtransSubscriptionNotification } from '@/lib/payments/subscriptionPaymentProcessor';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +17,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false }, { status: 403 });
     }
 
+    if (payload.order_id?.startsWith('SUB-')) {
+      const result = await processMidtransSubscriptionNotification(payload);
+      return NextResponse.json({
+        ok: true,
+        paymentId: result.paymentId,
+        businessId: result.businessId,
+        paymentStatus: result.paymentStatus,
+        subscriptionActivated: result.subscriptionActivated,
+      });
+    }
+
     const result = await processMidtransPaymentNotification(payload);
 
     return NextResponse.json({
@@ -29,4 +41,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 200 });
   }
 }
-

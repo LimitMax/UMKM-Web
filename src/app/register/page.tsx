@@ -18,12 +18,14 @@ import {
   Building2,
   Phone,
   MapPin,
-  HelpCircle
 } from 'lucide-react';
 import { useAuth } from '../../components/AuthProvider';
 import { supabaseClient } from '../../lib/supabase/client';
 import { profileService } from '../../lib/services/profileService';
 import { generateBusinessSlug, slugifyBusinessName } from '../../lib/utils/slug';
+import { getTrialEndDate, normalizeOwnerEmail, TRIAL_DAYS } from '../../lib/subscription/status';
+
+type RegistrationPlanCode = 'starter' | 'pro';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -33,7 +35,7 @@ export default function RegisterPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Step 1: Package Plan Selection
-  const [planCode, setPlanCode] = useState<'free' | 'starter' | 'pro'>('free');
+  const [planCode, setPlanCode] = useState<RegistrationPlanCode>('starter');
 
   // Step 2: Owner Account
   const [ownerName, setOwnerName] = useState('');
@@ -130,9 +132,25 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
+      const normalizedEmail = normalizeOwnerEmail(email);
+      const { data: previousTrialRows, error: trialCheckError } = await supabaseClient
+        .from('business_subscriptions')
+        .select('id')
+        .eq('owner_email', normalizedEmail)
+        .not('trial_ends_at', 'is', null)
+        .limit(1);
+
+      if (trialCheckError) {
+        throw trialCheckError;
+      }
+
+      const canStartTrial = !previousTrialRows || previousTrialRows.length === 0;
+      const trialEndsAt = canStartTrial ? getTrialEndDate().toISOString() : null;
+      const subscriptionStatus = canStartTrial ? 'trialing' : 'past_due';
+
       // 1. Sign up the owner via Supabase Auth
       const { data: authData, error: signUpError } = await supabaseClient.auth.signUp({
-        email,
+        email: normalizedEmail,
         password,
         options: {
           data: {
@@ -153,6 +171,7 @@ export default function RegisterPage() {
       const slug = await createUniqueSlug(businessName);
 
       // 3. Create the business row in Supabase
+      const trialEndsAtIso = trialEndsAt;
       const { error: bizInsertError } = await supabaseClient
         .from('businesses')
         .insert([
@@ -165,8 +184,8 @@ export default function RegisterPage() {
             address: businessAddress || null,
             whatsapp_number: whatsappNumber || null,
             plan_code: planCode,
-            subscription_status: planCode === 'free' ? 'active' : 'trialing',
-            trial_ends_at: planCode !== 'free' ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : null,
+            subscription_status: subscriptionStatus,
+            trial_ends_at: trialEndsAtIso,
             delivery_settings: {},
             eta_settings: {}
           },
@@ -184,7 +203,7 @@ export default function RegisterPage() {
         .eq('code', planCode)
         .maybeSingle();
 
-      // 6. Create the business subscription record
+      // 6. Create the business subscription record (with owner_email for email-based trial tracking)
       if (planData) {
         const { error: subError } = await supabaseClient
           .from('business_subscriptions')
@@ -192,9 +211,10 @@ export default function RegisterPage() {
             {
               business_id: businessId,
               plan_id: planData.id,
-              status: planCode === 'free' ? 'active' : 'trialing',
+              owner_email: normalizedEmail,
+              status: subscriptionStatus,
               started_at: new Date().toISOString(),
-              trial_ends_at: planCode !== 'free' ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : null,
+              trial_ends_at: trialEndsAtIso,
               current_period_start: new Date().toISOString(),
               current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             },
@@ -210,11 +230,15 @@ export default function RegisterPage() {
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
       const orderUrl = `${origin}/order/${slug}`;
       setCreatedOrderUrl(orderUrl);
-      setSuccessMsg('Registrasi UMKM baru berhasil! Link order bisnis Anda sudah dibuat. Mengalihkan ke Dashboard Admin...');
+
+      const trialMsg = canStartTrial
+        ? `Masa trial gratis ${TRIAL_DAYS} hari dimulai sekarang.`
+        : 'Email ini sudah pernah digunakan untuk trial. Anda akan diarahkan ke halaman pembayaran.';
+      setSuccessMsg(`Registrasi UMKM baru berhasil! ${trialMsg} Mengalihkan ke Dashboard...`);
       
       setTimeout(() => {
         router.push('/admin/settings');
-      }, 1500);
+      }, 1800);
 
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Pendaftaran gagal.');
@@ -223,23 +247,6 @@ export default function RegisterPage() {
   };
 
   const packagePlans = [
-    {
-      code: 'free' as const,
-      name: 'Free / Trial',
-      price: 'Rp 0',
-      period: '/ selamanya',
-      desc: 'Cocok untuk mencoba fitur dasar UMKM Pilot',
-      features: [
-        'Hingga 20 Produk',
-        'Hingga 100 Pesanan / bulan',
-        'Maksimal 1 Akun Staf/Kasir',
-        'Analisis AI Insights ❌',
-        'Pembayaran Online (Midtrans) ❌',
-        'Ekspor Laporan (Excel/PDF) ❌',
-      ],
-      borderClass: 'border-slate-800 focus:border-emerald-500 hover:border-slate-700',
-      activeClass: 'border-emerald-500 bg-emerald-950/10 shadow-emerald-500/5',
-    },
     {
       code: 'starter' as const,
       name: 'Starter',
@@ -254,8 +261,9 @@ export default function RegisterPage() {
         'Pembayaran Online (Midtrans) ✅',
         'Ekspor Laporan (Excel/PDF) ✅',
       ],
-      borderClass: 'border-slate-800 focus:border-indigo-500 hover:border-slate-700',
-      activeClass: 'border-indigo-500 bg-indigo-950/10 shadow-indigo-500/5',
+      borderClass: 'border-slate-800 hover:border-indigo-700',
+      activeClass: 'border-indigo-500 bg-indigo-950/10 shadow-lg shadow-indigo-500/5',
+      trialBadge: true,
     },
     {
       code: 'pro' as const,
@@ -271,9 +279,10 @@ export default function RegisterPage() {
         'Pembayaran Online (Midtrans) ✅',
         'Ekspor Laporan (Excel/PDF) ✅',
       ],
-      borderClass: 'border-slate-800 focus:border-teal-500 hover:border-slate-700',
-      activeClass: 'border-teal-500 bg-teal-950/10 shadow-teal-500/5',
+      borderClass: 'border-slate-800 hover:border-teal-700',
+      activeClass: 'border-teal-500 bg-teal-950/10 shadow-lg shadow-teal-500/5',
       badge: 'Paling Populer',
+      trialBadge: true,
     }
   ];
 
@@ -284,7 +293,7 @@ export default function RegisterPage() {
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 w-80 h-80 bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 w-80 h-80 bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
 
-      <div className={`w-full flex flex-col gap-6 relative z-10 ${step === 1 ? 'max-w-5xl' : 'max-w-md'}`}>
+      <div className={`w-full flex flex-col gap-6 relative z-10 ${step === 1 ? 'max-w-3xl' : 'max-w-md'}`}>
         
         {/* Brand Logo */}
         <div className="flex flex-col items-center gap-2 text-center">
@@ -337,18 +346,19 @@ export default function RegisterPage() {
             <div className="space-y-6">
               <div className="text-center md:text-left">
                 <h2 className="text-lg font-bold text-white">Langkah 1: Pilih Paket Langganan</h2>
-                <p className="text-xs text-slate-400 mt-1">Sesuaikan fitur and limitasi sistem dengan kebutuhan usaha Anda.</p>
+                <p className="text-xs text-slate-400 mt-1">Sesuaikan fitur dan limitasi sistem dengan kebutuhan usaha Anda.</p>
               </div>
 
-              {/* Free warning notice */}
-              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] leading-relaxed font-semibold flex items-start gap-2.5">
-                <HelpCircle className="w-4.5 h-4.5 text-amber-400 flex-shrink-0 mt-0.5" />
+              {/* 7-day trial info */}
+              <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 text-[11px] leading-relaxed font-semibold flex items-start gap-2.5">
+                <CheckCircle className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  Pembayaran paket belum aktif pada versi pilot. Paket digunakan untuk kebutuhan testing dan konfigurasi fitur. Anda dapat memilih paket apa saja secara gratis.
+                  <span className="text-indigo-100 font-black">Trial Gratis {TRIAL_DAYS} Hari</span> untuk semua paket berbayar —{' '}
+                  tanpa kartu kredit, cukup daftar dan mulai gunakan semua fitur. Setelah trial berakhir, lakukan pembayaran untuk melanjutkan.
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {packagePlans.map((plan) => {
                   const isActive = planCode === plan.code;
                   return (
@@ -359,11 +369,19 @@ export default function RegisterPage() {
                         isActive ? plan.activeClass : plan.borderClass
                       }`}
                     >
-                      {plan.badge && (
-                        <span className="absolute -top-2.5 right-4 bg-teal-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          {plan.badge}
-                        </span>
-                      )}
+                      {/* Top badges */}
+                      <div className="absolute -top-2.5 left-0 right-0 flex justify-between px-4">
+                        {plan.trialBadge && (
+                          <span className="bg-indigo-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            {TRIAL_DAYS} Hari Gratis
+                          </span>
+                        )}
+                        {plan.badge && (
+                          <span className="bg-teal-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider ml-auto">
+                            {plan.badge}
+                          </span>
+                        )}
+                      </div>
 
                       <div className="space-y-4">
                         <div className="flex justify-between items-start">
@@ -371,7 +389,7 @@ export default function RegisterPage() {
                             <h3 className="text-sm font-bold text-white">{plan.name}</h3>
                             <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">{plan.desc}</p>
                           </div>
-                          <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center ${
+                          <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center flex-shrink-0 ${
                             isActive ? 'border-emerald-500 bg-emerald-500' : 'border-slate-700'
                           }`}>
                             {isActive && <Check className="w-3 h-3 text-slate-950 stroke-[3]" />}
@@ -388,10 +406,10 @@ export default function RegisterPage() {
                             const isNo = f.includes('❌');
                             return (
                               <li key={idx} className="flex items-start gap-2 text-[10.5px]">
-                                <span className={isNo ? 'text-slate-650' : 'text-emerald-400'}>
+                                <span className={isNo ? 'text-slate-600' : 'text-emerald-400'}>
                                   {isNo ? '•' : '✓'}
                                 </span>
-                                <span className={isNo ? 'text-slate-500 line-through' : 'text-slate-350'}>
+                                <span className={isNo ? 'text-slate-500 line-through' : 'text-slate-300'}>
                                   {f.replace('❌', '').replace('✅', '')}
                                 </span>
                               </li>

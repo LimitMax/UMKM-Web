@@ -16,17 +16,24 @@ import {
   LogOut,
   Settings,
   ClipboardList,
-  ShieldAlert
+  ShieldAlert,
+  Lock,
+  Clock,
+  CreditCard,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../../components/AuthProvider';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
+import { getSubscriptionAccessState } from '../../lib/subscription/status';
+import SubscriptionPaymentModal from '../../components/payments/SubscriptionPaymentModal';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { user: supabaseUser, profile, currentBusiness, loading: authLoading, signOut } = useAuth();
+  const { user: supabaseUser, profile, currentBusiness, loading: authLoading, signOut, refreshAuth } = useAuth();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
@@ -84,6 +91,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const currentRole = profile?.role || 'admin';
+
+  // --- Subscription Access State ---
+  const subState = getSubscriptionAccessState({
+    plan_code: currentBusiness?.plan_code,
+    subscription_status: currentBusiness?.subscription_status,
+    trial_ends_at: currentBusiness?.trial_ends_at,
+  });
+
+  // Feature lock: locked AND not on settings page (so they can always pay from settings)
+  const isSettingsPage = pathname === '/admin/settings';
+  const showFeatureLock = subState.isLocked && !isSettingsPage;
 
   let navItems = [
     { href: '/admin', label: 'Ringkasan', icon: BarChart3 },
@@ -150,25 +168,54 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           </div>
 
+          {/* Subscription status pill in sidebar */}
+          {subState.isTrialing && !subState.isTrialExpired && (
+            <div className="px-3 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+              <div>
+                <span className="text-[9px] font-mono text-indigo-300 font-bold block">MASA TRIAL</span>
+                <span className="text-[10px] text-indigo-200 font-semibold">
+                  {subState.daysRemaining} hari tersisa
+                </span>
+              </div>
+            </div>
+          )}
+
+          {subState.isLocked && (
+            <div className="px-3 py-2 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
+              <Lock className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+              <div>
+                <span className="text-[9px] font-mono text-rose-300 font-bold block">TRIAL HABIS</span>
+                <span className="text-[10px] text-rose-200 font-semibold">Fitur dikunci</span>
+              </div>
+            </div>
+          )}
+
           {/* Navigation links */}
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
+              const isLockedItem = subState.isLocked && item.href !== '/admin/settings';
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setIsSidebarOpen(false)}
                   className={`
-                    flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all
+                    flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all relative
                     ${isActive 
                       ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/10' 
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}
+                      : isLockedItem
+                        ? 'text-slate-600 hover:text-slate-500 cursor-not-allowed'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}
                   `}
                 >
                   <Icon className="w-4.5 h-4.5 flex-shrink-0" />
                   <span>{item.label}</span>
+                  {isLockedItem && !isActive && (
+                    <Lock className="w-3 h-3 ml-auto text-slate-600" />
+                  )}
                 </Link>
               );
             })}
@@ -215,13 +262,130 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Main Content Pane */}
-      <div className="flex-1 overflow-x-hidden p-6 md:p-8">
-        <div className="max-w-6xl mx-auto">
-          <RoleGuardBanner allowedRoles={['admin']} currentPageName="Owner/Admin Dashboard" />
-          {children}
+      <div className="flex-1 overflow-x-hidden flex flex-col">
+
+        {/* ── Trial Countdown Banner ── */}
+        {subState.isTrialing && !subState.isTrialExpired && subState.daysRemaining !== null && (
+          <div className="bg-indigo-900/40 border-b border-indigo-500/20 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-indigo-200">
+              <Clock className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+              <span className="text-xs font-semibold">
+                Masa trial Anda:{' '}
+                <strong className="text-white">
+                  {subState.daysRemaining === 0
+                    ? 'berakhir hari ini!'
+                    : `${subState.daysRemaining} hari tersisa`}
+                </strong>
+                {' '}— Paket <span className="font-bold capitalize text-indigo-100">{currentBusiness?.plan_code || 'Starter'}</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPaymentModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] rounded-lg transition-all cursor-pointer border-none flex-shrink-0"
+            >
+              <CreditCard className="w-3 h-3" />
+              <span>Aktifkan Sekarang</span>
+            </button>
+          </div>
+        )}
+
+        {/* ── Trial Expired / Past Due Banner ── */}
+        {subState.isLocked && (
+          <div className="bg-rose-900/30 border-b border-rose-500/25 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-rose-200">
+              <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+              <span className="text-xs font-semibold">
+                Masa trial telah berakhir.{' '}
+                <strong className="text-white">Semua fitur dikunci</strong>
+                {' '}— lakukan pembayaran untuk membuka kembali akses penuh.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPaymentModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] rounded-lg transition-all cursor-pointer border-none flex-shrink-0"
+            >
+              <CreditCard className="w-3 h-3" />
+              <span>Bayar Sekarang</span>
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 p-6 md:p-8">
+          <div className="max-w-6xl mx-auto">
+            <RoleGuardBanner allowedRoles={['admin']} currentPageName="Owner/Admin Dashboard" />
+
+            {/* ── Feature Lock Screen (shown when locked and NOT on settings page) ── */}
+            {showFeatureLock ? (
+              <div className="min-h-[60vh] flex flex-col items-center justify-center text-center py-16">
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-10 max-w-md w-full shadow-2xl flex flex-col items-center gap-6">
+                  <div className="w-20 h-20 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                    <Lock className="w-10 h-10 text-rose-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-white mb-2">Fitur Terkunci</h2>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Masa trial gratis 7 hari untuk paket{' '}
+                      <strong className="text-white capitalize">{currentBusiness?.plan_code || 'Starter'}</strong>{' '}
+                      Anda telah berakhir. Lakukan pembayaran untuk membuka kembali semua fitur.
+                    </p>
+                  </div>
+
+                  <div className="w-full p-4 bg-slate-950/50 border border-slate-800 rounded-xl space-y-2 text-xs text-left">
+                    <p className="text-slate-500 font-semibold text-[10px] uppercase tracking-wider mb-2">Yang Anda Dapatkan:</p>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <span className="text-emerald-400">✓</span> Akses penuh semua menu admin
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <span className="text-emerald-400">✓</span> Kelola produk, stok, dan transaksi
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <span className="text-emerald-400">✓</span> Laporan dan ekspor data
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <span className="text-emerald-400">✓</span> Pembayaran online Midtrans
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2.5 w-full">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModalOpen(true)}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-black text-sm rounded-xl transition-all shadow-lg hover:shadow-indigo-500/20 flex items-center justify-center gap-2 cursor-pointer border-none"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      <span>Bayar Langganan Sekarang</span>
+                    </button>
+                    <Link
+                      href="/admin/settings"
+                      className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all text-center"
+                    >
+                      Ke Pengaturan
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              children
+            )}
+          </div>
         </div>
       </div>
-      
+
+      {/* Subscription Payment Modal */}
+      <SubscriptionPaymentModal
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        businessId={currentBusiness?.id || ''}
+        currentPlanCode={currentBusiness?.plan_code}
+        subscriptionStatus={currentBusiness?.subscription_status}
+        trialEndsAt={currentBusiness?.trial_ends_at}
+        onPaymentSuccess={async () => {
+          setPaymentModalOpen(false);
+          await refreshAuth();
+        }}
+      />
     </div>
   );
 }

@@ -26,6 +26,8 @@ import {
   Sparkles,
   Clock,
   Upload,
+  CreditCard,
+  Lock,
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { demoService, DemoStats, GenerateResult } from '../../../services/demoService';
@@ -39,6 +41,8 @@ import { supabaseClient } from '../../../lib/supabase/client';
 import { planService } from '../../../lib/services/planService';
 import { generateBusinessSlug, slugifyBusinessName } from '../../../lib/utils/slug';
 import { readImageFileAsDataUrl } from '../../../utils/imageUpload';
+import { getSubscriptionAccessState } from '../../../lib/subscription/status';
+import SubscriptionPaymentModal from '../../../components/payments/SubscriptionPaymentModal';
 
 interface ConfirmConfig {
   title: string;
@@ -2206,13 +2210,28 @@ export default function AdminSettingsPage() {
                   Detail paket berlangganan SaaS yang aktif untuk pengelolaan limitasi dan fitur.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setUpgradeModalOpen(true)}
-                className="flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-black text-slate-950 transition-all cursor-pointer shadow-md hover:shadow-emerald-500/10 border-none"
-              >
-                <span>Upgrade Paket</span>
-              </button>
+              {(() => {
+                const subState = getSubscriptionAccessState({
+                  plan_code: currentBusiness?.plan_code,
+                  subscription_status: currentBusiness?.subscription_status || subDetails?.status,
+                  trial_ends_at: currentBusiness?.trial_ends_at || subDetails?.trialEndsAt,
+                });
+                const btnLabel = subState.isLocked ? 'Bayar Langganan' : 'Upgrade Paket';
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setUpgradeModalOpen(true)}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black text-white transition-all cursor-pointer shadow-md border-none ${
+                      subState.isLocked
+                        ? 'bg-rose-600 hover:bg-rose-500 hover:shadow-rose-500/10'
+                        : 'bg-indigo-600 hover:bg-indigo-500 hover:shadow-indigo-500/10'
+                    }`}
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>{btnLabel}</span>
+                  </button>
+                );
+              })()}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -2227,15 +2246,47 @@ export default function AdminSettingsPage() {
                     {activePlan ? activePlan.description : 'Mencoba fitur dasar UMKM Pilot'}
                   </p>
                 </div>
-                <div className="border-t border-slate-850 pt-3 mt-4 flex items-center gap-2">
-                  <span className="text-[10px] text-slate-400 font-bold">Status subscription:</span>
-                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                    subDetails?.status === 'active' 
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  }`}>
-                    {subDetails?.status || 'active'}
-                  </span>
+                <div className="border-t border-slate-850 pt-3 mt-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 font-bold">Status:</span>
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                      subDetails?.status === 'active'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : subDetails?.status === 'trialing'
+                          ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20'
+                          : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                    }`}>
+                      {subDetails?.status === 'trialing' ? 'Trial' : subDetails?.status || 'active'}
+                    </span>
+                  </div>
+                  {subDetails?.trialEndsAt && subDetails?.status === 'trialing' && (
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <Clock className="w-3 h-3 text-indigo-400" />
+                      <span className="text-indigo-300 font-semibold">
+                        {Math.max(0, Math.ceil(
+                          (new Date(subDetails.trialEndsAt).getTime() - new Date().getTime()) / (24 * 60 * 60 * 1000)
+                        )) === 0
+                          ? 'Berakhir hari ini'
+                          : `${Math.max(0, Math.ceil(
+                              (new Date(subDetails.trialEndsAt).getTime() - new Date().getTime()) / (24 * 60 * 60 * 1000)
+                            ))} hari trial tersisa`}
+                      </span>
+                    </div>
+                  )}
+                  {(() => {
+                    const subState = getSubscriptionAccessState({
+                      plan_code: currentBusiness?.plan_code,
+                      subscription_status: currentBusiness?.subscription_status || subDetails?.status,
+                      trial_ends_at: currentBusiness?.trial_ends_at || subDetails?.trialEndsAt,
+                    });
+                    if (!subState.isLocked) return null;
+                    return (
+                      <div className="flex items-center gap-1.5 text-[10px] mt-1">
+                        <Lock className="w-3 h-3 text-rose-400" />
+                        <span className="text-rose-300 font-semibold">Fitur dikunci — perlu pembayaran</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -2280,9 +2331,9 @@ export default function AdminSettingsPage() {
               </div>
             </div>
 
-            {subDetails?.trialEndsAt && (
+            {subDetails?.trialEndsAt && subDetails?.status === 'trialing' && (
               <div className="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/10 text-xs text-indigo-300">
-                ⌛ Masa percobaan trial paket Anda akan berakhir pada tanggal <strong>{new Date(subDetails.trialEndsAt).toLocaleDateString('id-ID', { dateStyle: 'long' })}</strong>.
+                ⌛ Masa percobaan trial paket Anda akan berakhir pada tanggal <strong>{new Date(subDetails.trialEndsAt).toLocaleDateString('id-ID', { dateStyle: 'long' })}</strong>. Setelah itu semua fitur akan terkunci hingga pembayaran dilakukan.
               </div>
             )}
           </div>
@@ -2495,37 +2546,21 @@ export default function AdminSettingsPage() {
           </div>
         </div>
       )}
-      {/* Upgrade Plan Modal */}
-      {upgradeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col gap-5 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
-                  <Award className="w-5 h-5 text-indigo-400" />
-                </div>
-                <h3 className="text-sm font-extrabold text-white">Upgrade Paket</h3>
-              </div>
-              <button
-                onClick={() => setUpgradeModalOpen(false)}
-                className="text-slate-500 hover:text-white transition-colors cursor-pointer border-none bg-transparent"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <p className="text-xs text-slate-400 leading-relaxed text-center py-4">
-              Upgrade paket akan tersedia setelah versi production.
-            </p>
-            
-            <button
-              onClick={() => setUpgradeModalOpen(false)}
-              className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all cursor-pointer border-none"
-            >
-              Tutup
-            </button>
-          </div>
-        </div>
+      {/* Upgrade / Payment Plan Modal */}
+      {upgradeModalOpen && currentBusiness && (
+        <SubscriptionPaymentModal
+          isOpen={upgradeModalOpen}
+          onClose={() => setUpgradeModalOpen(false)}
+          businessId={currentBusiness.id}
+          currentPlanCode={currentBusiness.plan_code}
+          subscriptionStatus={currentBusiness.subscription_status || subDetails?.status}
+          trialEndsAt={currentBusiness.trial_ends_at || subDetails?.trialEndsAt}
+          onPaymentSuccess={async () => {
+            setUpgradeModalOpen(false);
+            await refreshAuth();
+            loadPlanDetails();
+          }}
+        />
       )}
     </div>
   );
