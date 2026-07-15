@@ -244,6 +244,7 @@ export interface Plan {
   name: string;
   description: string | null;
   priceMonthly: number;
+  priceAnnual: number;
   productLimit: number;
   orderLimitMonthly: number;
   cashierLimit: number;
@@ -261,6 +262,7 @@ export interface BusinessSubscription {
   businessId: string;
   planId: string;
   status: 'trialing' | 'active' | 'past_due' | 'cancelled';
+  billingCycle: string;
   startedAt: string;
   trialEndsAt: string | null;
   currentPeriodStart: string;

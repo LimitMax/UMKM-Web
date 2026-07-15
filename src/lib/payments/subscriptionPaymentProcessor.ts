@@ -11,6 +11,7 @@ interface SubscriptionPaymentRow {
   provider_reference_id: string;
   amount: number;
   status: string;
+  billing_cycle: string;
 }
 
 interface ProcessSubscriptionPaymentResult {
@@ -52,9 +53,13 @@ function timestampOrNull(value: unknown): string | null {
   return parsed.toISOString();
 }
 
-function nextBillingPeriodEnd(from: Date): string {
+function nextBillingPeriodEnd(from: Date, billingCycle = 'monthly'): string {
   const end = new Date(from);
-  end.setMonth(end.getMonth() + 1);
+  if (billingCycle === 'annual') {
+    end.setFullYear(end.getFullYear() + 1);
+  } else {
+    end.setMonth(end.getMonth() + 1);
+  }
   return end.toISOString();
 }
 
@@ -120,9 +125,10 @@ export async function processMidtransSubscriptionNotification(
 
   let subscriptionActivated = false;
   if (isPaid) {
-    const periodEnd = nextBillingPeriodEnd(now);
+    const periodEnd = nextBillingPeriodEnd(now, paymentRow.billing_cycle);
     const subscriptionUpdates: Record<string, unknown> = {
       status: 'active',
+      billing_cycle: paymentRow.billing_cycle || 'monthly',
       trial_ends_at: null,
       paid_at: nowIso,
       current_period_start: nowIso,

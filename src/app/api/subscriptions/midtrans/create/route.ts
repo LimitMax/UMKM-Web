@@ -71,6 +71,12 @@ async function verifyAdminBusinessAccess(request: Request, businessId: string) {
   return { supabaseAdmin, profile };
 }
 
+interface CreateSubscriptionPaymentBody {
+  businessId?: string;
+  billingCycle?: string;
+  couponCode?: string;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json().catch(() => null)) as CreateSubscriptionPaymentBody | null;
@@ -96,7 +102,7 @@ export async function POST(request: Request) {
 
     const { data: plan, error: planError } = await supabaseAdmin!
       .from('plans')
-      .select('id, code, name, price_monthly')
+      .select('id, code, name, price_monthly, price_annual')
       .eq('code', business.plan_code || 'starter')
       .maybeSingle();
 
@@ -104,9 +110,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Paket langganan tidak ditemukan.' }, { status: 404 });
     }
 
-    const grossAmount = normalizeAmount(plan.price_monthly);
+    const billingCycle = body?.billingCycle === 'annual' ? 'annual' : 'monthly';
+    const basePrice = billingCycle === 'annual' ? (plan.price_annual || 0) : plan.price_monthly;
+    
+    let grossAmount = normalizeAmount(basePrice);
     if (grossAmount <= 0) {
       return NextResponse.json({ message: 'Pilih paket berbayar untuk mengaktifkan langganan.' }, { status: 400 });
+    }
+
+    // Coupon discount application
+    const couponCode = typeof body?.couponCode === 'string' ? body.couponCode.trim().toUpperCase() : '';
+    let discountAmount = 0;
+    if (couponCode) {
+      const { data: coupon } = await supabaseAdmin!
+        .from('coupons')
+        .select('*')
+        .eq('code', couponCode)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (coupon) {
+        if (coupon.discount_type === 'percentage') {
+          discountAmount = Math.round((grossAmount * coupon.discount_value) / 100);
+        } else if (coupon.discount_type === 'fixed') {
+          discountAmount = coupon.discount_value;
+        }
+        grossAmount = Math.max(0, grossAmount - discountAmount);
+      }
     }
 
     const { data: subscription } = await supabaseAdmin!
@@ -128,7 +158,7 @@ export async function POST(request: Request) {
       item_details: [
         {
           id: `subscription-${plan.code}`,
-          name: `Langganan UMKM Pilot ${plan.name}`.slice(0, 50),
+          name: `Langganan ${plan.name} (${billingCycle === 'annual' ? 'Tahunan' : 'Bulanan'})`.slice(0, 50),
           price: grossAmount,
           quantity: 1,
         },
@@ -148,6 +178,7 @@ export async function POST(request: Request) {
       provider: 'midtrans',
       provider_reference_id: midtransOrderId,
       amount: grossAmount,
+      billing_cycle: billingCycle,
       status: 'pending',
       snap_token: snap.token,
       snap_redirect_url: snap.redirect_url || null,

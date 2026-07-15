@@ -60,6 +60,12 @@ export default function SubscriptionPaymentModal({
   const [errorMsg, setErrorMsg] = useState('');
   const [snapScriptLoaded, setSnapScriptLoaded] = useState(false);
 
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountType: string; discountValue: number } | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
   const isProduction = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === 'true';
   const snapJsUrl = isProduction
     ? 'https://app.midtrans.com/snap/snap.js'
@@ -112,6 +118,7 @@ export default function SubscriptionPaymentModal({
         name: row.name,
         description: row.description,
         priceMonthly: row.price_monthly,
+        priceAnnual: row.price_annual || 0,
         productLimit: row.product_limit,
         orderLimitMonthly: row.order_limit_monthly,
         cashierLimit: row.cashier_limit,
@@ -180,7 +187,11 @@ export default function SubscriptionPaymentModal({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ businessId }),
+        body: JSON.stringify({ 
+          businessId,
+          billingCycle,
+          couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -225,12 +236,54 @@ export default function SubscriptionPaymentModal({
     }
   };
 
+  const handleApplyCoupon = async () => {
+    setCouponError('');
+    setAppliedCoupon(null);
+    if (!couponCode.trim()) return;
+
+    setIsValidatingCoupon(true);
+    try {
+      const res = await fetch('/api/public/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: couponCode.trim().toUpperCase() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setCouponError(data.message || 'Kode kupon tidak valid.');
+      } else {
+        setAppliedCoupon(data.coupon);
+      }
+    } catch {
+      setCouponError('Gagal memvalidasi kupon.');
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const getPlanBasePrice = (plan: Plan) => {
+    return billingCycle === 'annual' ? (plan.priceAnnual || 0) : plan.priceMonthly;
+  };
+
+  const calculateDiscount = (basePrice: number) => {
+    if (!appliedCoupon) return 0;
+    if (appliedCoupon.discountType === 'percentage') {
+      return Math.round((basePrice * appliedCoupon.discountValue) / 100);
+    }
+    return appliedCoupon.discountValue;
+  };
+
+  const getPlanFinalPrice = (plan: Plan) => {
+    const base = getPlanBasePrice(plan);
+    const disc = calculateDiscount(base);
+    return Math.max(0, base - disc);
+  };
+
   const handleRetry = () => {
     setStep('select_plan');
     setErrorMsg('');
   };
-
-  if (!isOpen) return null;
 
   const selectedPlan = plans.find((p) => p.code === selectedPlanCode);
   // Compute trial expiry once — avoids calling impure Date.now() during JSX render
@@ -284,6 +337,34 @@ export default function SubscriptionPaymentModal({
         {/* Step: Select Plan */}
         {step === 'select_plan' && (
           <>
+            {/* Billing Cycle Toggle */}
+            <div className="flex justify-center mb-1">
+              <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setBillingCycle('monthly')}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
+                    billingCycle === 'monthly'
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-slate-400 hover:text-white bg-transparent'
+                  }`}
+                >
+                  Bayar Bulanan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingCycle('annual')}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
+                    billingCycle === 'annual'
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-slate-400 hover:text-white bg-transparent'
+                  }`}
+                >
+                  Bayar Tahunan
+                </button>
+              </div>
+            </div>
+
             {isLoadingPlans ? (
               <div className="flex items-center justify-center py-12 text-slate-500">
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -336,8 +417,8 @@ export default function SubscriptionPaymentModal({
                         </div>
                         <div className="flex flex-col items-end gap-2 flex-shrink-0">
                           <div className="text-right">
-                            <span className="text-base font-black text-white">{formatRupiah(plan.priceMonthly)}</span>
-                            <span className="text-[9px] text-slate-500 block">/ bulan</span>
+                            <span className="text-base font-black text-white">{formatRupiah(getPlanBasePrice(plan))}</span>
+                            <span className="text-[9px] text-slate-500 block">/ {billingCycle === 'annual' ? 'tahun' : 'bulan'}</span>
                           </div>
                           <div
                             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
@@ -358,6 +439,42 @@ export default function SubscriptionPaymentModal({
               </div>
             )}
 
+            {/* Coupon Code Input */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-850 flex flex-col gap-2">
+              <label className="text-[9px] font-mono text-slate-500 uppercase">KODE KUPON PROMO</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Masukkan kode kupon"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  disabled={isValidatingCoupon || isProcessing}
+                  className="flex-1 px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  disabled={isValidatingCoupon || isProcessing || !couponCode.trim()}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-55 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer border border-slate-700"
+                >
+                  {isValidatingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Terapkan'}
+                </button>
+              </div>
+              {appliedCoupon && (
+                <p className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1.5 mt-0.5">
+                  ✓ Kupon diskon terpasang: Potongan{' '}
+                  {appliedCoupon.discountType === 'percentage'
+                    ? `${appliedCoupon.discountValue}%`
+                    : formatRupiah(appliedCoupon.discountValue)}
+                </p>
+              )}
+              {couponError && (
+                <p className="text-[10px] text-rose-400 font-semibold flex items-center gap-1.5 mt-0.5">
+                  ✗ {couponError}
+                </p>
+              )}
+            </div>
+
             {/* Security note */}
             <div className="flex items-center gap-2 text-[10px] text-slate-500">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500/70 flex-shrink-0" />
@@ -368,10 +485,17 @@ export default function SubscriptionPaymentModal({
             <div className="flex flex-col gap-2.5 pt-1 border-t border-slate-800/60">
               <div className="flex justify-between items-center text-xs mb-1">
                 <span className="text-slate-400">Total yang perlu dibayar:</span>
-                <span className="text-white font-black text-base">
-                  {selectedPlan ? formatRupiah(selectedPlan.priceMonthly) : '-'}
-                  <span className="text-slate-500 text-[10px] font-normal"> /bulan</span>
-                </span>
+                <div className="text-right">
+                  {appliedCoupon && selectedPlan && (
+                    <span className="text-slate-500 text-[10px] line-through mr-2">
+                      {formatRupiah(getPlanBasePrice(selectedPlan))}
+                    </span>
+                  )}
+                  <span className="text-white font-black text-base">
+                    {selectedPlan ? formatRupiah(getPlanFinalPrice(selectedPlan)) : '-'}
+                    <span className="text-slate-500 text-[10px] font-normal"> / {billingCycle === 'annual' ? 'tahun' : 'bulan'}</span>
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
@@ -392,7 +516,7 @@ export default function SubscriptionPaymentModal({
                 ) : (
                   <>
                     <CreditCard className="w-4 h-4" />
-                    <span>Bayar Sekarang — {selectedPlan ? formatRupiah(selectedPlan.priceMonthly) : '...'}</span>
+                    <span>Bayar Sekarang — {selectedPlan ? formatRupiah(getPlanFinalPrice(selectedPlan)) : '...'}</span>
                   </>
                 )}
               </button>

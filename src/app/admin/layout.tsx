@@ -21,6 +21,7 @@ import {
   Clock,
   CreditCard,
   AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../../components/AuthProvider';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
@@ -120,6 +121,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/insights', label: 'AI Insights', icon: Brain },
     { href: '/admin/settings', label: 'Pengaturan Bisnis', icon: Settings },
   ];
+
+  if (isDeveloperAccount) {
+    navItems.push({ href: '/admin/platform-owner', label: 'Portal Pemilik', icon: ShieldCheck });
+  }
 
   if (currentRole === 'cashier') {
     navItems = [
