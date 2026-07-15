@@ -179,6 +179,7 @@ export async function POST(request: Request) {
       provider_reference_id: midtransOrderId,
       amount: grossAmount,
       billing_cycle: billingCycle,
+      coupon_code: couponCode || null,
       status: 'pending',
       snap_token: snap.token,
       snap_redirect_url: snap.redirect_url || null,

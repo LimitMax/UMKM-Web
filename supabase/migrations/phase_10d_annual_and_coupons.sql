@@ -8,9 +8,11 @@ UPDATE plans SET price_annual = 0 WHERE code = 'free';
 UPDATE plans SET price_annual = 990000 WHERE code = 'starter';
 UPDATE plans SET price_annual = 1990000 WHERE code = 'pro';
 
--- 2. Add billing_cycle to subscriptions and payments
+-- 2. Add billing_cycle and coupon_code to subscriptions and payments
 ALTER TABLE subscription_payments ADD COLUMN IF NOT EXISTS billing_cycle VARCHAR(50) DEFAULT 'monthly';
+ALTER TABLE subscription_payments ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(100);
 ALTER TABLE business_subscriptions ADD COLUMN IF NOT EXISTS billing_cycle VARCHAR(50) DEFAULT 'monthly';
+ALTER TABLE business_subscriptions ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(100);
 
 -- 3. Create coupons table
 CREATE TABLE IF NOT EXISTS coupons (

@@ -18,6 +18,7 @@ import {
   Building2,
   Phone,
   MapPin,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../components/AuthProvider';
 import { supabaseClient } from '../../lib/supabase/client';
@@ -49,6 +50,13 @@ export default function RegisterPage() {
   const [customBusinessType, setCustomBusinessType] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  
+  // Billing and Promo states
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountType: string; discountValue: number } | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
   
   // System states
   const [isLoading, setIsLoading] = useState(false);
@@ -84,6 +92,60 @@ export default function RegisterPage() {
     }
     return generateBusinessSlug(name);
   };
+
+  const handleApplyCoupon = async () => {
+    setCouponError('');
+    setAppliedCoupon(null);
+    if (!couponCode.trim()) return;
+
+    setIsValidatingCoupon(true);
+    try {
+      const res = await fetch('/api/public/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: couponCode.trim().toUpperCase() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setCouponError(data.message || 'Kode kupon tidak valid.');
+      } else {
+        setAppliedCoupon(data.coupon);
+      }
+    } catch {
+      setCouponError('Gagal memvalidasi kupon.');
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const getPlanBasePrice = (code: 'starter' | 'pro') => {
+    if (code === 'starter') {
+      return billingCycle === 'annual' ? 990000 : 99000;
+    }
+    return billingCycle === 'annual' ? 1990000 : 199000;
+  };
+
+  const calculateDiscount = (basePrice: number) => {
+    if (!appliedCoupon) return 0;
+    if (appliedCoupon.discountType === 'percentage') {
+      return Math.round((basePrice * appliedCoupon.discountValue) / 100);
+    }
+    return appliedCoupon.discountValue;
+  };
+
+  const getPlanFinalPrice = (code: 'starter' | 'pro') => {
+    const base = getPlanBasePrice(code);
+    const disc = calculateDiscount(base);
+    return Math.max(0, base - disc);
+  };
+
+  const formatRupiah = (amount: number) =>
+    new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(amount);
 
   const nextStep = () => {
     setErrorMsg('');
@@ -213,6 +275,8 @@ export default function RegisterPage() {
               plan_id: planData.id,
               owner_email: normalizedEmail,
               status: subscriptionStatus,
+              billing_cycle: billingCycle,
+              coupon_code: appliedCoupon ? appliedCoupon.code : null,
               started_at: new Date().toISOString(),
               trial_ends_at: trialEndsAtIso,
               current_period_start: new Date().toISOString(),
@@ -358,9 +422,40 @@ export default function RegisterPage() {
                 </div>
               </div>
 
+              {/* Billing Cycle Toggle */}
+              <div className="flex justify-center mb-1">
+                <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle('monthly')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
+                      billingCycle === 'monthly'
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-slate-400 hover:text-white bg-transparent'
+                    }`}
+                  >
+                    Bayar Bulanan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle('annual')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
+                      billingCycle === 'annual'
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-slate-400 hover:text-white bg-transparent'
+                    }`}
+                  >
+                    Bayar Tahunan (Diskon 2 Bulan)
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {packagePlans.map((plan) => {
                   const isActive = planCode === plan.code;
+                  const originalPrice = getPlanBasePrice(plan.code);
+                  const finalPrice = getPlanFinalPrice(plan.code);
+                  const hasDiscount = appliedCoupon !== null;
                   return (
                     <div
                       key={plan.code}
@@ -397,8 +492,13 @@ export default function RegisterPage() {
                         </div>
 
                         <div className="border-t border-b border-slate-800/80 py-2.5 flex items-baseline gap-1">
-                          <span className="text-xl font-black text-white">{plan.price}</span>
-                          <span className="text-[10px] text-slate-500">{plan.period}</span>
+                          {hasDiscount && (
+                            <span className="text-xs text-slate-500 line-through mr-1">
+                              {formatRupiah(originalPrice)}
+                            </span>
+                          )}
+                          <span className="text-xl font-black text-white">{formatRupiah(finalPrice)}</span>
+                          <span className="text-[10px] text-slate-500">/ {billingCycle === 'annual' ? 'tahun' : 'bulan'}</span>
                         </div>
 
                         <ul className="space-y-2">
@@ -420,6 +520,42 @@ export default function RegisterPage() {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Coupon Code Input */}
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col gap-2.5">
+                <label className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">KODE KUPON PROMO</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Masukkan kode kupon jika ada"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    disabled={isValidatingCoupon}
+                    className="flex-1 px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-655 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={isValidatingCoupon || !couponCode.trim()}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-55 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer border border-slate-700 flex items-center justify-center min-w-[90px]"
+                  >
+                    {isValidatingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Terapkan'}
+                  </button>
+                </div>
+                {appliedCoupon && (
+                  <p className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1.5 mt-0.5">
+                    ✓ Kupon diskon terpasang: Potongan{' '}
+                    {appliedCoupon.discountType === 'percentage'
+                      ? `${appliedCoupon.discountValue}%`
+                      : formatRupiah(appliedCoupon.discountValue)}
+                  </p>
+                )}
+                {couponError && (
+                  <p className="text-[10px] text-rose-400 font-semibold flex items-center gap-1.5 mt-0.5">
+                    ✗ {couponError}
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end pt-3 border-t border-slate-800/60">
