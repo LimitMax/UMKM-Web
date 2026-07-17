@@ -162,13 +162,18 @@ MIDTRANS_CORE_API_BASE_URL=https://api.sandbox.midtrans.com
 ```
 
 ### 3. Setup Database Schema & Migrations
-You can apply all tables, triggers, and RLS policies by running the included migration runner script:
+Apply the SQL files inside `supabase/migrations/` in chronological order:
+1. `20260716000001_initial_schema.sql` - Core products, orders, profile, and pricing schema tables.
+2. `20260716000002_rls_policies.sql` - Enable RLS security rules on all tenant layers.
+3. `20260716000003_seed_data.sql` - Seed starter subscription plans.
+4. `20260717000004_business_vouchers.sql` - Create vouchers schemas.
+5. `20260717000005_business_vouchers_rls.sql` - Enable RLS vouchers policies.
 
-```bash
-# Set your postgres db password in console when prompted or via environment
-node run_migration.js
-```
-Alternatively, apply the SQL files in `supabase/migrations/` in chronological order via your Supabase SQL editor interface.
+You can apply these files via your Supabase SQL Editor web console or using the Supabase CLI (`supabase db push`).
+
+> [!NOTE]
+> If you need to wipe transactional data and reset the UAT workspace during testing, run the helper SQL script located at [reset_database.sql](file:///d:/Riset/UMKM%20Web/supabase/reset_database.sql) in your Supabase SQL Editor.
+
 
 ### 4. Run the Development Server
 ```bash
