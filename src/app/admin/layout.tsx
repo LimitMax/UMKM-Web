@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -21,7 +21,7 @@ import {
   Clock,
   CreditCard,
   AlertTriangle,
-  ShieldCheck,
+  Globe,
 } from 'lucide-react';
 import { useAuth } from '../../components/AuthProvider';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
@@ -36,21 +36,49 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
+  const handleLogout = useCallback(async () => {
+    await signOut();
+    router.push('/login');
+  }, [signOut, router]);
+
   useEffect(() => {
+    console.log('[AdminLayout] useEffect checking redirect: ' + JSON.stringify({
+      pathname,
+      authLoading,
+      hasUser: !!supabaseUser,
+      hasProfile: !!profile,
+      role: profile?.role,
+      bizStatus: currentBusiness?.status,
+    }));
     if (!authLoading) {
-      if (!supabaseUser || !profile) {
+      if (!supabaseUser) {
+        console.log('[AdminLayout] Redirecting to login because user is missing');
         setTimeout(() => {
           setIsRedirecting(true);
           router.push('/login');
         }, 0);
+      } else if (!profile) {
+        console.log('[AdminLayout] Redirecting to onboarding/register because profile is missing');
+        setTimeout(() => {
+          setIsRedirecting(true);
+          router.push('/register');
+        }, 0);
+      } else if (currentBusiness && currentBusiness.status === 'archived') {
+        console.log('[AdminLayout] Redirecting to login because business is archived');
+        setTimeout(() => {
+          setIsRedirecting(true);
+          handleLogout();
+        }, 0);
+      } else if (currentBusiness && currentBusiness.status === 'suspended') {
+        console.log('[AdminLayout] Redirecting to suspended page');
+        setTimeout(() => {
+          setIsRedirecting(true);
+          router.push('/suspended');
+        }, 0);
       }
     }
-  }, [supabaseUser, profile, authLoading, router]);
+  }, [supabaseUser, profile, authLoading, router, currentBusiness, handleLogout, pathname]);
 
-  const handleLogout = async () => {
-    await signOut();
-    router.push('/login');
-  };
 
   if (authLoading || isRedirecting) {
     return (
@@ -60,7 +88,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // Double check: if user is logged in as cashier, block access to administrative layout children
+
+  // Block: cashier trying to access admin layout
   if (profile && profile.role === 'cashier') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
@@ -91,15 +120,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  const currentRole = profile?.role || 'admin';
+  // Block: platform_owner must NOT access business admin routes
+  if (profile && profile.role === 'platform_owner') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+          <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-white mb-2 font-sans">403 — Akses Ditolak</h1>
+          <p className="text-xs text-slate-400 mb-6 leading-relaxed font-sans">
+            Akun <span className="font-bold text-violet-400">Platform Owner</span> tidak dapat mengakses
+            Dashboard Bisnis. Area ini hanya untuk Owner/Admin bisnis.
+          </p>
+          <div className="flex flex-col gap-3">
+            <Link
+              href="/platform/dashboard"
+              className="w-full py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-all text-xs font-sans flex items-center justify-center gap-2"
+            >
+              <Globe className="w-4 h-4" />
+              Ke Platform Console
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold rounded-xl transition-all text-xs border border-slate-700 font-sans"
+            >
+              Keluar Akun
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const DEVELOPER_EMAILS = (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || '')
-    .split(',')
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-  const isDeveloperAccount = Boolean(
-    supabaseUser?.email && DEVELOPER_EMAILS.includes(supabaseUser.email.toLowerCase())
-  );
+  const currentRole = profile?.role || 'admin';
+  const isPlatformOwner = profile?.role === 'platform_owner' || currentBusiness?.id === 'biz-platform-owner';
 
   // --- Subscription Access State ---
   const subState = getSubscriptionAccessState({
@@ -110,7 +165,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Feature lock: locked AND not on settings page (so they can always pay from settings)
   const isSettingsPage = pathname === '/admin/settings';
-  const showFeatureLock = subState.isLocked && !isSettingsPage && !isDeveloperAccount;
+  const showFeatureLock = subState.isLocked && !isSettingsPage && !isPlatformOwner;
 
   let navItems = [
     { href: '/admin', label: 'Ringkasan', icon: BarChart3 },
@@ -122,9 +177,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/settings', label: 'Pengaturan Bisnis', icon: Settings },
   ];
 
-  if (isDeveloperAccount) {
-    navItems.push({ href: '/admin/platform-owner', label: 'Portal Pemilik', icon: ShieldCheck });
-  }
+
 
   if (currentRole === 'cashier') {
     navItems = [
@@ -182,7 +235,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           {/* Subscription status pill in sidebar */}
-          {subState.isTrialing && !subState.isTrialExpired && !isDeveloperAccount && (
+          {subState.isTrialing && !subState.isTrialExpired && !isPlatformOwner && (
             <div className="px-3 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
               <div>
@@ -194,7 +247,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           )}
 
-          {subState.isLocked && !isDeveloperAccount && (
+          {subState.isLocked && !isPlatformOwner && (
             <div className="px-3 py-2 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2">
               <Lock className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
               <div>
@@ -209,7 +262,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
-              const isLockedItem = subState.isLocked && item.href !== '/admin/settings' && !isDeveloperAccount;
+              const isLockedItem = subState.isLocked && item.href !== '/admin/settings' && !isPlatformOwner;
               return (
                 <Link
                   key={item.href}
@@ -278,7 +331,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex-1 overflow-x-hidden flex flex-col">
 
         {/* ── Trial Countdown Banner ── */}
-        {subState.isTrialing && !subState.isTrialExpired && subState.daysRemaining !== null && !isDeveloperAccount && (
+        {subState.isTrialing && !subState.isTrialExpired && subState.daysRemaining !== null && !isPlatformOwner && (
           <div className="bg-indigo-900/40 border-b border-indigo-500/20 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 text-indigo-200">
               <Clock className="w-4 h-4 text-indigo-400 flex-shrink-0" />
@@ -304,7 +357,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
 
         {/* ── Trial Expired / Past Due Banner ── */}
-        {subState.isLocked && !isDeveloperAccount && (
+        {subState.isLocked && !isPlatformOwner && (
           <div className="bg-rose-900/30 border-b border-rose-500/25 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 text-rose-200">
               <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />

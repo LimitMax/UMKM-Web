@@ -34,13 +34,19 @@ export async function GET(
       delivery_settings,
       eta_settings,
       plan_code,
-      subscription_status
+      subscription_status,
+      midtrans_client_key,
+      status
     `)
     .eq('slug', slug)
     .maybeSingle();
 
   if (error || !data) {
     return NextResponse.json({ message: 'Bisnis tidak ditemukan.' }, { status: 404 });
+  }
+
+  if (data.status === 'suspended' || data.status === 'archived') {
+    return NextResponse.json({ message: 'Toko sedang tidak tersedia.' }, { status: 403 });
   }
 
   if (data.public_order_enabled === false) {

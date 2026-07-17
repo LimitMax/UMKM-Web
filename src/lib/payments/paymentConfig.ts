@@ -1,4 +1,9 @@
-// src/lib/payments/paymentConfig.ts
+import {
+  MIDTRANS_PRODUCTION_SNAP_URL,
+  MIDTRANS_SANDBOX_SNAP_URL,
+  MIDTRANS_PRODUCTION_CORE_URL,
+  MIDTRANS_SANDBOX_CORE_URL
+} from '@/config/payment';
 
 const isServer = typeof window === 'undefined';
 
@@ -20,11 +25,11 @@ export const paymentConfig: PaymentConfig = {
   NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,
   MIDTRANS_SERVER_KEY: isServer ? process.env.MIDTRANS_SERVER_KEY : undefined,
   MIDTRANS_SNAP_BASE_URL: process.env.MIDTRANS_IS_PRODUCTION === 'true'
-    ? 'https://app.midtrans.com'
-    : 'https://app.sandbox.midtrans.com',
+    ? MIDTRANS_PRODUCTION_SNAP_URL
+    : MIDTRANS_SANDBOX_SNAP_URL,
   MIDTRANS_CORE_API_BASE_URL: process.env.MIDTRANS_IS_PRODUCTION === 'true'
-    ? 'https://api.midtrans.com'
-    : 'https://api.sandbox.midtrans.com',
+    ? MIDTRANS_PRODUCTION_CORE_URL
+    : MIDTRANS_SANDBOX_CORE_URL,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   MIDTRANS_WEBHOOK_URL: process.env.MIDTRANS_WEBHOOK_URL,
   ENABLE_PRODUCTION_PAYMENTS: process.env.ENABLE_PRODUCTION_PAYMENTS === 'true',

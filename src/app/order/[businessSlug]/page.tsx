@@ -22,7 +22,7 @@ import {
 import { productService } from '../../../services/productService';
 import { orderService } from '../../../services/orderService';
 import { realtimeService } from '../../../lib/services/realtimeService';
-import DemoRoleSwitcher from '../../../components/DemoRoleSwitcher';
+
 import { isSupabaseConfigured } from '../../../lib/supabase/client';
 import { Product, OrderItem, PaymentMethod, BusinessProfile, FulfillmentType } from '../../../types';
 import { formatRupiah } from '../../../utils/format';
@@ -148,6 +148,7 @@ export default function CustomerOrderPage() {
           etaSettings: business.eta_settings || {},
           planCode: business.plan_code || 'free',
           subscriptionStatus: business.subscription_status || 'active',
+          midtransClientKey: business.midtrans_client_key || '',
         } as BusinessProfile);
         await loadProducts(business.id);
 
@@ -258,11 +259,24 @@ export default function CustomerOrderPage() {
     return 'Bayar melalui Midtrans. Pilih QRIS, VA, e-wallet, atau metode lain di halaman pembayaran.';
   };
 
-  const loadMidtransSnapScript = (): Promise<void> => {
+  const loadMidtransSnapScript = (customClientKey?: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (typeof window === 'undefined') {
         reject(new Error('Snap hanya tersedia di browser.'));
         return;
+      }
+
+      const targetKey = customClientKey || process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
+      if (!targetKey) {
+        reject(new Error('Client key Midtrans belum dikonfigurasi.'));
+        return;
+      }
+
+      // If a different script is already loaded (different merchant key), remove and reload
+      const existingScript = document.getElementById('midtrans-snap-script') as HTMLScriptElement | null;
+      if (existingScript && existingScript.getAttribute('data-client-key') !== targetKey) {
+        existingScript.remove();
+        delete window.snap;
       }
 
       if (window.snap) {
@@ -270,16 +284,10 @@ export default function CustomerOrderPage() {
         return;
       }
 
-      const existingScript = document.getElementById('midtrans-snap-script') as HTMLScriptElement | null;
-      if (existingScript) {
-        existingScript.addEventListener('load', () => resolve(), { once: true });
-        existingScript.addEventListener('error', () => reject(new Error('Gagal memuat Snap Midtrans.')), { once: true });
-        return;
-      }
-
-      const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
-      if (!clientKey) {
-        reject(new Error('Client key Midtrans belum dikonfigurasi.'));
+      const staleScript = document.getElementById('midtrans-snap-script') as HTMLScriptElement | null;
+      if (staleScript) {
+        staleScript.addEventListener('load', () => resolve(), { once: true });
+        staleScript.addEventListener('error', () => reject(new Error('Gagal memuat Snap Midtrans.')), { once: true });
         return;
       }
 
@@ -287,7 +295,7 @@ export default function CustomerOrderPage() {
       script.id = 'midtrans-snap-script';
       script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
       script.async = true;
-      script.setAttribute('data-client-key', clientKey);
+      script.setAttribute('data-client-key', targetKey);
       script.onload = () => resolve();
       script.onerror = () => reject(new Error('Gagal memuat Snap Midtrans.'));
       document.body.appendChild(script);
@@ -298,7 +306,7 @@ export default function CustomerOrderPage() {
     const goToSuccess = () => router.push(`/order/success/${payment.orderId}`);
 
     try {
-      await loadMidtransSnapScript();
+      await loadMidtransSnapScript(businessProfile?.midtransClientKey || undefined);
 
       if (!window.snap) {
         throw new Error('Snap Midtrans tidak tersedia.');
@@ -610,7 +618,6 @@ export default function CustomerOrderPage() {
           </div>
           
           <div className="flex items-center gap-3">
-            <DemoRoleSwitcher />
             <button 
               onClick={() => setIsCartOpen(true)}
               className="relative p-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold flex items-center gap-2 hover:bg-emerald-400 transition-all shadow-md shadow-emerald-500/10"

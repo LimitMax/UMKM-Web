@@ -34,7 +34,7 @@ interface CouponRow {
 }
 
 export default function PlatformOwnerPage() {
-  const { user: supabaseUser, loading: authLoading } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   
   // States
   const [plans, setPlans] = useState<PlanRow[]>([]);
@@ -56,13 +56,7 @@ export default function PlatformOwnerPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const DEVELOPER_EMAILS = (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || '')
-    .split(',')
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-  const isDeveloperAccount = Boolean(
-    supabaseUser?.email && DEVELOPER_EMAILS.includes(supabaseUser.email.toLowerCase())
-  );
+  const isDeveloperAccount = profile?.role === 'platform_owner' || profile?.business_id === 'biz-platform-owner';
 
   // Load plans & coupons
   const loadData = useCallback(async () => {

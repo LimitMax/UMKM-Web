@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
     const { data: payment, error } = await supabaseAdmin
       .from('payments')
-      .select('id, provider_reference_id')
+      .select('id, provider_reference_id, business_id')
       .eq('order_id', orderId)
       .in('provider', ['midtrans', 'midtrans_snap_sandbox'])
       .order('created_at', { ascending: false })
@@ -69,7 +69,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Pembayaran Midtrans tidak ditemukan.' }, { status: 404 });
     }
 
-    const statusPayload = await getMidtransTransactionStatus(payment.provider_reference_id);
+    // Fetch merchant-specific server key if configured
+    let customServerKey: string | undefined = undefined;
+    if (payment.business_id) {
+      const { data: biz } = await supabaseAdmin
+        .from('businesses')
+        .select('midtrans_server_key')
+        .eq('id', payment.business_id)
+        .maybeSingle();
+      if (biz?.midtrans_server_key) {
+        customServerKey = biz.midtrans_server_key;
+      }
+    }
+
+    const statusPayload = await getMidtransTransactionStatus(payment.provider_reference_id, customServerKey);
     const result = await processMidtransPaymentNotification(statusPayload, 'sync');
 
     return NextResponse.json({

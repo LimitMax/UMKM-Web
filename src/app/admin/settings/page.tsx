@@ -17,11 +17,8 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
-  Package,
   ShoppingCart,
   Award,
-  DollarSign,
-  ListOrdered,
   ChevronRight,
   Sparkles,
   Clock,
@@ -31,9 +28,7 @@ import {
   User,
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
-import { demoService, DemoStats, GenerateResult } from '../../../services/demoService';
 import { businessService, DEFAULT_DELIVERY_SETTINGS, DEFAULT_ETA_SETTINGS } from '../../../services/businessService';
-import { productService } from '../../../services/productService';
 import { useAuth } from '../../../components/AuthProvider';
 import { formatRupiah } from '../../../utils/format';
 import type { BusinessProfile, EtaDisplayMode, Plan } from '../../../types';
@@ -85,21 +80,12 @@ const BUSINESS_CATEGORY_OPTIONS = [
   'Lainnya',
 ];
 
-const DEVELOPER_EMAILS = (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || '')
-  .split(',')
-  .map((email) => email.trim().toLowerCase())
-  .filter(Boolean);
-
 export default function AdminSettingsPage() {
   // Auth & data source mode
   const { isSupabaseConfigured, user: supabaseUser, currentBusiness, refreshAuth } = useAuth();
   const isSupabaseActive = isSupabaseConfigured && !!supabaseUser;
-  const isDeveloperAccount = Boolean(
-    supabaseUser?.email && DEVELOPER_EMAILS.includes(supabaseUser.email.toLowerCase())
-  );
 
-  // Tab state: 'profile' | 'demo' | 'payment' | 'cashier'
-  const [activeTab, setActiveTab] = useState<'profile' | 'demo' | 'payment' | 'cashier'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'payment' | 'cashier'>('profile');
 
   // Business Profile states
   const [businessName, setBusinessName] = useState(() => {
@@ -372,17 +358,9 @@ export default function AdminSettingsPage() {
     });
   };
 
-  // Demo stats states
-  const [stats, setStats] = useState<DemoStats | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return demoService.getStats();
-  });
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const [isMigrationLoading, setIsMigrationLoading] = useState(false);
 
   // Payment integration health checks state
   const [healthData, setHealthData] = useState<PaymentHealthData | null>(null);
@@ -462,11 +440,7 @@ export default function AdminSettingsPage() {
 
 
 
-  // Load business profile and stats
-  const loadStats = useCallback(() => {
-    const s = demoService.getStats();
-    setStats(s);
-  }, []);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -478,14 +452,7 @@ export default function AdminSettingsPage() {
     }
   }, [businessSlug]);
 
-  useEffect(() => {
-    if (activeTab === 'demo' && !isDeveloperAccount) {
-      const timer = setTimeout(() => {
-        setActiveTab('profile');
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [activeTab, isDeveloperAccount]);
+
 
   const ensureUniqueSlug = async (name: string, currentId: string, existingSlug?: string) => {
     const preferred = slugifyBusinessName(existingSlug || name) || 'bisnis';
@@ -594,11 +561,6 @@ export default function AdminSettingsPage() {
     return () => clearTimeout(timer);
   }, [currentBusiness]);
 
-  const handleRefreshStats = () => {
-    setIsRefreshing(true);
-    loadStats();
-    setTimeout(() => setIsRefreshing(false), 500);
-  };
 
   const handleLogoFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -616,69 +578,7 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const runAction = (action: () => void | GenerateResult, successMsg: string) => {
-    setIsActionLoading(true);
-    setConfirm(null);
-    try {
-      action();
-      loadStats();
-      showToast('success', successMsg);
-    } catch (err) {
-      showToast('error', err instanceof Error ? err.message : 'Terjadi kesalahan tidak diketahui.');
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
 
-  // ── Supabase Migration Actions ────────────────────────────────────────────
-
-  const handleImportBusinessProfile = async () => {
-    if (!isSupabaseActive) {
-      showToast('error', 'Fitur migrasi hanya tersedia saat login Supabase aktif.');
-      return;
-    }
-    setIsMigrationLoading(true);
-    try {
-      const localProfile = businessService.getProfileSync();
-      const imported = await businessService.updateProfile(localProfile, 'supabase');
-      if (imported) {
-        showToast('success', 'Profil bisnis demo berhasil diimpor ke Supabase!');
-      }
-    } catch (err) {
-      showToast('error', `Gagal mengimpor profil bisnis: ${err instanceof Error ? err.message : 'Kesalahan tidak diketahui'}`);
-    } finally {
-      setIsMigrationLoading(false);
-    }
-  };
-
-  const handleImportProducts = async () => {
-    if (!isSupabaseActive) {
-      showToast('error', 'Fitur migrasi hanya tersedia saat login Supabase aktif.');
-      return;
-    }
-    setIsMigrationLoading(true);
-    try {
-      const localProducts = await productService.getProducts('localStorage');
-      const supabaseProducts = await productService.getProducts('supabase');
-      const existingNames = new Set(supabaseProducts.map(p => p.name));
-      const toImport = localProducts.filter(p => !existingNames.has(p.name));
-      if (toImport.length === 0) {
-        showToast('success', 'Semua produk sudah ada di Supabase — tidak ada yang perlu diimpor.');
-        return;
-      }
-      let importedCount = 0;
-      for (const prod of toImport) {
-        const { id: _id, ...productData } = prod;
-        await productService.createProduct(productData, 'supabase');
-        importedCount++;
-      }
-      showToast('success', `${importedCount} produk berhasil diimpor ke Supabase! ${localProducts.length - toImport.length} produk sudah ada (dilewati).`);
-    } catch (err) {
-      showToast('error', `Gagal mengimpor produk: ${err instanceof Error ? err.message : 'Kesalahan tidak diketahui'}`);
-    } finally {
-      setIsMigrationLoading(false);
-    }
-  };
 
   // ── Business Settings Actions ────────────────────────────────────────────
 
@@ -887,108 +787,7 @@ export default function AdminSettingsPage() {
     }
   };
 
-  // ── Demo Action Handlers ────────────────────────────────────────────────
 
-  const handleResetAll = () => {
-    setConfirm({
-      title: 'Reset Semua Data',
-      description:
-        'Anda akan menghapus SELURUH pesanan dan mengembalikan katalog produk ke kondisi awal (7 produk seed). Tindakan ini TIDAK DAPAT dibatalkan.',
-      consequences: [
-        'Seluruh riwayat pesanan dihapus secara permanen',
-        'Semua statistik dashboard kembali ke nol',
-        'Katalog produk dikembalikan ke 7 produk seed',
-        'Stok semua produk dikembalikan ke nilai awal',
-        'Nomor antrean direset dari A001',
-      ],
-      confirmLabel: 'Ya, Reset Semua Data',
-      variant: 'danger',
-      onConfirm: () =>
-        runAction(() => {
-          demoService.resetAll();
-        }, 'Semua data berhasil direset ke kondisi awal.'),
-    });
-  };
-
-  const handleClearOrders = () => {
-    setConfirm({
-      title: 'Bersihkan Semua Pesanan',
-      description:
-        'Seluruh riwayat pesanan akan dihapus. Data katalog produk dan stok tidak akan terpengaruh.',
-      consequences: [
-        'Seluruh pesanan (aktif, selesai, batal) dihapus',
-        'Statistik dashboard omzet menjadi nol',
-        'Antrean kasir dikosongkan',
-        'Nomor antrean direset dari A001',
-      ],
-      confirmLabel: 'Ya, Bersihkan Pesanan',
-      variant: 'warning',
-      onConfirm: () =>
-        runAction(() => {
-          demoService.clearOrders();
-        }, 'Semua pesanan berhasil dibersihkan.'),
-    });
-  };
-
-  const handleRestoreProducts = () => {
-    setConfirm({
-      title: 'Pulihkan Katalog Produk',
-      description:
-        'Katalog produk akan dikembalikan ke 7 produk seed awal. Riwayat pesanan tidak akan terpengaruh, namun referensi produk yang sudah dihapus mungkin tidak sinkron.',
-      consequences: [
-        'Produk yang sudah ditambahkan secara manual akan hilang',
-        'Semua stok produk dikembalikan ke nilai seed',
-        'Perubahan harga/nama yang sudah dilakukan akan hilang',
-      ],
-      confirmLabel: 'Ya, Pulihkan Produk',
-      variant: 'info',
-      onConfirm: () =>
-        runAction(() => {
-          demoService.restoreProducts();
-        }, '7 produk seed berhasil dipulihkan ke kondisi awal.'),
-    });
-  };
-
-  const handleGenerateSampleOrders = () => {
-    setConfirm({
-      title: 'Buat Pesanan Contoh',
-      description:
-        'Akan dibuat 8 pesanan demo dengan berbagai status (selesai, aktif, menunggu, batal). Semua data saat ini AKAN DITIMPA untuk memastikan konsistensi.',
-      consequences: [
-        '8 pesanan baru dibuat untuk hari ini dengan perhitungan pajak & layanan aktif (jika diaktifkan)',
-        'Katalog produk dikembalikan ke 7 produk seed',
-        'Stok produk dikurangi sesuai pesanan aktif',
-        'Dashboard, kasir, dan transaksi terisi data contoh yang sinkron',
-      ],
-      confirmLabel: 'Ya, Generate Pesanan Demo',
-      variant: 'success',
-      onConfirm: () =>
-        runAction(() => {
-          const result = demoService.generateSampleOrders();
-          return result;
-        }, '8 pesanan demo berhasil dibuat! Dashboard, kasir, dan stok kini terisi data contoh.'),
-    });
-  };
-
-  const handleSetLowStock = () => {
-    setConfirm({
-      title: 'Simulasi Stok Kritis',
-      description:
-        'Akan mengatur 3 produk ke stok sangat sedikit (2–4 unit) untuk menguji tampilan peringatan stok di halaman dashboard dan stok.',
-      consequences: [
-        'Es Kopi Susu Gula Aren → 4 unit',
-        'Roti Bakar Cokelat Keju → 3 unit',
-        'Paket Kenyang A → 2 unit',
-        'Peringatan stok kritis akan muncul di dashboard admin',
-      ],
-      confirmLabel: 'Ya, Simulasikan Stok Kritis',
-      variant: 'warning',
-      onConfirm: () =>
-        runAction(() => {
-          demoService.setLowStockDemo();
-        }, 'Simulasi stok kritis berhasil. Cek halaman Kelola Stok dan Ringkasan Admin.'),
-    });
-  };
 
   // ── Variant Styling Helpers ──────────────────────────────────────────────
 
@@ -1090,19 +889,7 @@ export default function AdminSettingsPage() {
           <QrCode className="w-4.5 h-4.5" />
           <span>Profil Toko &amp; QR Menu</span>
         </button>
-        {isDeveloperAccount && (
-          <button
-            onClick={() => setActiveTab('demo')}
-            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all relative ${
-              activeTab === 'demo'
-                ? 'text-emerald-400 border-b-2 border-emerald-500'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Zap className="w-4.5 h-4.5" />
-            <span>Alat Demo &amp; Developer</span>
-          </button>
-        )}
+
         <button
           onClick={() => {
             setActiveTab('payment');
@@ -1976,366 +1763,7 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      {/* ── Tab Content: DEVELOPER DEMO TOOLS ────────────────────────────────── */}
-      {activeTab === 'demo' && isDeveloperAccount && (
-        <div className="flex flex-col gap-6 animate-in fade-in duration-100">
-          
-          {/* Stats Summary */}
-          <div className="bg-slate-900 border border-slate-850 rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold">
-                Status Data Saat Ini
-              </span>
-              <button
-                onClick={handleRefreshStats}
-                className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-emerald-400 transition-all"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>Perbarui</span>
-              </button>
-            </div>
 
-            {stats ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {/* Products */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
-                      <Package className="w-3.5 h-3.5 text-slate-400" />
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono">Produk</span>
-                  </div>
-                  <span className="text-xl font-black text-white">{stats.totalProducts}</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 font-bold">
-                      {stats.activeProducts} aktif
-                    </span>
-                    {stats.lowStockCount > 0 && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/15 font-bold">
-                        {stats.lowStockCount} menipis
-                      </span>
-                    )}
-                    {stats.outOfStockCount > 0 && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/15 font-bold">
-                        {stats.outOfStockCount} habis
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Orders */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
-                      <ShoppingCart className="w-3.5 h-3.5 text-slate-400" />
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono">Total Pesanan</span>
-                  </div>
-                  <span className="text-xl font-black text-white">{stats.totalOrders}</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-bold">
-                      {stats.todayOrdersCount} hari ini
-                    </span>
-                  </div>
-                </div>
-
-                {/* Active Queue */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
-                      <ListOrdered className="w-3.5 h-3.5 text-slate-400" />
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono">Antrean Aktif</span>
-                  </div>
-                  <span className="text-xl font-black text-white">{stats.activeOrdersCount}</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 font-bold">
-                      {stats.completedOrdersCount} selesai
-                    </span>
-                    {stats.cancelledOrdersCount > 0 && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 border border-slate-700 font-bold">
-                        {stats.cancelledOrdersCount} batal
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Revenue */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                      <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono">Omzet Hari Ini</span>
-                  </div>
-                  <span className="text-xl font-black text-emerald-400">
-                    {stats.todayRevenue > 0 ? formatRupiah(stats.todayRevenue) : '—'}
-                  </span>
-                  <span className="text-[9px] text-slate-655 mt-1">pesanan lunas + selesai</span>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-16 rounded-xl bg-slate-800 animate-pulse" />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Action Zone: Danger */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-slate-850" />
-              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest px-3">
-                Aksi Berbahaya
-              </span>
-              <div className="h-px flex-1 bg-slate-850" />
-            </div>
-            <p className="text-[11px] text-slate-500 text-center">
-              Tindakan di bawah bersifat permanen dan tidak dapat dibatalkan.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Reset All */}
-              <div className="bg-rose-950/20 border border-rose-500/20 rounded-2xl p-5 flex flex-col gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center flex-shrink-0">
-                    <RotateCcw className="w-4.5 h-4.5 text-rose-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Reset Semua Data</h3>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      Hapus seluruh pesanan dan kembalikan 7 produk seed ke kondisi awal. Cocok untuk memulai demo dari awal.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleResetAll}
-                  disabled={isActionLoading}
-                  className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all flex items-center justify-center gap-2"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  Reset Semua Data
-                </button>
-              </div>
-
-              {/* Clear Orders */}
-              <div className="bg-amber-950/10 border border-amber-500/20 rounded-2xl p-5 flex flex-col gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                    <Trash2 className="w-4.5 h-4.5 text-amber-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Bersihkan Semua Pesanan</h3>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      Hapus seluruh riwayat pesanan dan antrean kasir. Katalog produk dan stok tidak terpengaruh.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleClearOrders}
-                  disabled={isActionLoading}
-                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-2"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Bersihkan Pesanan</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Zone: Generate */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-slate-850" />
-              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest px-3">
-                Generate Data Demo
-              </span>
-              <div className="h-px flex-1 bg-slate-850" />
-            </div>
-            <p className="text-[11px] text-slate-500 text-center">
-              Isi database lokal dengan data contoh yang realistis untuk pengujian sistem.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Generate Orders */}
-              <div className="bg-emerald-950/20 border border-emerald-500/20 rounded-2xl p-5 flex flex-col gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                    <Zap className="w-4.5 h-4.5 text-emerald-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Buat Pesanan Contoh</h3>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      Buat 8 pesanan hari ini dengan rincian biaya pajak & layanan (jika aktif). Mengisi kasir, dashboard, transaksi, dan insights.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-slate-950/40 rounded-xl border border-slate-900 p-3 flex flex-col gap-1.5">
-                  <span className="text-[9px] font-mono text-emerald-400/80 uppercase font-bold tracking-widest mb-1">
-                    Rincian data:
-                  </span>
-                  {[
-                    { label: '3 pesanan Selesai', sub: 'Pendapatan langsung', color: 'text-emerald-400' },
-                    { label: '3 pesanan Aktif', sub: 'Dapur & kasir', color: 'text-blue-400' },
-                    { label: '1 pesanan Menunggu', sub: 'Antrean kasir', color: 'text-amber-400' },
-                    { label: '1 pesanan Batal', sub: 'Stok dipulihkan', color: 'text-slate-500' },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <ChevronRight className={`w-3 h-3 flex-shrink-0 ${item.color}`} />
-                      <span className="text-[10px] text-slate-350 font-semibold">{item.label}</span>
-                      <span className="text-[9px] text-slate-600">{item.sub}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={handleGenerateSampleOrders}
-                  disabled={isActionLoading}
-                  className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all shadow-lg hover:shadow-emerald-500/20 flex items-center justify-center gap-2"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Generate Pesanan Demo
-                </button>
-              </div>
-
-              {/* Low Stock Demo */}
-              <div className="bg-amber-950/10 border border-amber-500/20 rounded-2xl p-5 flex flex-col gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                    <AlertTriangle className="w-4.5 h-4.5 text-amber-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Simulasi Stok Kritis</h3>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      Set 3 produk ke stok menipis (2-4 unit) untuk memicu peringatan sistem di dashboard dan halaman inventaris.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-slate-950/40 rounded-xl border border-slate-900 p-3 flex flex-col gap-1.5">
-                  <span className="text-[9px] font-mono text-amber-400/80 uppercase font-bold tracking-widest mb-1">
-                    Produk target:
-                  </span>
-                  {[
-                    { name: 'Es Kopi Susu Gula Aren', stock: '4 unit' },
-                    { name: 'Roti Bakar Cokelat Keju', stock: '3 unit' },
-                    { name: 'Paket Kenyang A', stock: '2 unit' },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                        <span className="text-[10px] text-slate-350">{item.name}</span>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold text-amber-400">{item.stock}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={handleSetLowStock}
-                  disabled={isActionLoading}
-                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-2"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Simulasikan Stok Kritis
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Zone: Recovery */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-slate-850" />
-              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest px-3">
-                Pemulihan Data
-              </span>
-              <div className="h-px flex-1 bg-slate-850" />
-            </div>
-
-            <div className="bg-blue-950/10 border border-blue-500/20 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5">
-              <div className="flex items-start gap-3 flex-1">
-                <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                  <PackageOpen className="w-4.5 h-4.5 text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Pulihkan Katalog Produk</h3>
-                  <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                    Kembalikan 7 produk seed ke kondisi awal beserta stok semula. Riwayat pesanan tidak terpengaruh.
-                  </p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {['Es Kopi Susu', 'Nasi Geprek', 'Mie Goreng', 'Roti Bakar', 'Es Teh', 'Kopi Hitam', 'Paket Kenyang'].map(
-                      (name) => (
-                        <span
-                          key={name}
-                          className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700"
-                        >
-                          {name}
-                        </span>
-                      ),
-                    )}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={handleRestoreProducts}
-                disabled={isActionLoading}
-                className="flex-shrink-0 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all flex items-center gap-2 w-full sm:w-auto"
-              >
-                <PackageOpen className="w-3.5 h-3.5" />
-                Pulihkan Produk
-              </button>
-            </div>
-          </div>
-
-          {/* ── Supabase Migration Panel ──────────────────────────────────────── */}
-          <div className="bg-slate-900 border border-blue-500/20 rounded-2xl p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                <Database className="w-4 h-4 text-blue-400" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Migrasi Data Demo ke Supabase</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  {isSupabaseActive
-                    ? 'Import data lokal ke Supabase. Hanya data yang belum ada yang akan diimpor.'
-                    : 'Login dengan akun Supabase untuk mengaktifkan fitur migrasi data.'}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleImportBusinessProfile}
-                disabled={!isSupabaseActive || isMigrationLoading}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all"
-              >
-                <Database className="w-3.5 h-3.5" />
-                Import Profil Bisnis Demo
-              </button>
-              <button
-                onClick={handleImportProducts}
-                disabled={!isSupabaseActive || isMigrationLoading}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs transition-all"
-              >
-                <Database className="w-3.5 h-3.5" />
-                Import Produk Demo
-              </button>
-            </div>
-            {!isSupabaseActive && (
-              <p className="text-[10px] text-slate-500 mt-3 text-center">
-                Tombol aktif hanya saat login Supabase aktif (bukan demo mode).
-              </p>
-            )}
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-850 text-[11px] text-slate-500 leading-relaxed">
-            <strong className="text-slate-400">Catatan Pengembang:</strong> Semua perubahan di tab ini memengaruhi database localStorage lokal browser secara langsung. Refresh tab lainnya untuk memvalidasi perubahan Anda.
-          </div>
-        </div>
-      )}
       {activeTab === 'payment' && (
         <div className="space-y-6 animate-fade-in">
           {/* Paket Bisnis Panel */}

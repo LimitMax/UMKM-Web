@@ -6,7 +6,7 @@ import { useAuth } from './AuthProvider';
 import Link from 'next/link';
 
 interface RoleGuardBannerProps {
-  allowedRoles: ('admin' | 'cashier' | 'customer')[];
+  allowedRoles: ('admin' | 'cashier' | 'customer' | 'platform_owner')[];
   currentPageName: string;
 }
 
@@ -27,16 +27,17 @@ export default function RoleGuardBanner({ allowedRoles, currentPageName }: RoleG
   // If not logged in, layout will redirect. We show nothing here.
   if (!user || !profile) return null;
 
-  const activeRole = (role || profile.role) as 'admin' | 'cashier' | 'customer';
+  const activeRole = (role || profile.role) as 'admin' | 'cashier' | 'customer' | 'platform_owner';
   
   // If role is allowed, do not show anything
   if (allowedRoles.includes(activeRole)) {
     return null;
   }
 
-  const getRoleLabel = (r: 'admin' | 'cashier' | 'customer') => {
+  const getRoleLabel = (r: 'admin' | 'cashier' | 'customer' | 'platform_owner') => {
     if (r === 'admin') return 'Admin/Owner';
     if (r === 'cashier') return 'Kasir';
+    if (r === 'platform_owner') return 'Platform Owner';
     return 'Pelanggan';
   };
 
@@ -63,6 +64,15 @@ export default function RoleGuardBanner({ allowedRoles, currentPageName }: RoleG
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-500/5 font-sans"
           >
             <span>Ke Dashboard Kasir</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+        {activeRole === 'platform_owner' && (
+          <Link
+            href="/platform/dashboard"
+            className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white font-bold text-[11px] rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-violet-500/5 font-sans"
+          >
+            <span>Ke Platform Dashboard</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         )}

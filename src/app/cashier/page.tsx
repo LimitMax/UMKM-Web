@@ -108,6 +108,11 @@ export default function CashierDashboard() {
         setTimeout(() => {
           router.push('/login');
         }, 0);
+      } else if (profile.role !== 'admin' && profile.role !== 'cashier') {
+        // Unauthorized roles like platform_owner should be redirected
+        setTimeout(() => {
+          router.push('/platform/dashboard');
+        }, 0);
       } else {
         setTimeout(async () => {
           try {
@@ -126,6 +131,7 @@ export default function CashierDashboard() {
       }
     }
   }, [supabaseUser, profile, authLoading, router]);
+
 
   // Listen for Escape key to close drawer (Phase 6.9)
   useEffect(() => {

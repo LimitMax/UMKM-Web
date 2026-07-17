@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     // 1. Resolve business by slug and verify public_order_enabled
     const { data: business, error: bizError } = await supabaseAdmin
       .from('businesses')
-      .select('id, name, logo_url')
+      .select('id, name, logo_url, midtrans_client_key')
       .eq('slug', normalizedSlug)
       .eq('public_order_enabled', true)
       .maybeSingle();
@@ -88,7 +88,8 @@ export async function POST(request: Request) {
       success: true,
       business: {
         name: business.name,
-        logoUrl: business.logo_url
+        logoUrl: business.logo_url,
+        midtransClientKey: business.midtrans_client_key || null
       },
       order: {
         trackingCode: order.tracking_code,

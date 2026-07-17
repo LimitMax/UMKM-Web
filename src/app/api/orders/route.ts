@@ -90,6 +90,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Business ID tidak valid untuk pesanan ini.' }, { status: 400 });
     }
 
+    if (business.status === 'suspended' || business.status === 'archived') {
+      return NextResponse.json({ message: 'Toko sedang tidak tersedia.' }, { status: 403 });
+    }
+
     // 4. Calculate subtotal safely from verified database product prices
     const subtotal = items.reduce((sum: number, item: CartItem) => {
       const product = productMap[item.productId];

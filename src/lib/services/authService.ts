@@ -24,7 +24,7 @@ export const authService = {
     password: string,
     fullName: string,
     role: 'admin' | 'cashier',
-    businessId = 'biz-1'
+    businessId: string
   ) {
     // Check if the business exists in businesses table
     const { data: business, error: bizError } = await supabaseClient
@@ -39,7 +39,7 @@ export const authService = {
 
     if (!business) {
       throw new Error(
-        'Bisnis default ("biz-1") tidak ditemukan di database. Silakan jalankan script seed.sql terlebih dahulu di SQL Editor Supabase Anda.'
+        `Bisnis dengan ID "${businessId}" tidak ditemukan di database. Silakan periksa konfigurasi database Anda.`
       );
     }
 
@@ -108,7 +108,7 @@ export const authService = {
   /**
    * Helper to retrieve the current user's authorization role.
    */
-  async getUserRole(): Promise<'admin' | 'cashier' | null> {
+  async getUserRole(): Promise<'admin' | 'cashier' | 'platform_owner' | null> {
     const profile = await this.getCurrentProfile();
     return profile ? profile.role : null;
   },

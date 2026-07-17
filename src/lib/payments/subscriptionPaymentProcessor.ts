@@ -128,6 +128,7 @@ export async function processMidtransSubscriptionNotification(
     const periodEnd = nextBillingPeriodEnd(now, paymentRow.billing_cycle);
     const subscriptionUpdates: Record<string, unknown> = {
       status: 'active',
+      plan_id: paymentRow.plan_id,
       billing_cycle: paymentRow.billing_cycle || 'monthly',
       trial_ends_at: null,
       paid_at: nowIso,

@@ -174,15 +174,47 @@ export default function SubscriptionPaymentModal({
     setErrorMsg('');
 
     try {
+      const selectedPlan = plans.find((p) => p.code === selectedPlanCode);
+      const currentPlan = plans.find((p) => p.code === currentPlanCode);
+      const selectedValue = selectedPlan ? selectedPlan.sortOrder : 0;
+      const currentValue = currentPlan ? currentPlan.sortOrder : 0;
+
+      const isDowngrade = selectedValue < currentValue;
+
+      // Get auth token
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      const token = sessionData.session?.access_token || '';
+
+      if (isDowngrade) {
+        // Handle Scheduled Downgrade
+        const res = await fetch('/api/subscriptions/downgrade', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            businessId,
+            planId: selectedPlan?.id || 'plan-free'
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || 'Gagal menjadwalkan downgrade.');
+        }
+
+        await res.json();
+        setStep('success');
+        onPaymentSuccess?.();
+        return;
+      }
+
       // First update the business plan_code to match selection
       await supabaseClient
         .from('businesses')
         .update({ plan_code: selectedPlanCode })
         .eq('id', businessId);
-
-      // Get auth token
-      const { data: sessionData } = await supabaseClient.auth.getSession();
-      const token = sessionData.session?.access_token || '';
 
       // Create Midtrans Snap transaction
       const res = await fetch('/api/subscriptions/midtrans/create', {

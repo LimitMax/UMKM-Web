@@ -107,13 +107,7 @@ export async function POST(request: Request) {
     }
 
     // Check cashier limit (unless developer bypass)
-    const DEVELOPER_EMAILS = (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || '')
-      .split(',')
-      .map((em) => em.trim().toLowerCase())
-      .filter(Boolean);
-    const isDeveloperAccount = Boolean(
-      userData.user.email && DEVELOPER_EMAILS.includes(userData.user.email.toLowerCase())
-    );
+    const isDeveloperAccount = adminProfile.business_id === 'biz-platform-owner';
 
     if (!isDeveloperAccount) {
       // Fetch plan code and cashier limit

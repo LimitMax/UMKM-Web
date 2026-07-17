@@ -120,18 +120,11 @@ export default function AdminInsightsPage() {
   const [planCode, setPlanCode] = useState<string>('free');
   const [upgradeAlertOpen, setUpgradeAlertOpen] = useState(false);
 
-  const businessId = profile?.business_id;
-
-  const DEVELOPER_EMAILS = useMemo(() => {
-    return (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || '')
-      .split(',')
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean);
-  }, []);
+  const businessId = profile?.business_id ?? undefined;
 
   const isDeveloperAccount = useMemo(() => {
-    return Boolean(profile?.email && DEVELOPER_EMAILS.includes(profile.email.toLowerCase()));
-  }, [profile, DEVELOPER_EMAILS]);
+    return profile?.role === 'platform_owner' || profile?.business_id === 'biz-platform-owner';
+  }, [profile]);
 
   useEffect(() => {
     async function fetchPlan() {

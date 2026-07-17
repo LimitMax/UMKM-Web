@@ -18,14 +18,13 @@ async function verifyPlatformOwner(request: Request) {
     return { error: NextResponse.json({ message: 'Sesi login tidak valid.' }, { status: 401 }) };
   }
 
-  const DEVELOPER_EMAILS = (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || '')
-    .split(',')
-    .map((em) => em.trim().toLowerCase())
-    .filter(Boolean);
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .maybeSingle();
 
-  const isDeveloper = userData.user.email && DEVELOPER_EMAILS.includes(userData.user.email.toLowerCase());
-
-  if (!isDeveloper) {
+  if (profileError || !profile || profile.role !== 'platform_owner') {
     return { error: NextResponse.json({ message: 'Akses terbatas untuk Pemilik Platform saja.' }, { status: 403 }) };
   }
 

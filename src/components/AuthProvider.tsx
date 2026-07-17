@@ -30,13 +30,15 @@ export interface CurrentBusiness {
   midtrans_server_key?: string | null;
   midtrans_client_key?: string | null;
   midtrans_merchant_id?: string | null;
+  status?: 'trial' | 'active' | 'suspended' | 'archived' | null;
+  suspended_reason?: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   profile: SupabaseProfile | null;
   currentBusiness: CurrentBusiness | null;
-  role: 'admin' | 'cashier' | 'customer' | null;
+  role: 'admin' | 'cashier' | 'customer' | 'platform_owner' | null;
   loading: boolean;
   isSupabaseConfigured: boolean;
   signOut: () => Promise<void>;
@@ -49,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<SupabaseProfile | null>(null);
   const [currentBusiness, setCurrentBusiness] = useState<CurrentBusiness | null>(null);
-  const [role, setRole] = useState<'admin' | 'cashier' | 'customer' | null>(null);
+  const [role, setRole] = useState<'admin' | 'cashier' | 'customer' | 'platform_owner' | null>(null);
   const [loading, setLoading] = useState(true);
   const configured = isSupabaseConfigured();
 
@@ -64,8 +66,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Try to load active user from Supabase
-      const { data: { user: currentUser } } = await supabaseClient.auth.getUser();
+      console.log('[AuthProvider] loadAuth starting...');
+      // Try to load active session from Supabase
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const currentUser = session?.user || null;
+      console.log('[AuthProvider] loadAuth currentUser: ' + JSON.stringify({
+        hasUser: !!currentUser,
+        email: currentUser?.email,
+      }));
+
+      // Synchronize the session cookie for middleware checks
+      if (session) {
+        const maxAge = session.expires_in || 3600;
+        document.cookie = `sb-auth-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax; Secure`;
+      } else {
+        document.cookie = 'sb-auth-token=; path=/; max-age=0; SameSite=Lax; Secure';
+      }
       if (currentUser) {
         // Fetch profile
         const { data: currentProfile, error: profileErr } = await supabaseClient
@@ -74,21 +90,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq('id', currentUser.id)
           .single();
 
+        console.log('[AuthProvider] loadAuth currentProfile: ' + JSON.stringify({
+          hasProfile: !!currentProfile,
+          error: profileErr ? profileErr.message : null,
+          role: currentProfile?.role,
+        }));
+
         if (!profileErr && currentProfile) {
           setUser(currentUser);
           setProfile(currentProfile as SupabaseProfile);
           setRole(currentProfile.role);
 
-          const { data: businessData, error: businessErr } = await supabaseClient
-            .from('businesses')
-            .select('*')
-            .eq('id', currentProfile.business_id)
-            .maybeSingle();
-
-          if (!businessErr && businessData) {
-            setCurrentBusiness(businessData as CurrentBusiness);
-          } else {
+          // Platform owners have no associated business — skip business fetch
+          if (currentProfile.role === 'platform_owner' || !currentProfile.business_id) {
             setCurrentBusiness(null);
+          } else {
+            const { data: businessData, error: businessErr } = await supabaseClient
+              .from('businesses')
+              .select('*')
+              .eq('id', currentProfile.business_id)
+              .maybeSingle();
+
+            if (!businessErr && businessData) {
+              const biz = businessData as CurrentBusiness;
+              
+              // Direct block checks for current active sessions:
+              if (biz.status === 'archived') {
+                // Terminate session for all users if business is archived
+                await authService.signOut();
+                setUser(null);
+                setProfile(null);
+                setCurrentBusiness(null);
+                setRole(null);
+                return;
+              }
+              if (biz.status === 'suspended' && currentProfile.role === 'cashier') {
+                // Terminate session for cashier if business is suspended
+                await authService.signOut();
+                setUser(null);
+                setProfile(null);
+                setCurrentBusiness(null);
+                setRole(null);
+                return;
+              }
+
+              setCurrentBusiness(biz);
+            } else {
+              setCurrentBusiness(null);
+            }
           }
         } else {
           // Fallback if auth exists but profile row is missing
@@ -115,31 +164,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [configured]);
 
   useEffect(() => {
-    // Call loadAuth asynchronously to prevent synchronous cascading renders
-    const timer = setTimeout(() => {
-      loadAuth();
-    }, 0);
-
-    if (configured) {
-      // Subscribe to live auth events
-      const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(async (event) => {
-        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
-          setTimeout(() => {
-            loadAuth();
-          }, 0);
-        }
-      });
-
-      return () => {
-        clearTimeout(timer);
-        subscription.unsubscribe();
-      };
-    } else {
-      return () => {
-        clearTimeout(timer);
-      };
+    if (!configured) {
+      setTimeout(() => {
+        loadAuth();
+      }, 0);
+      return;
     }
+
+    // Subscribe to live auth events
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
+      console.log('[AuthProvider] onAuthStateChange event:', event, !!session);
+      
+      // Sync cookie
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        if (session) {
+          const maxAge = session.expires_in || 3600;
+          document.cookie = `sb-auth-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax; Secure`;
+        }
+      } else if (event === 'SIGNED_OUT') {
+        document.cookie = 'sb-auth-token=; path=/; max-age=0; SameSite=Lax; Secure';
+      }
+
+      if (
+        event === 'SIGNED_IN' ||
+        event === 'SIGNED_OUT' ||
+        event === 'USER_UPDATED' ||
+        event === 'TOKEN_REFRESHED' ||
+        event === 'INITIAL_SESSION'
+      ) {
+        setTimeout(() => {
+          loadAuth();
+        }, 0);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [configured, loadAuth]);
+
+
 
   const signOut = async () => {
     setLoading(true);
@@ -151,6 +215,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     
+    // Clear session cookie
+    document.cookie = 'sb-auth-token=; path=/; max-age=0; SameSite=Lax; Secure';
+
     // Clear state
     setUser(null);
     setProfile(null);

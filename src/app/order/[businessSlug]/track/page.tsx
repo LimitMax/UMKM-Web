@@ -71,6 +71,7 @@ interface TrackedOrder {
 interface BusinessInfo {
   name: string;
   logoUrl: string | null;
+  midtransClientKey?: string | null;
 }
 
 type SnapCallbacks = {
@@ -150,7 +151,8 @@ export default function OrderTrackingPage() {
         if (data?.business) {
           setBusiness({
             name: data.business.name,
-            logoUrl: data.business.logo_url || null
+            logoUrl: data.business.logo_url || null,
+            midtransClientKey: data.business.midtrans_client_key || null
           });
         }
       } catch (err) {
@@ -191,6 +193,13 @@ export default function OrderTrackingPage() {
       }
 
       setOrder(data.order);
+      if (data.business) {
+        setBusiness({
+          name: data.business.name,
+          logoUrl: data.business.logoUrl || null,
+          midtransClientKey: data.business.midtransClientKey || null
+        });
+      }
       // Clean up URL to include tracked code without reloading
       const newUrl = `/order/${businessSlug}/track?code=${encodeURIComponent(codeToTrack)}`;
       window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
@@ -240,11 +249,24 @@ export default function OrderTrackingPage() {
   }, [order, fetchTrackingStatus]);
 
   // Dynamic Midtrans Snap Script Loader
-  const loadMidtransSnapScript = (): Promise<void> => {
+  const loadMidtransSnapScript = (customClientKey?: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (typeof window === 'undefined') {
         reject(new Error('Snap hanya tersedia di browser.'));
         return;
+      }
+
+      const targetKey = customClientKey || process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
+      if (!targetKey) {
+        reject(new Error('Client key Midtrans belum dikonfigurasi.'));
+        return;
+      }
+
+      // If a different script is already loaded (different merchant key), remove and reload
+      const existingScript = document.getElementById('midtrans-snap-script') as HTMLScriptElement | null;
+      if (existingScript && existingScript.getAttribute('data-client-key') !== targetKey) {
+        existingScript.remove();
+        delete window.snap;
       }
 
       if (window.snap) {
@@ -252,16 +274,10 @@ export default function OrderTrackingPage() {
         return;
       }
 
-      const existingScript = document.getElementById('midtrans-snap-script') as HTMLScriptElement | null;
-      if (existingScript) {
-        existingScript.addEventListener('load', () => resolve(), { once: true });
-        existingScript.addEventListener('error', () => reject(new Error('Gagal memuat Snap Midtrans.')), { once: true });
-        return;
-      }
-
-      const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
-      if (!clientKey) {
-        reject(new Error('Client key Midtrans belum dikonfigurasi.'));
+      const staleScript = document.getElementById('midtrans-snap-script') as HTMLScriptElement | null;
+      if (staleScript) {
+        staleScript.addEventListener('load', () => resolve(), { once: true });
+        staleScript.addEventListener('error', () => reject(new Error('Gagal memuat Snap Midtrans.')), { once: true });
         return;
       }
 
@@ -269,7 +285,7 @@ export default function OrderTrackingPage() {
       script.id = 'midtrans-snap-script';
       script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
       script.async = true;
-      script.setAttribute('data-client-key', clientKey);
+      script.setAttribute('data-client-key', targetKey);
       script.onload = () => resolve();
       script.onerror = () => reject(new Error('Gagal memuat Snap Midtrans.'));
       document.body.appendChild(script);
@@ -291,7 +307,7 @@ export default function OrderTrackingPage() {
 
     try {
       if (snapToken) {
-        await loadMidtransSnapScript();
+        await loadMidtransSnapScript(business?.midtransClientKey || undefined);
         if (!window.snap) throw new Error('Snap token tidak dapat dimuat.');
         window.snap.pay(snapToken, {
           onSuccess: () => {

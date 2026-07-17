@@ -12,24 +12,35 @@ import {
   Database
 } from 'lucide-react';
 import { authService as supabaseAuthService } from '../../lib/services/authService';
+import { profileService } from '../../lib/services/profileService';
 import { useAuth } from '../../components/AuthProvider';
+import { supabaseClient } from '../../lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, profile, isSupabaseConfigured } = useAuth();
+  const { user, profile, isSupabaseConfigured, loading } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // If already authenticated via Supabase, redirect
+  // If already authenticated via Supabase, redirect based on role
   useEffect(() => {
-    if (isSupabaseConfigured && user && profile) {
-      if (profile.role === 'admin') router.push('/admin');
-      else router.push('/cashier');
+    if (isSupabaseConfigured && !loading && user && !isLoading) {
+      if (profile) {
+        if (profile.role === 'platform_owner') {
+          router.push('/platform/dashboard');
+        } else if (profile.role === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/cashier');
+        }
+      }
     }
-  }, [user, profile, isSupabaseConfigured, router]);
+  }, [user, profile, isSupabaseConfigured, router, isLoading, loading]);
+
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,16 +50,37 @@ export default function LoginPage() {
     try {
       if (isSupabaseConfigured) {
         // Real Supabase Auth Login
-        await supabaseAuthService.signInWithEmail(email, password);
+        const loginData = await supabaseAuthService.signInWithEmail(email, password);
+        const currentUser = loginData.user;
         
-        const currentUser = await supabaseAuthService.getCurrentUser();
         if (currentUser) {
-          const currentProfile = await supabaseAuthService.getCurrentProfile();
+          const currentProfile = await profileService.getProfileByUserId(currentUser.id);
           if (currentProfile) {
-            if (currentProfile.role === 'admin') {
-              router.push('/admin');
+            if (currentProfile.role !== 'platform_owner') {
+              const { data: business } = await supabaseClient
+                .from('businesses')
+                .select('status')
+                .eq('id', currentProfile.business_id)
+                .maybeSingle();
+
+              if (business) {
+                if (business.status === 'archived') {
+                  await supabaseAuthService.signOut();
+                  throw new Error('Akun bisnis ini telah dinonaktifkan (diarsipkan).');
+                }
+                if (business.status === 'suspended' && currentProfile.role === 'cashier') {
+                  await supabaseAuthService.signOut();
+                  throw new Error('Akun bisnis ini sedang ditangguhkan. Kasir tidak dapat masuk.');
+                }
+              }
+            }
+
+            if (currentProfile.role === 'platform_owner') {
+              // Allow platform owner but let useEffect handle redirection
+            } else if (currentProfile.role === 'admin') {
+              // Allow admin but let useEffect handle redirection
             } else {
-              router.push('/cashier');
+              // Allow cashier but let useEffect handle redirection
             }
             return;
           }
@@ -59,9 +91,14 @@ export default function LoginPage() {
       }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Terjadi kesalahan saat masuk.');
+    } finally {
+      // Always reset loading state — whether login succeeded or failed
       setIsLoading(false);
     }
   };
+
+
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black px-4 py-12 relative overflow-hidden">

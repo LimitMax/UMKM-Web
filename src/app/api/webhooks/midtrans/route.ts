@@ -12,14 +12,18 @@ export async function POST(request: Request) {
     let customServerKey: string | undefined = undefined;
 
     const orderIdStr = payload.order_id || '';
-    if (!orderIdStr.startsWith('SUB-') && orderIdStr.startsWith('UMKM-')) {
+
+    // Only customer orders (UMKM- prefix) may use a tenant's individual Midtrans key.
+    // Subscription payments (SUB- prefix) always use the platform's server key —
+    // they intentionally skip this block.
+    if (orderIdStr.startsWith('UMKM-')) {
       try {
         const lastHyphenIndex = orderIdStr.lastIndexOf('-');
         if (lastHyphenIndex > 5) {
           const dbOrderId = orderIdStr.slice(5, lastHyphenIndex);
           const supabaseAdmin = createSupabaseAdminClient();
-          
-          // Fetch order to get business_id
+
+          // Fetch order to get business_id, then look up the tenant's individual Midtrans key
           const { data: order } = await supabaseAdmin
             .from('orders')
             .select('business_id')

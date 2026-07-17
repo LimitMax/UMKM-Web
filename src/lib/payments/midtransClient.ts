@@ -152,7 +152,8 @@ export function verifyMidtransNotification(payload: MidtransNotificationPayload,
 }
 
 export async function getMidtransTransactionStatus(
-  providerReferenceId: string
+  providerReferenceId: string,
+  customServerKey?: string
 ): Promise<MidtransTransactionStatusResponse> {
   assertServerOnly();
 
@@ -160,7 +161,7 @@ export async function getMidtransTransactionStatus(
   const response = await fetch(endpoint, {
     method: 'GET',
     headers: {
-      Authorization: getBasicAuthHeader(),
+      Authorization: getBasicAuthHeader(customServerKey),
       Accept: 'application/json',
     },
   });

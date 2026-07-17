@@ -142,6 +142,12 @@ export interface BusinessProfile {
   midtransServerKey?: string;
   midtransClientKey?: string;
   midtransMerchantId?: string;
+  status?: 'trial' | 'active' | 'suspended' | 'archived' | null;
+  suspendedReason?: string | null;
+  suspendedAt?: string | null;
+  suspendedBy?: string | null;
+  deletedAt?: string | null;
+  deletedBy?: string | null;
 }
 
 export interface SalesSummary {

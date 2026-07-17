@@ -165,7 +165,11 @@ export async function POST(request: Request) {
       ],
     };
 
+    // Always use the platform's Midtrans server key for subscription billing.
+    // Never pass a tenant's customServerKey here — subscription payments belong
+    // to the platform account, not the individual tenant's merchant account.
     const snap = await createSnapTransaction(snapPayload);
+
     const now = new Date().toISOString();
     const paymentId = `subpay-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 

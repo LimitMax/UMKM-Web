@@ -2,9 +2,9 @@ import { supabaseClient } from '../supabase/client';
 
 export interface SupabaseProfile {
   id: string;
-  business_id: string;
+  business_id: string | null; // NULL for platform_owner
   full_name: string;
-  role: 'admin' | 'cashier';
+  role: 'admin' | 'cashier' | 'platform_owner';
   email: string;
   created_at: string;
   updated_at: string;
@@ -33,7 +33,7 @@ export const profileService = {
   },
 
   /**
-   * Creates a new profile record for a registered user.
+   * Creates a new profile record for a registered business user.
    */
   async createProfileForUser(
     userId: string,
@@ -89,6 +89,7 @@ export const profileService = {
 
   /**
    * Returns the business ID associated with the current user.
+   * Returns null for platform_owner accounts.
    */
   async getCurrentUserBusinessId(userId: string): Promise<string | null> {
     const profile = await this.getProfileByUserId(userId);
