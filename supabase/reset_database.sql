@@ -43,7 +43,8 @@ DECLARE
     'products',
     'profiles',
     'businesses',
-    'coupons'
+    'coupons',
+    'business_vouchers'
   ];
   existing_tables text := '';
 BEGIN

@@ -117,17 +117,15 @@ export function canCashierProcessOrder(order: Pick<Order, 'paymentStatus'>): boo
   return order.paymentStatus?.toLowerCase() === 'paid';
 }
 
-export function canRetryPayment(order: Pick<Order, 'paymentMethod' | 'paymentStatus'>, payment?: PaymentMetadata | null): boolean {
+export function canRetryPayment(order: Pick<Order, 'paymentMethod' | 'paymentStatus'>, _payment?: PaymentMetadata | null): boolean {
   const method = order.paymentMethod?.toLowerCase();
   const status = order.paymentStatus?.toLowerCase();
-  const hasTokenOrUrl = Boolean(payment?.snapToken || payment?.redirectUrl);
   return (
     (method === 'non_cash' || method === 'non-cash') &&
     status !== 'paid' &&
     status !== 'expired' &&
     status !== 'cancelled' &&
-    status !== 'refunded' &&
-    hasTokenOrUrl
+    status !== 'refunded'
   );
 }
 

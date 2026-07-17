@@ -17,7 +17,9 @@ import {
   DollarSign,
   MapPin,
   Phone,
-  Clock
+  Clock,
+  Ticket,
+  Loader2
 } from 'lucide-react';
 import { productService } from '../../../services/productService';
 import { orderService } from '../../../services/orderService';
@@ -51,12 +53,7 @@ interface MidtransCreateResponse {
   paymentId: string;
 }
 
-const CATEGORY_IMAGES = {
-  Makanan: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80',
-  Minuman: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=600&q=80',
-  Snack: 'https://images.unsplash.com/photo-1584776296984-48cd02b0c497?auto=format&fit=crop&w=600&q=80',
-  'Paket Promo': 'https://images.unsplash.com/photo-1626132647523-66f5bf380027?auto=format&fit=crop&w=600&q=80',
-};
+
 
 export default function CustomerOrderPage() {
   const router = useRouter();
@@ -92,6 +89,63 @@ export default function CustomerOrderPage() {
   const [menuError, setMenuError] = useState<string>('');
 
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
+
+  // Voucher states
+  const [voucherCodeInput, setVoucherCodeInput] = useState<string>('');
+  const [voucherError, setVoucherError] = useState<string>('');
+  const [voucherLoading, setVoucherLoading] = useState<boolean>(false);
+  const [appliedVoucher, setAppliedVoucher] = useState<{
+    code: string;
+    name: string;
+    discountType: 'percentage' | 'fixed';
+    discountValue: number;
+    discountAmount: number;
+    minOrderAmount: number;
+    maxDiscount: number | null;
+  } | null>(null);
+
+  const handleApplyVoucher = async () => {
+    if (!voucherCodeInput.trim() || !activeBusinessId) return;
+    setVoucherLoading(true);
+    setVoucherError('');
+    try {
+      const res = await fetch('/api/public/vouchers/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessId: activeBusinessId,
+          code: voucherCodeInput.trim().toUpperCase(),
+          subtotal
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Voucher tidak valid.');
+      }
+
+      setAppliedVoucher({
+        code: data.code,
+        name: data.name,
+        discountType: data.discountType,
+        discountValue: Number(data.discountValue),
+        discountAmount: Number(data.discountAmount),
+        minOrderAmount: Number(data.minOrderAmount),
+        maxDiscount: data.maxDiscount ? Number(data.maxDiscount) : null
+      });
+      setVoucherCodeInput('');
+      setVoucherError('');
+    } catch (err) {
+      setVoucherError(err instanceof Error ? err.message : 'Gagal menerapkan voucher.');
+    } finally {
+      setVoucherLoading(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherError('');
+  };
 
   useEffect(() => {
     if (!businessSlug) return;
@@ -173,8 +227,8 @@ export default function CustomerOrderPage() {
     };
   }, [businessSlug]);
 
-  // Filter categories
-  const categories = ['Semua', 'Makanan', 'Minuman', 'Snack', 'Paket Promo'];
+  // Filter categories dynamically
+  const categories = ['Semua', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))];
 
   // Filter products by category and search query
   const filteredProducts = products.filter((p) => {
@@ -232,6 +286,28 @@ export default function CustomerOrderPage() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+
+  // Auto-remove voucher if subtotal falls below requirement
+  useEffect(() => {
+    if (appliedVoucher && subtotal < appliedVoucher.minOrderAmount) {
+      const timer = setTimeout(() => {
+        setAppliedVoucher(null);
+        setVoucherError(`Voucher ${appliedVoucher.code} dilepas karena min. belanja tidak terpenuhi.`);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [subtotal, appliedVoucher]);
+
+  let voucherDiscountAmount = 0;
+  if (appliedVoucher) {
+    if (appliedVoucher.discountType === 'percentage') {
+      const calculated = Math.round(subtotal * (appliedVoucher.discountValue / 100));
+      voucherDiscountAmount = appliedVoucher.maxDiscount ? Math.min(appliedVoucher.maxDiscount, calculated) : calculated;
+    } else {
+      voucherDiscountAmount = appliedVoucher.discountValue;
+    }
+    voucherDiscountAmount = Math.min(subtotal, voucherDiscountAmount);
+  }
   
   const totals = calculateOrderTotals({
     subtotal,
@@ -242,6 +318,7 @@ export default function CustomerOrderPage() {
     serviceChargePercentage: businessProfile?.serviceChargePercentage ?? 5,
     deliverySettings: businessProfile?.deliverySettings,
     deliveryDistanceKm: fulfillmentType === 'delivery' ? deliveryDistanceKm : undefined,
+    voucherDiscountAmount,
   });
 
   const serviceCharge = totals.serviceChargeAmount;
@@ -451,6 +528,7 @@ export default function CustomerOrderPage() {
         deliveryDistanceKm: fulfillmentType === 'delivery' ? deliveryDistanceKm : undefined,
         deliveryDistanceSource: fulfillmentType === 'delivery' ? deliveryDistanceSource : undefined,
         deliveryFeeCalculationType: fulfillmentType === 'delivery' ? (businessProfile?.deliverySettings?.deliveryFeeCalculationType || 'fixed') : undefined,
+        voucherCode: appliedVoucher ? appliedVoucher.code : undefined,
       });
 
       // Clear cart
@@ -462,8 +540,14 @@ export default function CustomerOrderPage() {
       }
 
       setLoadingMessage('Membuka pembayaran Midtrans...');
-      const payment = await createMidtransPayment(order.id);
-      await openMidtransPayment(payment);
+      try {
+        const payment = await createMidtransPayment(order.id);
+        await openMidtransPayment(payment);
+      } catch (payErr) {
+        console.error('Failed to auto-open Midtrans payment on checkout:', payErr);
+        // Redirect to success page anyway so customer gets their queue number, and can retry payment there
+        router.push(`/order/success/${order.id}`);
+      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Terjadi kesalahan saat memproses pesanan.');
     } finally {
@@ -560,7 +644,64 @@ export default function CustomerOrderPage() {
       </div>
     );
   };
-
+  const renderVoucherSection = () => {
+    return (
+      <div className="border-t border-slate-850 pt-3.5 mt-3.5 animate-fade-in">
+        <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1.5 flex items-center gap-1.5">
+          <Ticket className="w-4 h-4 text-emerald-450" />
+          <span>Voucher / Kode Promo</span>
+        </label>
+        
+        {appliedVoucher ? (
+          <div className="flex items-center justify-between p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+            <div className="flex-1 pr-2">
+              <span className="font-mono font-black text-emerald-455 text-xs tracking-wider uppercase block">
+                {appliedVoucher.code}
+              </span>
+              <span className="text-[10px] text-emerald-300 block mt-0.5 leading-snug">
+                {appliedVoucher.name} (-{formatRupiah(voucherDiscountAmount)})
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleRemoveVoucher}
+              className="text-slate-450 hover:text-rose-450 hover:border-rose-500/30 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-850 cursor-pointer transition-all"
+            >
+              Hapus
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={voucherCodeInput}
+                onChange={(e) => {
+                  setVoucherCodeInput(e.target.value);
+                  setVoucherError('');
+                }}
+                placeholder="KODE VOUCHER TOKO..."
+                className="flex-1 p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 uppercase tracking-wider font-mono text-center"
+              />
+              <button
+                type="button"
+                disabled={voucherLoading || !voucherCodeInput.trim()}
+                onClick={handleApplyVoucher}
+                className="px-4 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-650 font-bold text-xs text-slate-950 rounded-lg transition-all flex items-center justify-center min-w-[85px] cursor-pointer border-none"
+              >
+                {voucherLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-950" /> : 'Gunakan'}
+              </button>
+            </div>
+            {voucherError && (
+              <span className="text-[9px] text-rose-450 block font-sans italic leading-normal">
+                {voucherError}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
   const isDistanceInvalid = fulfillmentType === 'delivery' && 
     (businessProfile?.deliverySettings?.deliveryFeeCalculationType === 'distance_based') && 
     (!distanceInputStr.trim() || deliveryDistanceKm <= 0 || deliveryDistanceKm > (businessProfile?.deliverySettings?.maxDeliveryDistanceKm ?? 10) || isNaN(deliveryDistanceKm));
@@ -749,14 +890,20 @@ export default function CustomerOrderPage() {
                 >
                   {/* Image container */}
                   <div className="relative aspect-square w-full bg-slate-950 overflow-hidden">
-                    <Image
-                      src={prod.imageUrl || CATEGORY_IMAGES[prod.category as keyof typeof CATEGORY_IMAGES] || CATEGORY_IMAGES.Makanan} 
-                      alt={prod.name}
-                      fill
-                      sizes="(min-width: 1024px) 33vw, 50vw"
-                      unoptimized
-                      className="object-cover w-full h-full transform hover:scale-105 transition-all duration-500" 
-                    />
+                    {prod.imageUrl ? (
+                      <Image
+                        src={prod.imageUrl} 
+                        alt={prod.name}
+                        fill
+                        sizes="(min-width: 1024px) 33vw, 50vw"
+                        unoptimized
+                        className="object-cover w-full h-full transform hover:scale-105 transition-all duration-500" 
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase text-slate-500 bg-slate-900 border border-slate-850/30">
+                        Blank
+                      </div>
+                    )}
                     <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 text-[10px] font-semibold text-slate-350">
                       {prod.category}
                     </span>
@@ -1007,6 +1154,7 @@ export default function CustomerOrderPage() {
                         ⚠️ Pembayaran online tersedia di paket Starter dan Pro. Transaksi sandbox saat ini tetap berjalan untuk simulasi uji coba.
                       </p>
                     )}
+                    {renderVoucherSection()}
                   </div>
                 </div>
               </div>
@@ -1050,6 +1198,12 @@ export default function CustomerOrderPage() {
                         </div>
                       )}
                     </>
+                  )}
+                  {voucherDiscountAmount > 0 && (
+                    <div className="flex justify-between text-xs text-emerald-400 font-semibold">
+                      <span>Potongan Voucher ({appliedVoucher?.code}):</span>
+                      <span>-{formatRupiah(voucherDiscountAmount)}</span>
+                    </div>
                   )}
                   <div className="flex justify-between font-bold text-xs text-white border-t border-slate-850 pt-2 mt-1">
                     <span>Total Bayar:</span>
@@ -1347,6 +1501,7 @@ export default function CustomerOrderPage() {
                       <p className="text-[9px] text-slate-455 font-sans mt-2 italic leading-relaxed">
                         {getPaymentHelperText()}
                       </p>
+                      {renderVoucherSection()}
                     </div>
                   </div>
                 </div>
@@ -1390,6 +1545,12 @@ export default function CustomerOrderPage() {
                           </div>
                         )}
                       </>
+                    )}
+                    {voucherDiscountAmount > 0 && (
+                      <div className="flex justify-between text-xs text-emerald-400 font-semibold">
+                        <span>Potongan Voucher ({appliedVoucher?.code}):</span>
+                        <span>-{formatRupiah(voucherDiscountAmount)}</span>
+                      </div>
                     )}
                     <div className="flex justify-between font-bold text-xs text-white border-t border-slate-850 pt-2 mt-1">
                       <span>Total Bayar:</span>

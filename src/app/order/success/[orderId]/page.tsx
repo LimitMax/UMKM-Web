@@ -62,6 +62,44 @@ export default function OrderSuccessPage() {
   const [syncLoading, setSyncLoading] = useState(false);
   const [paymentOpenLoading, setPaymentOpenLoading] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  
+  const [isChangingMethod, setIsChangingMethod] = useState(false);
+  const [methodChangeLoading, setMethodChangeLoading] = useState(false);
+
+  const handleChangePaymentMethod = async (newMethod: 'Cash' | 'Non-Cash') => {
+    if (!order || methodChangeLoading) return;
+    setMethodChangeLoading(true);
+    setSyncMessage(null);
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentMethod: newMethod }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Gagal mengubah metode pembayaran.');
+      }
+
+      setOrder((prev) => prev ? { 
+        ...prev, 
+        paymentMethod: newMethod,
+        paymentStatus: 'Waiting for Payment'
+      } : null);
+      
+      if (newMethod === 'Cash') {
+        setLatestPayment(null);
+      }
+      
+      setSyncMessage(`Metode pembayaran diubah ke ${newMethod === 'Cash' ? 'Tunai' : 'Non-Tunai'}`);
+      setIsChangingMethod(false);
+    } catch (err) {
+      setSyncMessage(err instanceof Error ? err.message : 'Gagal mengubah metode pembayaran.');
+    } finally {
+      setMethodChangeLoading(false);
+    }
+  };
 
   const loadBusinessById = useCallback(async (businessId?: string) => {
     if (!businessId) return;
@@ -301,47 +339,72 @@ export default function OrderSuccessPage() {
 
   const handleContinuePayment = async () => {
     if (paymentOpenLoading || syncLoading) return;
-    if (!latestPayment) {
-      setSyncMessage('Payment metadata belum tersedia.');
-      return;
-    }
 
     setPaymentOpenLoading(true);
     setSyncMessage(null);
 
     try {
-      if (latestPayment.snapToken) {
-        await loadMidtransSnapScript(businessProfile?.midtransClientKey || undefined);
-        if (!window.snap) throw new Error('Snap token tidak ditemukan.');
-        window.snap.pay(latestPayment.snapToken, {
-          onSuccess: handleSyncPaymentStatus,
-          onPending: handleSyncPaymentStatus,
-          onClose: () => setPaymentOpenLoading(false),
-          onError: () => {
-            if (latestPayment.redirectUrl) {
-              window.location.assign(latestPayment.redirectUrl);
-              return;
-            }
-            setSyncMessage('Gagal membuka halaman pembayaran.');
-            setPaymentOpenLoading(false);
-          },
+      let activePayment = latestPayment;
+
+      // If there is no latestPayment or it doesn't have a snapToken/redirectUrl, initialize a new payment session
+      if (!activePayment || (!activePayment.snapToken && !activePayment.redirectUrl)) {
+        setSyncMessage('Menginisialisasi sesi pembayaran baru...');
+        const createRes = await fetch('/api/payments/midtrans/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId, paymentMethod: 'non_cash' }),
         });
-        return;
+
+        if (!createRes.ok) {
+          const errData = await createRes.json().catch(() => null);
+          throw new Error(errData?.message || 'Gagal menginisialisasi pembayaran Midtrans.');
+        }
+
+        const createData = await createRes.json();
+        activePayment = {
+          id: createData.paymentId,
+          provider: 'midtrans',
+          providerReferenceId: createData.orderId,
+          paymentMethod: 'non_cash',
+          amount: order?.totalAmount || 0,
+          status: 'pending',
+          snapToken: createData.snapToken,
+          redirectUrl: createData.redirectUrl,
+          createdAt: new Date().toISOString(),
+        };
+        setLatestPayment(activePayment);
       }
 
-      if (latestPayment.redirectUrl) {
-        window.location.assign(latestPayment.redirectUrl);
-        return;
+      if (!activePayment || !activePayment.snapToken) {
+        throw new Error('Gagal mendapatkan Snap token dari server.');
       }
 
-      setSyncMessage('Snap token tidak ditemukan.');
-    } catch {
-      if (latestPayment.redirectUrl) {
-        window.location.assign(latestPayment.redirectUrl);
-        return;
+      setSyncMessage('Membuka halaman pembayaran...');
+      await loadMidtransSnapScript(businessProfile?.midtransClientKey || undefined);
+
+      if (!window.snap) {
+        throw new Error('Snap Midtrans tidak dapat dimuat.');
       }
-      setSyncMessage('Gagal membuka halaman pembayaran.');
-    } finally {
+
+      window.snap.pay(activePayment.snapToken, {
+        onSuccess: handleSyncPaymentStatus,
+        onPending: handleSyncPaymentStatus,
+        onClose: () => {
+          setPaymentOpenLoading(false);
+          setSyncMessage(null);
+        },
+        onError: () => {
+          if (activePayment?.redirectUrl) {
+            window.location.assign(activePayment.redirectUrl);
+            return;
+          }
+          setSyncMessage('Gagal membuka halaman pembayaran.');
+          setPaymentOpenLoading(false);
+        },
+      });
+    } catch (err) {
+      console.error('Failed to process payment retry:', err);
+      setSyncMessage(err instanceof Error ? err.message : 'Gagal memproses pembayaran.');
       setPaymentOpenLoading(false);
     }
   };
@@ -533,10 +596,58 @@ export default function OrderSuccessPage() {
                 <h2 className="text-base font-black text-white">
                   {order.paymentMethod?.toLowerCase() === 'cash' ? 'Pembayaran Tunai' : 'Pembayaran Midtrans Sandbox'}
                 </h2>
-                <p className="text-xs text-slate-350 leading-relaxed mt-1">
+                <p className="text-xs text-slate-355 leading-relaxed mt-1">
                   {paymentDescription}
                 </p>
               </div>
+              
+              {/* Payment Method Switcher */}
+              {order.paymentStatus?.toLowerCase() !== 'paid' && order.status !== 'Completed' && order.status !== 'Cancelled' && (
+                <div className="mt-3 pt-3 border-t border-slate-800/40">
+                  {isChangingMethod ? (
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[9px] text-slate-450 font-mono uppercase tracking-wider">Metode Pembayaran Baru:</span>
+                      <div className="flex gap-2">
+                        {order.paymentMethod === 'Non-Cash' ? (
+                          <button
+                            type="button"
+                            disabled={methodChangeLoading}
+                            onClick={() => handleChangePaymentMethod('Cash')}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-emerald-500/35 text-[9px] font-bold text-slate-200 transition-all cursor-pointer"
+                          >
+                            Ganti ke Tunai
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={methodChangeLoading}
+                            onClick={() => handleChangePaymentMethod('Non-Cash')}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-emerald-500/35 text-[9px] font-bold text-slate-200 transition-all cursor-pointer"
+                          >
+                            Ganti ke Non-Tunai
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={methodChangeLoading}
+                          onClick={() => setIsChangingMethod(false)}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-950 text-slate-500 hover:text-slate-300 text-[9px] font-medium cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsChangingMethod(true)}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-950/60 border border-slate-850 hover:bg-slate-900 hover:border-slate-800 text-[8px] font-bold text-emerald-450 uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      Ubah Metode Pembayaran
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <CreditCard className={`w-8 h-8 flex-shrink-0 ${
               order.paymentStatus?.toLowerCase() === 'paid' ? 'text-emerald-300' : 'text-amber-300'

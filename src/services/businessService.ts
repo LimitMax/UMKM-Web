@@ -1,9 +1,8 @@
-import { BusinessProfile } from '../types';
+import { BusinessProfile, DataSourceMode } from '../types';
 import { getStorageItem, setStorageItem } from './db';
 import { isSupabaseConfigured } from '../lib/supabase/client';
 import { supabaseClient } from '../lib/supabase/client';
 import { supabaseDataSource } from '../lib/data/supabaseDataSource';
-import { DataSourceMode } from '../config/dataSourceConfig';
 
 import {
   DEFAULT_DELIVERY_SETTINGS,

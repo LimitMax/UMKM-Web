@@ -1,5 +1,4 @@
 import { Product, Order, BusinessProfile } from '../../types';
-import { DataSource } from './dataSource';
 import { supabaseClient } from '../supabase/client';
 import { 
   mapSupabaseBusinessToBusinessProfile,
@@ -41,7 +40,7 @@ async function resolveBusinessId(providedId?: string): Promise<string> {
  * Supabase database driver implementation.
  * Queries/updates real PostgreSQL tables by checking dynamic session business IDs.
  */
-export const supabaseDataSource: DataSource = {
+export const supabaseDataSource = {
   async getBusinessProfile(businessId?: string): Promise<BusinessProfile> {
     const resolvedId = await resolveBusinessId(businessId);
     

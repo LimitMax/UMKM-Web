@@ -64,3 +64,62 @@ export async function GET(
     return NextResponse.json({ message: 'Terjadi kesalahan internal server.' }, { status: 500 });
   }
 }
+
+export async function PATCH(
+  request: Request,
+  props: { params: Promise<{ orderId: string }> | { orderId: string } }
+) {
+  try {
+    const resolvedParams = 'then' in props.params ? await props.params : props.params;
+    const { orderId } = resolvedParams;
+
+    if (!orderId) {
+      return NextResponse.json({ message: 'Order ID tidak valid.' }, { status: 400 });
+    }
+
+    const { paymentMethod } = await request.json();
+    if (paymentMethod !== 'Cash' && paymentMethod !== 'Non-Cash') {
+      return NextResponse.json({ message: 'Metode pembayaran tidak valid.' }, { status: 400 });
+    }
+
+    const supabaseAdmin = createSupabaseAdminClient();
+
+    // 1. Fetch order to verify its current status
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .select('payment_status, order_status')
+      .eq('id', orderId)
+      .single();
+
+    if (orderError || !order) {
+      return NextResponse.json({ message: 'Pesanan tidak ditemukan.' }, { status: 404 });
+    }
+
+    // Only allow if order is still waiting for payment
+    if (order.payment_status === 'paid' || order.order_status === 'completed' || order.order_status === 'cancelled') {
+      return NextResponse.json({ message: 'Metode pembayaran tidak dapat diubah karena pesanan sudah diproses atau dibayar.' }, { status: 400 });
+    }
+
+    const dbPaymentMethod = paymentMethod === 'Cash' ? 'cash' : 'non_cash';
+
+    const { data: updatedOrder, error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update({
+        payment_method: dbPaymentMethod,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', orderId)
+      .select('*')
+      .single();
+
+    if (updateError) {
+      console.error('Failed to update order payment method:', updateError.message);
+      return NextResponse.json({ message: 'Gagal memperbarui metode pembayaran.' }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, order: updatedOrder });
+  } catch (error) {
+    console.error('API PATCH Order exception:', error);
+    return NextResponse.json({ message: 'Terjadi kesalahan internal server.' }, { status: 500 });
+  }
+}

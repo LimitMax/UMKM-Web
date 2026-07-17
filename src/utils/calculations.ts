@@ -79,6 +79,7 @@ export interface CalculateOrderTotalsParams {
   serviceChargePercentage: number;
   deliverySettings?: DeliverySettings;
   deliveryDistanceKm?: number;
+  voucherDiscountAmount?: number;
 }
 
 export function calculateOrderTotals(params: CalculateOrderTotalsParams): {
@@ -89,6 +90,7 @@ export function calculateOrderTotals(params: CalculateOrderTotalsParams): {
   deliveryAdminFeeAmount: number;
   freeDeliveryApplied: boolean;
   totalAmount: number;
+  voucherDiscountAmount: number;
 } {
   const {
     subtotal,
@@ -99,6 +101,7 @@ export function calculateOrderTotals(params: CalculateOrderTotalsParams): {
     serviceChargePercentage,
     deliverySettings,
     deliveryDistanceKm,
+    voucherDiscountAmount = 0,
   } = params;
 
   const serviceChargeAmount = serviceChargeEnabled
@@ -120,7 +123,7 @@ export function calculateOrderTotals(params: CalculateOrderTotalsParams): {
     deliveryAdminFeeAmount = calculateDeliveryAdminFee(subtotal, deliverySettings);
   }
 
-  const rawTotal = subtotal + serviceChargeAmount + taxAmount + deliveryFeeAmount + deliveryAdminFeeAmount;
+  const rawTotal = subtotal + serviceChargeAmount + taxAmount + deliveryFeeAmount + deliveryAdminFeeAmount - voucherDiscountAmount;
   const totalAmount = Math.max(0, rawTotal);
 
   return {
@@ -131,5 +134,6 @@ export function calculateOrderTotals(params: CalculateOrderTotalsParams): {
     deliveryAdminFeeAmount,
     freeDeliveryApplied,
     totalAmount,
+    voucherDiscountAmount,
   };
 }

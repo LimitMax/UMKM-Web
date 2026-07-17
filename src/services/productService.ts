@@ -1,8 +1,7 @@
-import { Product } from '../types';
+import { Product, DataSourceMode } from '../types';
 import { getStorageItem, setStorageItem, STORAGE_KEYS } from './db';
 import { isSupabaseConfigured, supabaseClient } from '../lib/supabase/client';
 import { supabaseDataSource } from '../lib/data/supabaseDataSource';
-import { DataSourceMode } from '../config/dataSourceConfig';
 
 interface ProductApiResponse {
   product: Product;

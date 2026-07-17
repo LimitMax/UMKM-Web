@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "check_rpcs.js",
+    "run_migration.js",
+    "run_migration_5.js",
   ]),
   // Allow underscore-prefixed parameters to be declared but unused (standard TS convention)
   {

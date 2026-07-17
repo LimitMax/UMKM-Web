@@ -22,12 +22,7 @@ import { useAuth } from '../../../components/AuthProvider';
 import { realtimeService } from '../../../lib/services/realtimeService';
 import { readImageFileAsDataUrl } from '../../../utils/imageUpload';
 
-const CATEGORY_IMAGES = {
-  Makanan: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80',
-  Minuman: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=600&q=80',
-  Snack: 'https://images.unsplash.com/photo-1584776296984-48cd02b0c497?auto=format&fit=crop&w=600&q=80',
-  'Paket Promo': 'https://images.unsplash.com/photo-1626132647523-66f5bf380027?auto=format&fit=crop&w=600&q=80',
-};
+
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -42,6 +37,8 @@ export default function AdminProductsPage() {
   // Form Fields
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ProductCategory>('Makanan');
+  const [customCategory, setCustomCategory] = useState('');
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [price, setPrice] = useState<number>(0);
   const [stock, setStock] = useState<number>(0);
   const [imageUrl, setImageUrl] = useState('');
@@ -106,6 +103,8 @@ export default function AdminProductsPage() {
   const openCreateModal = () => {
     setName('');
     setCategory('Makanan');
+    setCustomCategory('');
+    setIsCustomCategory(false);
     setPrice(0);
     setStock(0);
     setImageUrl('');
@@ -119,7 +118,18 @@ export default function AdminProductsPage() {
   const openEditModal = (prod: Product) => {
     setCurrentId(prod.id);
     setName(prod.name);
-    setCategory(prod.category);
+    
+    const defaults = ['Makanan', 'Minuman', 'Snack', 'Paket Promo'];
+    if (defaults.includes(prod.category)) {
+      setCategory(prod.category);
+      setIsCustomCategory(false);
+      setCustomCategory('');
+    } else {
+      setCategory('Lainnya');
+      setIsCustomCategory(true);
+      setCustomCategory(prod.category);
+    }
+    
     setPrice(prod.price);
     setStock(prod.stock);
     setImageUrl(prod.imageUrl);
@@ -165,8 +175,13 @@ export default function AdminProductsPage() {
       return;
     }
 
-    // Set fallback image URL matching category if empty
-    const finalImageUrl = imageUrl.trim() || CATEGORY_IMAGES[category];
+    const finalCategory = isCustomCategory ? customCategory.trim() : category;
+    if (isCustomCategory && !customCategory.trim()) {
+      setErrorMsg('Nama kategori kustom wajib diisi.');
+      return;
+    }
+
+    const finalImageUrl = imageUrl.trim();
 
     try {
       if (!businessId) {
@@ -176,7 +191,7 @@ export default function AdminProductsPage() {
       if (modalMode === 'create') {
         await productService.createProduct({
           name,
-          category,
+          category: finalCategory,
           price,
           stock,
           imageUrl: finalImageUrl,
@@ -186,7 +201,7 @@ export default function AdminProductsPage() {
       } else if (modalMode === 'edit' && currentId) {
         await productService.updateProduct(currentId, {
           name,
-          category,
+          category: finalCategory,
           price,
           stock,
           imageUrl: finalImageUrl,
@@ -229,6 +244,9 @@ export default function AdminProductsPage() {
     return matchesCategory && matchesSearch;
   });
 
+  // Dynamically compile categories for admin filter
+  const adminCategories = ['Semua', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))];
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header section */}
@@ -263,14 +281,14 @@ export default function AdminProductsPage() {
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none flex-shrink-0">
-            {['Semua', 'Makanan', 'Minuman', 'Snack', 'Paket Promo'].map((cat) => (
+            {adminCategories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   selectedCategory === cat
                     ? 'bg-slate-800 text-emerald-400 border border-emerald-500/25'
-                    : 'bg-slate-900/50 text-slate-450 border border-slate-850 hover:text-white'
+                    : 'bg-slate-900/50 text-slate-455 border border-slate-850 hover:text-white'
                 }`}
               >
                 {cat}
@@ -328,14 +346,20 @@ export default function AdminProductsPage() {
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0">
-                          <Image
-                            src={prod.imageUrl || CATEGORY_IMAGES[prod.category as keyof typeof CATEGORY_IMAGES] || CATEGORY_IMAGES.Makanan} 
-                            alt={prod.name} 
-                            fill
-                            sizes="40px"
-                            unoptimized
-                            className="w-full h-full object-cover" 
-                          />
+                          {prod.imageUrl ? (
+                            <Image
+                              src={prod.imageUrl} 
+                              alt={prod.name} 
+                              fill
+                              sizes="40px"
+                              unoptimized
+                              className="w-full h-full object-cover" 
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-[9px] font-bold uppercase text-slate-500 bg-slate-900 border border-slate-850/30">
+                              Blank
+                            </div>
+                          )}
                         </div>
                         <div>
                           <p className="font-bold text-white text-xs max-w-[180px] md:max-w-[220px] truncate" title={prod.name}>
@@ -456,18 +480,43 @@ export default function AdminProductsPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Kategori *</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as ProductCategory)}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="Makanan">Makanan</option>
-                    <option value="Minuman">Minuman</option>
-                    <option value="Snack">Snack</option>
-                    <option value="Paket Promo">Paket Promo</option>
-                  </select>
+                <div className="flex flex-col gap-1.5">
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Kategori *</label>
+                    <select
+                      value={isCustomCategory ? 'Lainnya' : category}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'Lainnya') {
+                          setIsCustomCategory(true);
+                          setCategory('Lainnya');
+                        } else {
+                          setIsCustomCategory(false);
+                          setCategory(val);
+                        }
+                      }}
+                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="Makanan">Makanan</option>
+                      <option value="Minuman">Minuman</option>
+                      <option value="Snack">Snack</option>
+                      <option value="Paket Promo">Paket Promo</option>
+                      <option value="Lainnya">Lainnya (Input Manual)</option>
+                    </select>
+                  </div>
+                  {isCustomCategory && (
+                    <div className="animate-fade-in">
+                      <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Kategori Manual *</label>
+                      <input
+                        type="text"
+                        required
+                        value={customCategory}
+                        onChange={(e) => setCustomCategory(e.target.value)}
+                        placeholder="Kategori kustom..."
+                        className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">Harga (Rupiah) *</label>

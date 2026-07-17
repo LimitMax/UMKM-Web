@@ -59,6 +59,8 @@ interface DbOrder {
   items_error?: string | null;
   items?: DbOrderItem[];
   payments?: DbPayment[];
+  voucher_code?: string | null;
+  voucher_discount_amount?: number | string | null;
 }
 
 export function mapDbStatusToFrontend(dbStatus: string): OrderStatus {
@@ -186,6 +188,8 @@ export function mapDbOrderToOrder(dbOrder: DbOrder): Order {
     paidAt: dbOrder.paid_at || (latestPayment ? latestPayment.paid_at : undefined),
     completedAt: dbOrder.completed_at || undefined,
     cancelledAt: dbOrder.cancelled_at || undefined,
+    voucherCode: dbOrder.voucher_code || undefined,
+    voucherDiscountAmount: dbOrder.voucher_discount_amount !== null && dbOrder.voucher_discount_amount !== undefined ? Number(dbOrder.voucher_discount_amount) : undefined,
 
     itemsError: dbOrder.items_error || undefined,
     items

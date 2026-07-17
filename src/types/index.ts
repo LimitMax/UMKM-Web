@@ -1,4 +1,6 @@
-export type ProductCategory = 'Makanan' | 'Minuman' | 'Snack' | 'Paket Promo';
+export type ProductCategory = string;
+export type DataSourceMode = 'localStorage' | 'supabase';
+
 
 export type FulfillmentType = 'dine_in' | 'pickup' | 'delivery';
 
@@ -116,6 +118,8 @@ export interface Order {
   paymentProvider?: string;
   paymentChannel?: string;
   providerReferenceId?: string;
+  voucherCode?: string;
+  voucherDiscountAmount?: number;
 }
 
 export interface BusinessProfile {

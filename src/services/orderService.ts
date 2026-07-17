@@ -1,11 +1,10 @@
 import { Order, OrderStatus, PaymentStatus, OrderItem } from '../types';
 import { getStorageItem, setStorageItem, STORAGE_KEYS } from './db';
 import { productService } from './productService';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabaseClient as supabase } from '../lib/supabase/client';
 import { businessService } from './businessService';
 import { calculateOrderTotals } from '../utils/calculations';
 import { calculateOrderEta, applyEtaAdjustment } from '../utils/etaHelpers';
-import { isSupabaseConfigured } from '../lib/supabase/client';
 import { 
   mapDbOrderToOrder, 
   mapFrontendStatusToDb, 
@@ -141,6 +140,7 @@ export const orderService = {
     deliveryDistanceSource?: string;
     deliveryFeeCalculationType?: Order['deliveryFeeCalculationType'];
     businessId?: string;
+    voucherCode?: string;
   }): Promise<Order> {
     if (USE_SUPABASE) {
       const response = await fetch('/api/orders', {

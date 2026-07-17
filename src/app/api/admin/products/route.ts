@@ -15,7 +15,7 @@ interface ProductRequestBody {
   product?: Omit<Product, 'id'> | Partial<Omit<Product, 'id'>>;
 }
 
-async function verifyAdminBusinessAccess(request: Request, businessId: string) {
+async function verifyStaffBusinessAccess(request: Request, businessId: string) {
   const authHeader = request.headers.get('authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
@@ -46,9 +46,9 @@ async function verifyAdminBusinessAccess(request: Request, businessId: string) {
     };
   }
 
-  if (authProfile.role !== 'admin') {
+  if (authProfile.role !== 'admin' && authProfile.role !== 'owner' && authProfile.role !== 'cashier') {
     return {
-      error: NextResponse.json({ message: 'Hanya admin yang dapat mengelola produk.' }, { status: 403 }),
+      error: NextResponse.json({ message: 'Hanya admin, owner, atau kasir yang dapat mengakses.' }, { status: 403 }),
     };
   }
 
@@ -58,7 +58,7 @@ async function verifyAdminBusinessAccess(request: Request, businessId: string) {
     };
   }
 
-  return { supabaseAdmin };
+  return { supabaseAdmin, role: authProfile.role };
 }
 
 function parseBusinessId(body: ProductRequestBody | null) {
@@ -79,8 +79,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Payload produk tidak valid.' }, { status: 400 });
     }
 
-    const authResult = await verifyAdminBusinessAccess(request, businessId);
+    const authResult = await verifyStaffBusinessAccess(request, businessId);
     if (authResult.error) return authResult.error;
+
+    if (authResult.role !== 'admin' && authResult.role !== 'owner') {
+      return NextResponse.json({ message: 'Hanya admin atau owner yang dapat menambahkan produk.' }, { status: 403 });
+    }
 
     const insertPayload = mapProductToSupabaseInsert(product, businessId);
     const { data, error } = await authResult.supabaseAdmin!
@@ -112,8 +116,20 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: 'Payload produk tidak valid.' }, { status: 400 });
     }
 
-    const authResult = await verifyAdminBusinessAccess(request, businessId);
+    const authResult = await verifyStaffBusinessAccess(request, businessId);
     if (authResult.error) return authResult.error;
+
+    if (authResult.role === 'cashier') {
+      // Cashier is only allowed to edit product stock
+      const productKeys = Object.keys(product || {});
+      const hasOtherKeys = productKeys.some((k) => k !== 'stock');
+      if (hasOtherKeys) {
+        return NextResponse.json(
+          { message: 'Kasir hanya diperbolehkan merubah stok produk.' },
+          { status: 403 }
+        );
+      }
+    }
 
     const updatePayload = {
       ...mapProductToSupabaseUpdate(product),
@@ -150,8 +166,12 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ message: 'Payload produk tidak valid.' }, { status: 400 });
     }
 
-    const authResult = await verifyAdminBusinessAccess(request, businessId);
+    const authResult = await verifyStaffBusinessAccess(request, businessId);
     if (authResult.error) return authResult.error;
+
+    if (authResult.role !== 'admin' && authResult.role !== 'owner') {
+      return NextResponse.json({ message: 'Hanya admin atau owner yang dapat menghapus produk.' }, { status: 403 });
+    }
 
     const { error } = await authResult.supabaseAdmin!
       .from('products')

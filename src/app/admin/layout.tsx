@@ -22,6 +22,7 @@ import {
   CreditCard,
   AlertTriangle,
   Globe,
+  Ticket,
 } from 'lucide-react';
 import { useAuth } from '../../components/AuthProvider';
 import RoleGuardBanner from '../../components/RoleGuardBanner';
@@ -173,6 +174,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/stock', label: 'Kelola Stok', icon: Layers },
     { href: '/admin/transactions', label: 'Transaksi', icon: History },
     { href: '/admin/reports', label: 'Laporan', icon: ClipboardList },
+    { href: '/admin/vouchers', label: 'Promo & Voucher', icon: Ticket },
     { href: '/admin/insights', label: 'AI Insights', icon: Brain },
     { href: '/admin/settings', label: 'Pengaturan Bisnis', icon: Settings },
   ];

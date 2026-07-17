@@ -34,6 +34,8 @@ interface OrderRow {
   payment_method: string;
   payment_status: string;
   order_status: string;
+  voucher_code?: string | null;
+  voucher_discount_amount?: number | null;
   items?: OrderItemRow[];
 }
 
@@ -66,6 +68,19 @@ function buildItemDetails(order: OrderRow): NonNullable<MidtransSnapTransactionP
   addFeeItem('delivery-fee', 'Ongkos Kirim', order.delivery_fee_amount);
   addFeeItem('delivery-admin-fee', 'Biaya Admin Delivery', order.delivery_admin_fee_amount);
 
+  // Add voucher discount as a negative price item
+  if (order.voucher_code && order.voucher_discount_amount) {
+    const discountVal = normalizeAmount(order.voucher_discount_amount);
+    if (discountVal > 0) {
+      items.push({
+        id: 'voucher-discount',
+        name: `Diskon Voucher: ${order.voucher_code}`.slice(0, 50),
+        price: -discountVal,
+        quantity: 1,
+      });
+    }
+  }
+
   const itemsTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const adjustment = grossAmount - itemsTotal;
 
@@ -79,7 +94,12 @@ function buildItemDetails(order: OrderRow): NonNullable<MidtransSnapTransactionP
   }
 
   if (adjustment < 0) {
-    throw new Error('Total item Midtrans melebihi gross_amount pesanan.');
+    items.push({
+      id: 'order-adjustment-discount',
+      name: 'Diskon Penyesuaian',
+      price: adjustment,
+      quantity: 1,
+    });
   }
 
   return items;

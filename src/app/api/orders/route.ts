@@ -100,6 +100,54 @@ export async function POST(request: Request) {
       return sum + (Number(product.price) * item.quantity);
     }, 0);
 
+    // Voucher validation and discount calculation
+    const reqVoucherCode = typeof body.voucherCode === 'string' ? body.voucherCode.trim().toUpperCase() : '';
+    let voucherDiscountAmount = 0;
+    let appliedVoucher = null;
+
+    if (reqVoucherCode) {
+      const { data: voucher, error: voucherError } = await supabaseAdmin
+        .from('business_vouchers')
+        .select('*')
+        .eq('business_id', finalBusinessId)
+        .eq('code', reqVoucherCode)
+        .maybeSingle();
+
+      if (voucherError || !voucher) {
+        return NextResponse.json({ message: 'Voucher tidak valid.' }, { status: 400 });
+      }
+
+      if (!voucher.is_active) {
+        return NextResponse.json({ message: 'Voucher sedang tidak aktif.' }, { status: 400 });
+      }
+
+      const now = new Date();
+      if (now < new Date(voucher.start_date)) {
+        return NextResponse.json({ message: 'Voucher belum dapat digunakan.' }, { status: 400 });
+      }
+      if (now > new Date(voucher.end_date)) {
+        return NextResponse.json({ message: 'Masa berlaku voucher telah habis.' }, { status: 400 });
+      }
+
+      if (subtotal < Number(voucher.min_order_amount)) {
+        return NextResponse.json({ message: 'Minimum pembelian voucher belum terpenuhi.' }, { status: 400 });
+      }
+
+      if (voucher.usage_limit !== null && voucher.used_count >= voucher.usage_limit) {
+        return NextResponse.json({ message: 'Kuota penggunaan voucher telah habis.' }, { status: 400 });
+      }
+
+      if (voucher.discount_type === 'percentage') {
+        const calculated = Math.round(subtotal * (Number(voucher.discount_value) / 100));
+        voucherDiscountAmount = voucher.max_discount ? Math.min(Number(voucher.max_discount), calculated) : calculated;
+      } else if (voucher.discount_type === 'fixed') {
+        voucherDiscountAmount = Number(voucher.discount_value);
+      }
+
+      voucherDiscountAmount = Math.min(subtotal, voucherDiscountAmount);
+      appliedVoucher = voucher;
+    }
+
     // 5. Compute totals (tax, service charge, delivery fees)
     const totals = calculateOrderTotals({
       subtotal,
@@ -110,6 +158,7 @@ export async function POST(request: Request) {
       serviceChargePercentage: Number(business.service_charge_percentage),
       deliverySettings: business.delivery_settings,
       deliveryDistanceKm: body.deliveryDistanceKm,
+      voucherDiscountAmount,
     });
 
     // 6. Generate queue number (A001, A002 etc. resetting daily)
@@ -215,6 +264,8 @@ export async function POST(request: Request) {
       order_status: 'pending',
       created_at: createdAt,
       updated_at: createdAt,
+      voucher_code: reqVoucherCode || null,
+      voucher_discount_amount: voucherDiscountAmount,
       // ETA fields
       ...(etaResult ? {
         estimated_preparation_minutes: etaResult.estimatedPreparationMinutes,
@@ -236,6 +287,21 @@ export async function POST(request: Request) {
     if (insertOrderError) {
       console.error('Insert order error:', insertOrderError.message);
       return NextResponse.json({ message: 'Gagal membuat pesanan di database.' }, { status: 500 });
+    }
+
+    // 9.5 If a voucher was applied, increment its used_count
+    if (appliedVoucher) {
+      const { error: updateVoucherError } = await supabaseAdmin
+        .from('business_vouchers')
+        .update({ 
+          used_count: (appliedVoucher.used_count || 0) + 1,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', appliedVoucher.id);
+
+      if (updateVoucherError) {
+        console.error('Failed to increment voucher usage count:', updateVoucherError.message);
+      }
     }
 
     // 10. Construct order items rows
