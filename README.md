@@ -143,23 +143,23 @@ Data security and tenant isolation are enforced directly in PostgreSQL via **Sup
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Customer
-    participant Tracker as Order Tracker (/track)
-    participant API as Track API (/api/public/orders/track)
+    actor Customer as Customer
+    participant Tracker as Order Tracker Page
+    participant API as Track API Endpoint
     participant CoreAPI as Midtrans Core API
     participant DB as Supabase PostgreSQL
     participant Realtime as Cashier WebSocket
 
-    Customer->>Tracker: Customer opens tracker page (/order/warung-kopi/track?code=K8P2Q9)
+    Customer->>Tracker: Customer opens tracker page
     loop Every 3 seconds (while payment is pending)
-        Tracker->>API: POST /api/public/orders/track { orderId, trackingCode }
-        API->>CoreAPI: GET /v2/{order_id}/status (Midtrans Core API)
-        CoreAPI-->>API: 200 OK (transaction_status: "settlement")
-        API->>DB: Update payment status='paid' & order status='Paid'
+        Tracker->>API: POST /api/public/orders/track
+        API->>CoreAPI: GET /v2/order_id/status (Midtrans Core API)
+        CoreAPI-->>API: 200 OK (transaction_status: settlement)
+        API->>DB: Update payment status to paid & order status to Paid
         DB-->>Realtime: Fire postgres_changes broadcast event
         Realtime-->>Cashier: Instant order notification sound & queue update
-        API-->>Tracker: Returns order object { paymentStatus: 'paid' }
-        Tracker->>Tracker: Stop 3s poller & render Green Success Banner
+        API-->>Tracker: Returns order object (paymentStatus: paid)
+        Tracker->>Tracker: Stop 3-second poller & render green success banner
     end
 ```
 
@@ -167,15 +167,15 @@ sequenceDiagram
 
 ```mermaid
 graph TD
-    User[Client Request: JWT Token] --> Gateway[Next.js App Router API / RLS Engine]
+    User["Client Request (JWT Token)"] --> Gateway["Next.js App Router API & RLS Engine"]
     
-    subgraph PostgreSQL Row Level Security (RLS)
-        Gateway --> AuthCheck{Check auth.uid()}
-        AuthCheck -->|Extract business_id| RLSFilter[Apply RLS Policy: WHERE business_id = user_business_id]
+    subgraph RLS_Sub ["PostgreSQL Row Level Security"]
+        Gateway --> AuthCheck{"Check auth.uid()"}
+        AuthCheck -->|"Extract business_id"| RLSFilter["Apply RLS Policy: WHERE business_id = user_business_id"]
     end
 
-    RLSFilter -->|Tenant A| DataA[(Merchant A Data Isolated)]
-    RLSFilter -->|Tenant B| DataB[(Merchant B Data Isolated)]
+    RLSFilter -->|"Tenant A"| DataA[("Merchant A Data (Isolated)")]
+    RLSFilter -->|"Tenant B"| DataB[("Merchant B Data (Isolated)")]
 ```
 
 ---
