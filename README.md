@@ -1,135 +1,137 @@
 # 🚀 UMKM Pilot
 
-### A Production-Grade Multi-Tenant SaaS Platform with Split-Payment Gateways & LLM-Powered Business Analytics
+### A Production-Grade Multi-Tenant SaaS Platform with Split-Payment Gateways, Instant Auto-Sync, and LLM-Powered Business Analytics
 
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-Database-emerald?style=for-the-badge&logo=supabase)](https://supabase.com/)
 [![Midtrans](https://img.shields.io/badge/Midtrans-Gateway-navy?style=for-the-badge&logo=cashapp)](https://midtrans.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
+[![Vitest](https://img.shields.io/badge/Vitest-Unit_Tests-yellow?style=for-the-badge&logo=vitest)](https://vitest.dev/)
+[![Playwright](https://img.shields.io/badge/Playwright-E2E_Tests-green?style=for-the-badge&logo=playwright)](https://playwright.dev/)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 ---
 
-## 📖 Introduction
+## 📋 Table of Contents
 
-**UMKM Pilot** is a comprehensive, production-ready, multi-tenant SaaS application designed to empower Micro, Small, and Medium Enterprises (UMKM/MSMEs) with state-of-the-art digital tools. The platform streamlines end-to-end business operations—enabling merchants to publish interactive digital catalogs, handle real-time cashier order queues, manage stock levels, calculate dynamic distance-based delivery fees, and receive customer payments directly into their own accounts.
-
-Furthermore, UMKM Pilot features an advanced **LLM-powered Business Coach & Analyst** that delivers contextual sales insights, identifies inventory anomalies, and recommends actionable promotion campaigns.
+- [📖 Introduction & Overview](#-introduction--overview)
+- [✨ Core Application Modules](#-core-application-modules)
+- [🛠️ Technology Stack](#️-technology-stack)
+- [🏗️ Multi-Tenant Architecture & Payment Flow](#️-multi-tenant-architecture--payment-flow)
+- [⚡ Local Development & Setup](#-local-development--setup)
+- [🧪 Automated Testing Guide (Vitest + Playwright)](#-automated-testing-guide-vitest--playwright)
+- [🗂️ Project Directory Structure](#️-project-directory-structure)
+- [🚀 Deployment & Production Checklist](#-deployment--production-checklist)
+- [📄 License](#-license)
 
 ---
 
-## 📸 Platform Preview
+## 📖 Introduction & Overview
 
-Below are placeholders representing key dashboard screens of the platform:
+**UMKM Pilot** is an end-to-end, multi-tenant SaaS application designed specifically for Micro, Small, and Medium Enterprises (UMKM / MSMEs). The platform streamlines the entire retail and culinary sales pipeline:
+1. **Self-Ordering Digital Catalog**: Mobile-first store page accessed via business slug (`/order/[businessSlug]`).
+2. **Direct Tenant Payment Gateway**: Payments process directly into the merchant's Midtrans account (QRIS, GoPay, ShopeePay, Virtual Accounts, Credit Cards).
+3. **Automated Real-Time Payment Auto-Sync**: Customer order status automatically updates to **Sudah Dibayar** as soon as payment settles—eliminating cashier validation bottlenecks and webhook dependencies.
+4. **Real-Time Cashier Console**: Orders stream instantly to cashiers via Supabase Realtime WebSocket channels (`/cashier`).
+5. **LLM-Powered Business Analytics**: **Nara AI Pilot** provides merchants with data-driven sales advice, inventory warnings, and automatic promo campaign recommendations.
 
-![Merchant Admin Analytics Dashboard](file:///d:/Riset/UMKM%20Web/docs/images/admin_analytics_placeholder.png)
-*Figure 1: Merchant Admin Dashboard showing live analytical charts and LLM-powered sales insights.*
+---
 
-![Customer Ordering Page](file:///d:/Riset/UMKM%20Web/docs/images/customer_catalog_placeholder.png)
-*Figure 2: Mobile-first customer ordering menu featuring dynamic filters and checkout controls.*
+## ✨ Core Application Modules
 
-![Real-time Cashier Queue Console](file:///d:/Riset/UMKM%20Web/docs/images/cashier_console_placeholder.png)
-*Figure 3: Cashier interface showing real-time incoming orders, fulfillment actions, and stock controls.*
+### 🛒 1. Customer Ordering & Self-Tracking
+- **Dynamic Digital Menu**: Instant loading via store slug with category navigation and live product search.
+- **Midtrans Payment Integration**: Native Snap payment popup supporting QRIS, Virtual Accounts (BCA, BNI, BRI, Permata, Mandiri, CIMB), E-Wallets, and Credit Cards.
+- **3-Second Auto-Polling Status Tracker**: Real-time status tracker (`/order/[businessSlug]/track`) that polls status every 3 seconds for pending payments and automatically stops when settled.
+- **Printable Digital Receipts**: Accessible digital receipt view (`/receipt/[orderId]`).
+
+### 🏪 2. Cashier Operations Console
+- **Sub-Second Real-Time Queue**: Instant order arrival via Supabase Realtime broadcast channels (`/cashier`).
+- **Atomic Order Lifecycle**: Transition order status (`pending` → `paid` → `processing` → `ready` → `completed` / `cancelled`).
+- **Automatic Inventory Reconciliation**: Stock is deducted upon checkout and restored automatically if an order is cancelled.
+
+### 📊 3. Merchant Administration Dashboard
+- **Business Insights**: Live performance charts, daily revenue metrics, top-selling items, and fulfillment breakdowns (`/admin/insights`).
+- **Inventory Control**: Low-stock alerts, stock adjustments, and product catalog management (`/admin/products`, `/admin/stock`).
+- **Promo Vouchers**: Merchant-configurable discount codes with redemption limits (`/admin/vouchers`).
+- **Nara AI Pilot Assistant**: Contextual AI assistant analyzing real-time store metrics.
+
+### 🏢 4. Platform Owner Portal
+- **Tenant Management**: Multi-tenant business metrics, plan statuses, and business toggles (`/platform/businesses`).
+- **SaaS Plan Billing**: Automated billing for Starter/Pro tiers (`/platform/subscriptions`).
+- **Platform Campaign Coupons**: Global promotional coupons across stores (`/platform/coupons`).
+- **System Monitoring**: Live health check monitoring Supabase, Auth, Midtrans, and AI engines (`/platform/monitoring`).
 
 ---
 
 ## 🛠️ Technology Stack
 
-UMKM Pilot is built on a modern, robust, and highly-scalable stack:
-
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Framework** | **Next.js 15 (App Router)** | Server-side rendering (SSR), API routes, and optimized routing |
-| **Language** | **TypeScript** | Static typing and compile-time code safety |
-| **Database** | **PostgreSQL (Supabase)** | Relational database hosting core tenant schemas |
-| **Auth & Security** | **Supabase Auth & RLS** | Multi-tenant row separation and role authorization guards |
-| **Realtime** | **Supabase Broadcast Channels** | Sub-second order notifications and cashier state synchronization |
-| **Styling** | **Vanilla CSS & Tailwind** | Premium UI aesthetics, custom glassmorphic styling, and dark mode |
-| **Payments** | **Midtrans Snap & Core API** | Tenant-split payment routing (Platform Subscriptions vs Merchant Sales) |
-| **AI / LLM** | **OpenAI API Standard** | Analytical engine and Tanya AI Pilot conversational interface |
+| **Framework** | **Next.js 16.2 (App Router + Turbopack)** | SSR, API routes, and optimized routing |
+| **Language** | **TypeScript 5** | End-to-end static typing and compile-time safety |
+| **Database** | **PostgreSQL (Supabase)** | Multi-tenant database with Row Level Security (RLS) |
+| **Auth & Security** | **Supabase Auth & RLS** | Tenant isolation and session authentication |
+| **Realtime** | **Supabase Realtime** | Sub-second order queue WebSockets |
+| **Payments** | **Midtrans Snap & Core API** | Tenant-split payments & non-blocking status auto-sync |
+| **Unit Testing** | **Vitest + JSDOM** | Fast unit and helper function testing |
+| **E2E Testing** | **Playwright** | End-to-end browser user journey testing |
+| **AI Engine** | **OpenAI API Standard** | Nara AI Pilot analytical engine |
 
 ---
 
-## 🏗️ Multi-Tenant SaaS Architecture
+## 🏗️ Multi-Tenant Architecture & Payment Flow
 
-UMKM Pilot leverages a **shared-database, isolated-schema** architecture enforced through PostgreSQL **Row Level Security (RLS)**.
+### PostgreSQL Row Level Security (RLS)
+Data isolation across tenants is strictly enforced at the database level using `business_id` filters.
 
 ```mermaid
 graph TD
-    Client[Customer / Cashier / Owner] -->|Requests| Gateway[Next.js API Gateway]
-    Gateway -->|Applies JWT & Auth Headers| DB[(Supabase PostgreSQL Database)]
-    
-    subgraph Database Security Policies
-        DB --> RLS_Biz[Businesses Table: tenant_id Check]
-        DB --> RLS_Prod[Products Table: tenant_id Check]
-        DB --> RLS_Ord[Orders Table: tenant_id Check]
+    Client[Customer / Cashier / Owner] -->|HTTP / REST| Gateway[Next.js App Router]
+    Gateway -->|JWT Session / Auth| DB[(Supabase PostgreSQL)]
+
+    subgraph Database RLS Policies
+        DB --> RLS_Biz[Businesses Table: tenant_id check]
+        DB --> RLS_Prod[Products Table: tenant_id check]
+        DB --> RLS_Ord[Orders Table: tenant_id check]
     end
 
-    RLS_Biz -->|Allow Read/Write| TenantA[Tenant A Data]
-    RLS_Biz -->|Block Access| TenantB[Tenant B Data]
+    RLS_Biz -->|Allow Access| MerchantA[Merchant A Workspace]
+    RLS_Biz -->|Block Access| MerchantB[Merchant B Workspace]
 ```
 
-### Row Level Security (RLS)
-Every database transaction is guarded by strict RLS policies. The tenant identifier is parsed directly from the authenticated JWT session or public store slug. This setup prevents cross-tenant data leakage.
+### Automatic Payment Synchronization Sequence
 
-### Dynamic Tenant-Split Payments
-To support independent merchants, the platform supports a dual-credential payment pipeline:
-1. **Platform Level (SaaS Subscriptions)**: Subscriptions to Starter/Pro plans are billed using the **Platform Owner's** Midtrans gateway credentials.
-2. **Tenant Level (Merchant Sales)**: Customer orders placed at a specific store are billed using the **Merchant's** own Midtrans Server/Client keys, configured in their business dashboard. Funds flow directly into the merchant's account.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer
+    participant Tracker as Order Tracker (/track)
+    participant API as Track API (/api/public/orders/track)
+    participant CoreAPI as Midtrans Core API
+    participant DB as Supabase PostgreSQL
 
----
-
-## 🤖 AI Capabilities
-
-UMKM Pilot integrates Large Language Models to transform raw transaction data into operational strategy:
-
-*   **Tanya AI Chat Pilot**: A floating, contextual chat assistant trained on the merchant's real-time inventory and sales metrics. It answers operational questions, flags low-stock items, and writes marketing copy on demand.
-*   **Analytical Widgets**: Automated dashboards that generate summaries of daily sales trends, best-selling product categories, and optimal times for staffing adjustments.
-*   **Smart Promo Generator**: Suggests dynamic, stock-aware discount vouchers (e.g., clearance codes for high-stock items) to improve capital turnover.
-
----
-
-## 🗂️ Project Directory Structure
-
-```text
-UMKM-Web/
-├── docs/                       # Platform images and architecture documentation
-├── public/                     # Static public assets (icons, logos)
-├── supabase/
-│   └── migrations/             # SQL migrations in chronological order
-├── src/
-│   ├── app/                    # Next.js App Router folders
-│   │   ├── admin/              # Merchant management dashboard modules
-│   │   ├── api/                # Secure serverless API endpoints
-│   │   ├── cashier/            # Cashier queue management screen
-│   │   ├── login/              # Unified authentication portal
-│   │   ├── order/              # Customer catalog and tracker interfaces
-│   │   ├── platform/           # Platform-owner control dashboard
-│   │   ├── register/           # Multi-step business onboarding portal
-│   │   └── suspended/          # Subscription alert/block pages
-│   ├── components/             # Reusable UI elements (providers, overlays)
-│   ├── lib/
-│   │   ├── services/           # Data services (profiles, real-time sync)
-│   │   ├── supabase/           # Database clients (client, admin, middleware)
-│   │   └── subscription/       # Trial calculations and payment webhooks
-│   ├── services/               # Front-end API integration helpers
-│   ├── types/                  # Shared TypeScript interfaces & types
-│   └── utils/                  # Calculations, currency formatters, and helpers
-└── run_migration.js            # Node script for database setup
+    Customer->>Tracker: Opens tracking page (/track?code=K8P2Q9)
+    loop Every 3 seconds (if pending)
+        Tracker->>API: POST /api/public/orders/track
+        API->>CoreAPI: GET /v2/{order_id}/status
+        CoreAPI-->>API: 200 OK (transaction_status: settlement)
+        API->>DB: UPDATE payments SET status='paid' & orders SET payment_status='paid'
+        API-->>Tracker: Returns order (paymentStatus: 'paid')
+        Tracker->>Tracker: Clear 3s interval, show Green Success Alert Banner
+    end
 ```
 
 ---
 
-## ⚡ Installation & Local Development
-
-Follow these steps to set up a local development environment:
+## ⚡ Local Development & Setup
 
 ### Prerequisites
-- Node.js (v18.x or newer)
-- A Supabase Project
-- A Midtrans Sandbox Account
+- **Node.js**: v18.x or newer
+- **Supabase**: Active Supabase project
+- **Midtrans Account**: Sandbox account keys
 
-### 1. Clone the Repository & Install Dependencies
+### 1. Clone & Install Dependencies
 ```bash
 git clone https://github.com/your-username/umkm-pilot.git
 cd umkm-pilot
@@ -137,7 +139,7 @@ npm install
 ```
 
 ### 2. Configure Environment Variables
-Create a `.env.local` file in the root directory. Use the template below:
+Create `.env.local` in the project root:
 
 ```env
 # Supabase Configuration
@@ -153,7 +155,7 @@ LLM_API_KEY=your-api-key
 LLM_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-4o-mini
 
-# Midtrans Payment Gateway Configuration
+# Midtrans Gateway Configuration
 NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=SB-Mid-client-your-client-key
 MIDTRANS_SERVER_KEY=SB-Mid-server-your-server-key
 NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION=false
@@ -161,81 +163,97 @@ MIDTRANS_SNAP_BASE_URL=https://app.sandbox.midtrans.com
 MIDTRANS_CORE_API_BASE_URL=https://api.sandbox.midtrans.com
 ```
 
-### 3. Setup Database Schema & Migrations
-Apply the SQL files inside `supabase/migrations/` in chronological order:
-1. `20260716000001_initial_schema.sql` - Core products, orders, profile, and pricing schema tables.
-2. `20260716000002_rls_policies.sql` - Enable RLS security rules on all tenant layers.
-3. `20260716000003_seed_data.sql` - Seed starter subscription plans.
-4. `20260717000004_business_vouchers.sql` - Create vouchers schemas.
-5. `20260717000005_business_vouchers_rls.sql` - Enable RLS vouchers policies.
-
-You can apply these files via your Supabase SQL Editor web console or using the Supabase CLI (`supabase db push`).
-
-> [!NOTE]
-> If you need to wipe transactional data and reset the UAT workspace during testing, run the helper SQL script located at [reset_database.sql](file:///d:/Riset/UMKM%20Web/supabase/reset_database.sql) in your Supabase SQL Editor.
-
-
-### 4. Run the Development Server
+### 3. Run Development Server
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser to view the application.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🚀 Deployment (Vercel + Supabase)
+## 🧪 Automated Testing Guide (Vitest + Playwright)
 
-### Deploying the Database (Supabase)
-1. Link your local project using the Supabase CLI, or paste the schemas in `supabase/migrations/` directly into the Supabase SQL Web Console.
-2. In the **Database API** settings of Supabase, enable the PostgreSQL Realtime channel for tables: `orders` and `products`.
+The project includes unit, integration, and end-to-end test suites.
 
-### Deploying the Frontend (Vercel)
-1. Import this repository into Vercel.
-2. Populate the **Environment Variables** in your Vercel project settings using the keys specified in your `.env.local`.
-3. Set the **Build Command** to:
-   ```bash
-   npm run build
-   ```
-4. Configure Midtrans Webhooks in your Midtrans Dashboard to point to your deployed production domain:
-   - **Merchant Sales Webhook**: `https://your-domain.vercel.app/api/webhooks/midtrans`
-   - **SaaS Subscription Webhook**: Configured similarly or using split targets as specified by the platform setup.
+### 1. Unit & Integration Testing (Vitest)
+Vitest executes tests for currency formatting, status mapping, and payment type conversions.
 
----
+```bash
+# Run unit tests once
+npm run test
 
-## 🛣️ Roadmap & Milestones
+# Run unit tests in watch mode
+npm run test:watch
+```
 
-### Completed Milestones
-*   [x] Core Multi-Tenant database schema & Row Level Security (RLS) rules.
-*   [x] Mobile-first Customer Ordering interface with dynamic category tabs.
-*   [x] Real-time Cashier Queue Dashboard with automatic stock-level reconciliation upon cancellation.
-*   [x] Multi-Merchant payment splitting using custom Midtrans API keys.
-*   [x] Dynamic Delivery Fee structures with configurable rounding behaviors (Ceil, Floor, Round).
-*   [x] Contextual LLM-powered Tanya AI chatbot and automated analytical insights.
-*   [x] Dynamic "Blank" image placeholders for cleaner UI catalog presentation.
+### 2. End-to-End Testing (Playwright)
+Playwright tests complete customer user journeys (catalog navigation, invalid code validation, cashier views).
 
-### Upcoming Roadmap
-*   [ ] Multi-outlet/branch support for enterprise-scale tenants.
-*   [ ] Offline cashier queue synchronizer for weak connection situations.
-*   [ ] Native iOS & Android companion applications for instant order push alerts.
+```bash
+# Install Playwright browser binaries (first-time setup)
+npx playwright install
+
+# Run E2E tests in headless mode
+npm run test:e2e
+```
 
 ---
 
-## 🤝 Contribution Guidelines
+## 🗂️ Project Directory Structure
 
-We welcome contributions from the open-source community! To contribute:
+```text
+UMKM-Web/
+├── docs/                       # Architecture guides & checklists
+├── public/                     # Brand logos and static icons
+├── supabase/
+│   ├── migrations/             # SQL migrations in chronological order
+│   └── reset_database.sql      # Test workspace reset script
+├── tests/
+│   ├── e2e/                    # Playwright E2E browser tests
+│   │   └── order-flow.spec.ts
+│   └── unit/                   # Vitest unit test suites
+│       ├── format.test.ts
+│       └── paymentHelpers.test.ts
+├── src/
+│   ├── app/                    # Next.js App Router
+│   │   ├── admin/              # Merchant management dashboard
+│   │   ├── api/                # Secure API endpoints
+│   │   ├── cashier/            # Real-time cashier queue console
+│   │   ├── login/              # Authentication portal
+│   │   ├── order/              # Customer ordering & tracking
+│   │   ├── platform/           # Platform Owner SaaS portal
+│   │   ├── receipt/            # Digital printable receipt page
+│   │   ├── register/           # Multi-step store onboarding
+│   │   └── suspended/          # Account suspension screen
+│   ├── components/             # Reusable UI components
+│   ├── lib/
+│   │   ├── data/               # Supabase data access layer
+│   │   ├── payments/           # Midtrans client, processors, audit logging
+│   │   ├── services/           # Services & broadcast channels
+│   │   └── supabase/           # Supabase client configurations
+│   ├── services/               # Front-end API wrappers
+│   ├── types/                  # Shared TypeScript types
+│   └── utils/                  # Currency, status mappers, ETA helpers
+├── playwright.config.ts        # Playwright test configuration
+├── vitest.config.ts            # Vitest test configuration
+└── README.md
+```
 
-1. **Fork** the repository on GitHub.
-2. Create a new feature branch:
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. Ensure your code passes TypeScript type checks and lint checks:
+---
+
+## 🚀 Deployment & Production Checklist
+
+1. **Lint & Build Verification**:
    ```bash
    npm run lint
-   node node_modules/typescript/bin/tsc --noEmit
+   npm run build
    ```
-4. Commit your changes following conventional commit standards.
-5. Push to the branch and open a **Pull Request**.
+2. **Database Realtime Enablement**:
+   Ensure PostgreSQL Realtime is enabled in Supabase for tables `orders` and `products`.
+3. **Midtrans Webhook URLs**:
+   Configure Midtrans Payment Notification URLs:
+   - Merchant Webhook: `https://your-domain.com/api/webhooks/midtrans`
+   - Subscription Webhook: `https://your-domain.com/api/subscriptions/midtrans/sync`
 
 ---
 
