@@ -149,18 +149,34 @@ export const supabaseDataSource = {
     return mapSupabaseProductToProduct(data);
   },
 
-  async deleteProduct(id: string, businessId?: string): Promise<void> {
+  async deleteProduct(id: string, businessId?: string): Promise<{ ok: boolean; message?: string }> {
     const resolvedId = await resolveBusinessId(businessId);
     const { error } = await supabaseClient
       .from('products')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .delete()
       .eq('id', id)
       .eq('business_id', resolvedId);
 
     if (error) {
-      console.error('Supabase deleteProduct error:', error.message);
+      if (error.code === '23503') {
+        const { error: softDeleteError } = await supabaseClient
+          .from('products')
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('id', id)
+          .eq('business_id', resolvedId);
+        if (softDeleteError) {
+          console.error('Supabase soft deleteProduct error:', softDeleteError.message);
+          throw softDeleteError;
+        }
+        return {
+          ok: true,
+          message: 'Produk tidak dapat dihapus permanen karena terdapat riwayat transaksi pesanan. Produk dinonaktifkan sebagai gantinya.'
+        };
+      }
+      console.error('Supabase hard deleteProduct error:', error.message);
       throw error;
     }
+    return { ok: true };
   },
 
   async getOrders(): Promise<Order[]> {

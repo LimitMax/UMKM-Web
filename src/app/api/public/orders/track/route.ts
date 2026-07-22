@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
+import { getMidtransTransactionStatus } from '@/lib/payments/midtransClient';
+import { processMidtransPaymentNotification } from '@/lib/payments/midtransStatusProcessor';
 
 export const runtime = 'nodejs';
 
@@ -57,17 +59,62 @@ export async function POST(request: Request) {
       );
     }
 
+    let activeOrder = order;
+
+    // Auto-sync with Midtrans API if payment is pending for non-cash order
+    if (activeOrder.payment_status === 'pending' && activeOrder.payment_method === 'non_cash') {
+      const { data: pendingPayment } = await supabaseAdmin
+        .from('payments')
+        .select('id, provider_reference_id, business_id')
+        .eq('order_id', activeOrder.id)
+        .in('provider', ['midtrans', 'midtrans_snap_sandbox'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (pendingPayment?.provider_reference_id) {
+        try {
+          let customServerKey: string | undefined = undefined;
+          const { data: bizData } = await supabaseAdmin
+            .from('businesses')
+            .select('midtrans_server_key')
+            .eq('id', pendingPayment.business_id)
+            .maybeSingle();
+
+          if (bizData?.midtrans_server_key) {
+            customServerKey = bizData.midtrans_server_key;
+          }
+
+          const statusPayload = await getMidtransTransactionStatus(pendingPayment.provider_reference_id, customServerKey);
+          await processMidtransPaymentNotification(statusPayload, 'sync');
+
+          // Re-fetch updated order status from DB
+          const { data: refreshedOrder } = await supabaseAdmin
+            .from('orders')
+            .select('*')
+            .eq('id', activeOrder.id)
+            .maybeSingle();
+
+          if (refreshedOrder) {
+            activeOrder = refreshedOrder;
+          }
+        } catch (syncErr) {
+          console.warn('[Public track API] Best-effort auto-sync with Midtrans failed:', syncErr instanceof Error ? syncErr.message : syncErr);
+        }
+      }
+    }
+
     // 3. Fetch order items (only select safe public display fields)
     const { data: items } = await supabaseAdmin
       .from('order_items')
       .select('product_name, quantity, price, subtotal')
-      .eq('order_id', order.id);
+      .eq('order_id', activeOrder.id);
 
     // 4. Fetch payments to get latest status/snap token
     const { data: payments } = await supabaseAdmin
       .from('payments')
       .select('status, amount, payment_type, snap_token, redirect_url, provider, created_at')
-      .eq('order_id', order.id);
+      .eq('order_id', activeOrder.id);
 
     const latestPayment = payments && payments.length > 0
       ? [...payments].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).pop()
@@ -92,37 +139,37 @@ export async function POST(request: Request) {
         midtransClientKey: business.midtrans_client_key || null
       },
       order: {
-        trackingCode: order.tracking_code,
-        queueNumber: order.queue_number,
-        orderStatus: order.order_status,
-        paymentStatus: order.payment_status,
-        paymentMethod: order.payment_method,
-        fulfillmentType: order.fulfillment_type,
-        totalAmount: Number(order.total_amount),
-        createdAt: order.created_at,
-        customerName: order.customer_name,
-        maskedPhone: maskPhone(order.customer_phone),
+        trackingCode: activeOrder.tracking_code,
+        queueNumber: activeOrder.queue_number,
+        orderStatus: activeOrder.order_status,
+        paymentStatus: activeOrder.payment_status,
+        paymentMethod: activeOrder.payment_method,
+        fulfillmentType: activeOrder.fulfillment_type,
+        totalAmount: Number(activeOrder.total_amount),
+        createdAt: activeOrder.created_at,
+        customerName: activeOrder.customer_name,
+        maskedPhone: maskPhone(activeOrder.customer_phone),
         
         // Fulfillment delivery fields if applicable
-        recipientName: order.fulfillment_type === 'delivery' ? order.recipient_name : null,
-        maskedDeliveryPhone: order.fulfillment_type === 'delivery' ? maskPhone(order.delivery_phone) : null,
-        deliveryAddress: order.fulfillment_type === 'delivery' ? order.delivery_address : null,
-        deliveryNotes: order.fulfillment_type === 'delivery' ? order.delivery_notes : null,
-        deliveryDistanceKm: order.fulfillment_type === 'delivery' ? Number(order.delivery_distance_km) : null,
-        deliveryFeeAmount: order.fulfillment_type === 'delivery' ? Number(order.delivery_fee_amount) : null,
-        deliveryAdminFeeAmount: order.fulfillment_type === 'delivery' ? Number(order.delivery_admin_fee_amount) : null,
-        freeDeliveryApplied: order.fulfillment_type === 'delivery' ? order.free_delivery_applied : null,
-        notes: order.notes || null,
+        recipientName: activeOrder.fulfillment_type === 'delivery' ? activeOrder.recipient_name : null,
+        maskedDeliveryPhone: activeOrder.fulfillment_type === 'delivery' ? maskPhone(activeOrder.delivery_phone) : null,
+        deliveryAddress: activeOrder.fulfillment_type === 'delivery' ? activeOrder.delivery_address : null,
+        deliveryNotes: activeOrder.fulfillment_type === 'delivery' ? activeOrder.delivery_notes : null,
+        deliveryDistanceKm: activeOrder.fulfillment_type === 'delivery' ? Number(activeOrder.delivery_distance_km) : null,
+        deliveryFeeAmount: activeOrder.fulfillment_type === 'delivery' ? Number(activeOrder.delivery_fee_amount) : null,
+        deliveryAdminFeeAmount: activeOrder.fulfillment_type === 'delivery' ? Number(activeOrder.delivery_admin_fee_amount) : null,
+        freeDeliveryApplied: activeOrder.fulfillment_type === 'delivery' ? activeOrder.free_delivery_applied : null,
+        notes: activeOrder.notes || null,
 
         // ETA details
-        estimatedPreparationMinutes: order.estimated_preparation_minutes,
-        estimatedDeliveryMinutes: order.estimated_delivery_minutes,
-        estimatedTotalMinutes: order.estimated_total_minutes,
-        estimatedReadyAt: order.estimated_ready_at,
-        estimatedArrivalAt: order.estimated_arrival_at,
-        etaLabel: order.eta_label,
-        etaUpdatedAt: order.eta_updated_at,
-        etaManuallyAdjusted: order.eta_manually_adjusted,
+        estimatedPreparationMinutes: activeOrder.estimated_preparation_minutes,
+        estimatedDeliveryMinutes: activeOrder.estimated_delivery_minutes,
+        estimatedTotalMinutes: activeOrder.estimated_total_minutes,
+        estimatedReadyAt: activeOrder.estimated_ready_at,
+        estimatedArrivalAt: activeOrder.estimated_arrival_at,
+        etaLabel: activeOrder.eta_label,
+        etaUpdatedAt: activeOrder.eta_updated_at,
+        etaManuallyAdjusted: activeOrder.eta_manually_adjusted,
 
         // Items
         items: items || [],

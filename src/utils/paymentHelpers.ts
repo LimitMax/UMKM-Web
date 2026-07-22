@@ -33,6 +33,58 @@ export function formatPaymentMethod(method?: string | null): string {
   }
 }
 
+/**
+ * Maps Midtrans payment_type (or fallback order payment_method) to valid database
+ * transactions.payment_method column check constraint ('cash', 'qris', 'bank_transfer', 'non_cash').
+ */
+export function mapMidtransPaymentTypeToDb(
+  paymentType?: string | null,
+  fallbackPaymentMethod?: string | null
+): 'cash' | 'qris' | 'bank_transfer' | 'non_cash' {
+  const rawType = (paymentType || fallbackPaymentMethod || '').toLowerCase().trim();
+
+  if (!rawType) return 'non_cash';
+
+  if (rawType === 'cash') return 'cash';
+
+  if (
+    rawType === 'qris' ||
+    rawType === 'gopay' ||
+    rawType === 'shopeepay' ||
+    rawType.includes('qris') ||
+    rawType.includes('gopay') ||
+    rawType.includes('shopeepay')
+  ) {
+    return 'qris';
+  }
+
+  if (
+    rawType === 'bank_transfer' ||
+    rawType === 'bca_va' ||
+    rawType === 'bni_va' ||
+    rawType === 'bri_va' ||
+    rawType === 'permata_va' ||
+    rawType === 'echannel' ||
+    rawType === 'cimb_va' ||
+    rawType.includes('va') ||
+    rawType.includes('bank') ||
+    rawType.includes('transfer') ||
+    rawType.includes('echannel')
+  ) {
+    return 'bank_transfer';
+  }
+
+  if (['non_cash', 'non-cash', 'credit_card', 'cstore', 'akulaku', 'kredivo'].includes(rawType)) {
+    return 'non_cash';
+  }
+
+  if (['cash', 'qris', 'bank_transfer', 'non_cash'].includes(rawType)) {
+    return rawType as 'cash' | 'qris' | 'bank_transfer' | 'non_cash';
+  }
+
+  return 'non_cash';
+}
+
 export function formatPaymentStatus(status?: string | null): string {
   switch (status?.toLowerCase()) {
     case 'waiting for payment':

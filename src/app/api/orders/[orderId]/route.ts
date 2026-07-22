@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
+import { getMidtransTransactionStatus } from '@/lib/payments/midtransClient';
+import { processMidtransPaymentNotification } from '@/lib/payments/midtransStatusProcessor';
 
 export async function GET(
   request: Request,
@@ -27,6 +29,50 @@ export async function GET(
       return NextResponse.json({ message: 'Pesanan tidak ditemukan.' }, { status: 404 });
     }
 
+    let activeOrder = order;
+
+    // Auto-sync pending Midtrans payment
+    if (activeOrder.payment_status === 'pending' && activeOrder.payment_method === 'non_cash') {
+      const { data: pendingPayment } = await supabaseAdmin
+        .from('payments')
+        .select('id, provider_reference_id, business_id')
+        .eq('order_id', orderId)
+        .in('provider', ['midtrans', 'midtrans_snap_sandbox'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (pendingPayment?.provider_reference_id) {
+        try {
+          let customServerKey: string | undefined = undefined;
+          const { data: bizData } = await supabaseAdmin
+            .from('businesses')
+            .select('midtrans_server_key')
+            .eq('id', pendingPayment.business_id)
+            .maybeSingle();
+
+          if (bizData?.midtrans_server_key) {
+            customServerKey = bizData.midtrans_server_key;
+          }
+
+          const statusPayload = await getMidtransTransactionStatus(pendingPayment.provider_reference_id, customServerKey);
+          await processMidtransPaymentNotification(statusPayload, 'sync');
+
+          const { data: refreshedOrder } = await supabaseAdmin
+            .from('orders')
+            .select('*')
+            .eq('id', orderId)
+            .maybeSingle();
+
+          if (refreshedOrder) {
+            activeOrder = refreshedOrder;
+          }
+        } catch (syncErr) {
+          console.warn(`[API GET Order ${orderId}] Auto-sync with Midtrans failed:`, syncErr);
+        }
+      }
+    }
+
     // 2. Fetch order items
     const { data: items, error: itemsError } = await supabaseAdmin
       .from('order_items')
@@ -37,7 +83,7 @@ export async function GET(
       console.error(`API GET Order ${orderId} items error:`, itemsError.message);
       // Return order header with item error details separately
       return NextResponse.json({
-        ...order,
+        ...activeOrder,
         items: [],
         items_error: 'Gagal memuat rincian item pesanan.'
       });
@@ -55,8 +101,8 @@ export async function GET(
 
     // 3. Return combined order details safely
     return NextResponse.json({
-      ...order,
-      items,
+      ...activeOrder,
+      items: items || [],
       payments: payments || []
     });
   } catch (error) {

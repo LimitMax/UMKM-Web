@@ -1,6 +1,7 @@
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { MidtransNotificationPayload } from './midtransClient';
 import { logPaymentEvent } from './paymentAuditLogger';
+import { mapMidtransPaymentTypeToDb } from '@/utils/paymentHelpers';
 
 type AppPaymentStatus = 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled' | 'refunded';
 
@@ -66,7 +67,8 @@ function shouldIgnoreDowngrade(currentPaymentStatus: string, nextStatus: AppPaym
 
 function timestampOrNull(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;
-  const parsed = new Date(value);
+  const normalized = value.trim().replace(' ', 'T');
+  const parsed = new Date(normalized);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString();
 }
@@ -116,25 +118,24 @@ export async function processMidtransPaymentNotification(
   const orderPaymentStatus = toOrderPaymentStatus(effectiveStatus);
   const now = new Date().toISOString();
   const isPaid = effectiveStatus === 'paid';
+  const settlementTimeIso = timestampOrNull(payload.settlement_time);
 
   const paymentUpdates: Record<string, unknown> = {
     status: effectiveStatus,
     payment_type: payload.payment_type || null,
     fraud_status: payload.fraud_status || null,
     transaction_time: timestampOrNull(payload.transaction_time),
-    settlement_time: timestampOrNull(payload.settlement_time),
+    settlement_time: settlementTimeIso,
     raw_callback_payload: payload,
     updated_at: now,
-    webhook_received_at: now,
-    last_webhook_status: payload.status_code || null,
-    last_webhook_transaction_status: payload.transaction_status || null,
   };
 
-  if (isPaid && !paymentUpdates.settlement_time) {
-    paymentUpdates.settlement_time = now;
-  }
   if (isPaid) {
-    paymentUpdates.paid_at = now;
+    const paidAtTimestamp = settlementTimeIso || now;
+    if (!paymentUpdates.settlement_time) {
+      paymentUpdates.settlement_time = paidAtTimestamp;
+    }
+    paymentUpdates.paid_at = paidAtTimestamp;
   }
 
   const { error: updatePaymentError } = await supabaseAdmin
@@ -152,19 +153,24 @@ export async function processMidtransPaymentNotification(
   };
 
   if (isPaid) {
-    orderUpdates.paid_at = now;
+    orderUpdates.paid_at = (paymentUpdates.paid_at as string) || now;
     if (orderRow.order_status === 'pending') {
       orderUpdates.order_status = 'paid';
     }
   }
 
   if (effectiveStatus === 'expired' || effectiveStatus === 'cancelled') {
-    orderUpdates.order_status = 'cancelled';
-    orderUpdates.cancelled_at = now;
+    if (orderRow.order_status === 'pending') {
+      orderUpdates.order_status = 'cancelled';
+      orderUpdates.cancelled_at = now;
+    }
   }
 
   if (ignoredDowngrade) {
     delete orderUpdates.payment_status;
+    delete orderUpdates.order_status;
+    delete orderUpdates.paid_at;
+    delete orderUpdates.cancelled_at;
   }
 
   const { error: updateOrderError } = await supabaseAdmin
@@ -178,46 +184,56 @@ export async function processMidtransPaymentNotification(
 
   let transactionCreated = false;
   if (isPaid) {
-    const { data: existingTransaction, error: existingTxError } = await supabaseAdmin
-      .from('transactions')
-      .select('id')
-      .eq('order_id', orderRow.id)
-      .limit(1)
-      .maybeSingle();
+    try {
+      const { data: existingTransaction, error: existingTxError } = await supabaseAdmin
+        .from('transactions')
+        .select('id')
+        .eq('order_id', orderRow.id)
+        .limit(1)
+        .maybeSingle();
 
-    if (existingTxError) {
-      throw new Error(`Failed to check existing transaction: ${existingTxError.message}`);
-    }
-
-    if (!existingTransaction) {
-      const txId = `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      const { error: insertTxError } = await supabaseAdmin.from('transactions').insert([{
-        id: txId,
-        business_id: orderRow.business_id,
-        order_id: orderRow.id,
-        amount: Number(orderRow.total_amount),
-        payment_method: orderRow.payment_method,
-        payment_status: 'paid',
-        transaction_status: 'paid',
-        created_at: now,
-      }]);
-
-      if (insertTxError) {
-        throw new Error(`Failed to create transaction: ${insertTxError.message}`);
+      if (existingTxError) {
+        console.warn('[Midtrans Processor] Best-effort check existing transaction failed:', existingTxError.message);
       }
 
-      transactionCreated = true;
+      if (!existingTransaction) {
+        const txId = `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const mappedPaymentMethod = mapMidtransPaymentTypeToDb(payload.payment_type, orderRow.payment_method);
+
+        const { error: insertTxError } = await supabaseAdmin.from('transactions').insert([{
+          id: txId,
+          business_id: orderRow.business_id,
+          order_id: orderRow.id,
+          amount: Number(orderRow.total_amount),
+          payment_method: mappedPaymentMethod,
+          payment_status: 'paid',
+          transaction_status: 'paid',
+          created_at: now,
+        }]);
+
+        if (insertTxError) {
+          console.warn('[Midtrans Processor] Best-effort transaction creation failed:', insertTxError.message);
+        } else {
+          transactionCreated = true;
+        }
+      }
+    } catch (txErr) {
+      console.warn('[Midtrans Processor] Non-blocking exception during transaction creation:', txErr);
     }
   }
 
   if (effectiveStatus === 'refunded') {
-    await supabaseAdmin
-      .from('transactions')
-      .update({
-        payment_status: 'refunded',
-        transaction_status: 'refunded',
-      })
-      .eq('order_id', orderRow.id);
+    try {
+      await supabaseAdmin
+        .from('transactions')
+        .update({
+          payment_status: 'refunded',
+          transaction_status: 'refunded',
+        })
+        .eq('order_id', orderRow.id);
+    } catch (refundTxErr) {
+      console.warn('[Midtrans Processor] Non-blocking exception during transaction refund update:', refundTxErr);
+    }
   }
 
   // Log payment event (best-effort audit log)

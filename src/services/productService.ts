@@ -128,24 +128,26 @@ export const productService = {
   },
 
   async deactivateProduct(id: string, mode?: DataSourceMode, businessId?: string): Promise<void> {
-    const activeMode = this.resolveMode(mode);
-    if (activeMode === 'supabase') {
-      if (typeof window !== 'undefined') {
-        await requestAdminProductApi<{ ok: boolean }>('DELETE', {
-          businessId,
-          productId: id,
-        });
-        return;
-      }
-
-      await supabaseDataSource.deleteProduct(id, businessId);
-      return;
-    }
     await this.updateProduct(id, { isActive: false }, mode, businessId);
   },
 
-  async deleteProduct(id: string, mode?: DataSourceMode, businessId?: string): Promise<void> {
-    await this.deactivateProduct(id, mode, businessId);
+  async deleteProduct(id: string, mode?: DataSourceMode, businessId?: string): Promise<{ ok: boolean; message?: string }> {
+    const activeMode = this.resolveMode(mode);
+    if (activeMode === 'supabase') {
+      if (typeof window !== 'undefined') {
+        return await requestAdminProductApi<{ ok: boolean; message?: string }>('DELETE', {
+          businessId,
+          productId: id,
+        });
+      }
+
+      return await supabaseDataSource.deleteProduct(id, businessId);
+    }
+    // LocalStorage fallback permanent delete
+    const products = await this.getProducts(mode);
+    const updated = products.filter((p) => p.id !== id);
+    setStorageItem(STORAGE_KEYS.PRODUCTS, updated);
+    return { ok: true };
   },
 
   async updateStock(id: string, newStock: number, mode?: DataSourceMode, businessId?: string): Promise<void> {

@@ -175,12 +175,26 @@ export async function DELETE(request: Request) {
 
     const { error } = await authResult.supabaseAdmin!
       .from('products')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .delete()
       .eq('id', productId)
       .eq('business_id', businessId);
 
     if (error) {
       console.error('[Admin Products API] Delete failed:', error);
+      if (error.code === '23503') {
+        const { error: softDeleteError } = await authResult.supabaseAdmin!
+          .from('products')
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('id', productId)
+          .eq('business_id', businessId);
+        if (softDeleteError) {
+          return NextResponse.json({ message: 'Gagal menonaktifkan produk.' }, { status: 500 });
+        }
+        return NextResponse.json({
+          ok: true,
+          message: 'Produk tidak dapat dihapus permanen karena terdapat riwayat transaksi pesanan. Produk dinonaktifkan sebagai gantinya.'
+        });
+      }
       return NextResponse.json({ message: 'Gagal menghapus produk.' }, { status: 500 });
     }
 

@@ -48,7 +48,8 @@ function shouldIgnoreDowngrade(currentPaymentStatus: string, nextStatus: Subscri
 
 function timestampOrNull(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;
-  const parsed = new Date(value);
+  const normalized = value.trim().replace(' ', 'T');
+  const parsed = new Date(normalized);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString();
 }
@@ -65,7 +66,7 @@ function nextBillingPeriodEnd(from: Date, billingCycle = 'monthly'): string {
 
 export async function processMidtransSubscriptionNotification(
   payload: MidtransNotificationPayload,
-  source: 'webhook' | 'sync' = 'webhook'
+  _source: 'webhook' | 'sync' = 'webhook'
 ): Promise<ProcessSubscriptionPaymentResult> {
   if (!payload.order_id) {
     throw new Error('Midtrans notification missing subscription payment order_id.');
@@ -93,25 +94,24 @@ export async function processMidtransSubscriptionNotification(
   const now = new Date();
   const nowIso = now.toISOString();
   const isPaid = effectiveStatus === 'paid';
+  const settlementTimeIso = timestampOrNull(payload.settlement_time);
 
   const paymentUpdates: Record<string, unknown> = {
     status: effectiveStatus,
     payment_type: payload.payment_type || null,
     fraud_status: payload.fraud_status || null,
     transaction_time: timestampOrNull(payload.transaction_time),
-    settlement_time: timestampOrNull(payload.settlement_time),
+    settlement_time: settlementTimeIso,
     raw_callback_payload: payload,
     updated_at: nowIso,
-    webhook_received_at: source === 'webhook' ? nowIso : null,
-    last_webhook_status: payload.status_code || null,
-    last_webhook_transaction_status: payload.transaction_status || null,
   };
 
-  if (isPaid && !paymentUpdates.settlement_time) {
-    paymentUpdates.settlement_time = nowIso;
-  }
   if (isPaid) {
-    paymentUpdates.paid_at = nowIso;
+    const paidAtTimestamp = settlementTimeIso || nowIso;
+    if (!paymentUpdates.settlement_time) {
+      paymentUpdates.settlement_time = paidAtTimestamp;
+    }
+    paymentUpdates.paid_at = paidAtTimestamp;
   }
 
   const { error: updatePaymentError } = await supabaseAdmin

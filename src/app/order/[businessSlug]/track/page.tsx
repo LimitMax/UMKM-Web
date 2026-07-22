@@ -106,9 +106,12 @@ export default function OrderTrackingPage() {
   const [paymentOpenLoading, setPaymentOpenLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [showPaymentSuccessAlert, setShowPaymentSuccessAlert] = useState<boolean>(false);
 
-  // Polling ref
+  // Polling & In-flight Refs
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const inFlightRef = useRef<boolean>(false);
+  const prevPaymentStatusRef = useRef<string | null>(null);
 
   // Order status Indonesian translation mapper
   const formatTrackingOrderStatus = (status: string, fulfillmentType?: string): string => {
@@ -171,6 +174,11 @@ export default function OrderTrackingPage() {
   // Main status query function
   const fetchTrackingStatus = useCallback(async (codeToTrack: string, showSpinner = false) => {
     if (!codeToTrack.trim()) return;
+    
+    // Prevent duplicate in-flight requests during auto-polling
+    if (inFlightRef.current && !showSpinner) return;
+
+    inFlightRef.current = true;
     if (showSpinner) setIsSearchLoading(true);
     setErrorMsg(null);
     setSyncMessage(null);
@@ -192,7 +200,19 @@ export default function OrderTrackingPage() {
         return;
       }
 
-      setOrder(data.order);
+      const newOrder: TrackedOrder = data.order;
+
+      // Detect transition from pending -> paid
+      if (prevPaymentStatusRef.current === 'pending' && newOrder.paymentStatus === 'paid') {
+        setShowPaymentSuccessAlert(true);
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      }
+      prevPaymentStatusRef.current = newOrder.paymentStatus;
+
+      setOrder(newOrder);
       if (data.business) {
         setBusiness({
           name: data.business.name,
@@ -207,6 +227,7 @@ export default function OrderTrackingPage() {
       console.error('Track API error:', err);
       setErrorMsg('Gagal terhubung ke server untuk mengecek status.');
     } finally {
+      inFlightRef.current = false;
       if (showSpinner) setIsSearchLoading(false);
     }
   }, [businessSlug]);
@@ -215,6 +236,8 @@ export default function OrderTrackingPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!trackingCode.trim()) return;
+    setShowPaymentSuccessAlert(false);
+    prevPaymentStatusRef.current = null;
     fetchTrackingStatus(trackingCode, true);
   };
 
@@ -228,22 +251,30 @@ export default function OrderTrackingPage() {
     }
   }, [codeParam, businessSlug, fetchTrackingStatus]);
 
-  // Set up status auto-polling (every 20 seconds) when order is found and not in final state
+  // Set up status auto-polling (every 3 seconds for pending payment)
   useEffect(() => {
-    // Clear old polling
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
     }
 
-    if (order && !['completed', 'cancelled'].includes(order.orderStatus)) {
-      pollingIntervalRef.current = setInterval(() => {
-        fetchTrackingStatus(order.trackingCode, false);
-      }, 20000);
+    // Stop polling if order is absent, payment is settled ('paid'), or order reached terminal state
+    if (!order || order.paymentStatus === 'paid' || ['completed', 'cancelled'].includes(order.orderStatus)) {
+      return;
     }
+
+    // While payment_status is "pending", poll every 3 seconds
+    const pollMs = order.paymentStatus === 'pending' || order.orderStatus === 'pending' ? 3000 : 10000;
+    const currentCode = order.trackingCode;
+
+    pollingIntervalRef.current = setInterval(() => {
+      fetchTrackingStatus(currentCode, false);
+    }, pollMs);
 
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
       }
     };
   }, [order, fetchTrackingStatus]);
@@ -513,6 +544,21 @@ export default function OrderTrackingPage() {
         {order && (
           <div className="flex flex-col gap-6 animate-fade-in">
             
+            {/* Success notification banner when payment transitions to paid */}
+            {showPaymentSuccessAlert && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-3xl p-5 flex items-start gap-3.5 animate-in fade-in slide-in-from-top duration-300">
+                <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-2xl flex-shrink-0 mt-0.5">
+                  <Check className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-emerald-400">Pembayaran Berhasil Dikonfirmasi!</h4>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    Sistem telah mengonfirmasi pembayaran Midtrans Anda secara otomatis. Pesanan Anda kini sedang disiapkan oleh toko.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Header: Queue & Status Summary */}
             <div className="glass rounded-3xl p-6 text-center border border-slate-800/80 relative overflow-hidden">
               <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 to-indigo-500" />
@@ -530,13 +576,13 @@ export default function OrderTrackingPage() {
               </div>
 
               {/* Autorefresh banner info */}
-              {!['completed', 'cancelled'].includes(order.orderStatus) && (
+              {!['completed', 'cancelled'].includes(order.orderStatus) && order.paymentStatus !== 'paid' && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800/50 text-[9px] text-slate-400 mt-4 select-none animate-pulse">
                   <span className="relative flex h-1.5 w-1.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                   </span>
-                  <span>Otomatis diperbarui setiap 20 detik</span>
+                  <span>{order.paymentStatus === 'pending' ? 'Mengecek pembayaran otomatis setiap 3 detik...' : 'Otomatis diperbarui'}</span>
                 </div>
               )}
             </div>

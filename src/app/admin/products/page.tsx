@@ -232,7 +232,18 @@ export default function AdminProductsPage() {
   const handleDeleteProduct = async (id: string) => {
     if (!businessId) return;
     if (confirm('Apakah Anda yakin ingin menghapus produk ini secara permanen?')) {
-      await productService.deleteProduct(id, 'supabase', businessId);
+      try {
+        const res = await productService.deleteProduct(id, 'supabase', businessId);
+        if (res && res.message) {
+          alert(res.message);
+        } else {
+          setSuccessMsg('Produk berhasil dihapus permanen!');
+          setTimeout(() => setSuccessMsg(''), 1500);
+        }
+      } catch (err) {
+        setErrorMsg(err instanceof Error ? err.message : 'Gagal menghapus produk.');
+        setTimeout(() => setErrorMsg(''), 3000);
+      }
       await loadProducts();
     }
   };
