@@ -10,7 +10,13 @@ import {
   Settings,
   Archive,
   X,
-  PlusCircle
+  PlusCircle,
+  Sparkles,
+  CreditCard,
+  FileSpreadsheet,
+  Users,
+  ShoppingBag,
+  Sliders
 } from 'lucide-react';
 import { useAuth } from '../../../components/AuthProvider';
 import { supabaseClient } from '../../../lib/supabase/client';
@@ -20,12 +26,19 @@ interface PlanRow {
   code: string;
   name: string;
   price: number;
+  price_monthly?: number;
+  price_annual?: number;
   billing_cycle: 'monthly' | 'annual';
   trial_days: number;
   description: string | null;
   status: 'active' | 'archived';
   is_active: boolean;
   product_limit: number;
+  cashier_limit?: number;
+  order_limit_monthly?: number;
+  ai_enabled?: boolean;
+  midtrans_enabled?: boolean;
+  report_export_enabled?: boolean;
   sort_order: number;
   created_at: string;
 }
@@ -60,6 +73,11 @@ export default function PlatformPlansPage() {
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<'active' | 'archived'>('active');
   const [productLimit, setProductLimit] = useState<number>(100);
+  const [cashierLimit, setCashierLimit] = useState<number>(3);
+  const [orderLimitMonthly, setOrderLimitMonthly] = useState<number>(-1);
+  const [aiEnabled, setAiEnabled] = useState<boolean>(false);
+  const [midtransEnabled, setMidtransEnabled] = useState<boolean>(true);
+  const [reportExportEnabled, setReportExportEnabled] = useState<boolean>(false);
 
   const loadPlans = useCallback(async () => {
     setLoading(true);
@@ -104,6 +122,11 @@ export default function PlatformPlansPage() {
     setDescription('');
     setStatus('active');
     setProductLimit(100);
+    setCashierLimit(3);
+    setOrderLimitMonthly(-1);
+    setAiEnabled(false);
+    setMidtransEnabled(true);
+    setReportExportEnabled(false);
     setModalOpen(true);
   };
 
@@ -116,6 +139,11 @@ export default function PlatformPlansPage() {
     setDescription(plan.description || '');
     setStatus(plan.status || 'active');
     setProductLimit(plan.product_limit || 100);
+    setCashierLimit(plan.cashier_limit ?? 3);
+    setOrderLimitMonthly(plan.order_limit_monthly ?? -1);
+    setAiEnabled(Boolean(plan.ai_enabled));
+    setMidtransEnabled(plan.midtrans_enabled ?? true);
+    setReportExportEnabled(Boolean(plan.report_export_enabled));
     setModalOpen(true);
   };
 
@@ -145,7 +173,12 @@ export default function PlatformPlansPage() {
           trial_days: Number(trialDays),
           description,
           status,
-          product_limit: Number(productLimit)
+          product_limit: Number(productLimit),
+          cashier_limit: Number(cashierLimit),
+          order_limit_monthly: Number(orderLimitMonthly),
+          ai_enabled: aiEnabled,
+          midtrans_enabled: midtransEnabled,
+          report_export_enabled: reportExportEnabled
         })
       });
 
@@ -217,7 +250,7 @@ export default function PlatformPlansPage() {
             </span>
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">Manajemen Paket Plan</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Kelola penawaran harga, masa uji coba gratis, dan limit fitur merchant SaaS.</p>
+          <p className="text-xs text-slate-400 mt-0.5">Kelola penawaran harga, fitur kustom, dan limit merchant SaaS.</p>
         </div>
         <button
           onClick={openCreateModal}
@@ -286,25 +319,66 @@ export default function PlatformPlansPage() {
                   <p className="text-[10px] text-slate-500 font-mono mt-1">Trial gratis: {p.trial_days} hari</p>
                 </div>
 
-                {/* Plan Features limits */}
-                <div className="space-y-2.5 text-xs pb-6">
+                {/* Plan Features limits & toggles */}
+                <div className="space-y-2 text-xs pb-6">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-450">Limit Produk:</span>
+                    <span className="text-slate-450 flex items-center gap-1.5">
+                      <ShoppingBag className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Limit Produk:</span>
+                    </span>
                     <span className="font-mono text-white font-semibold">
                       {p.product_limit === -1 || p.product_limit > 10000 ? 'Unlimited' : `${p.product_limit} produk`}
                     </span>
                   </div>
+
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-450">Sistem POS & Kasir:</span>
-                    <span className="text-white font-semibold">Aktif</span>
+                    <span className="text-slate-450 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Limit Kasir:</span>
+                    </span>
+                    <span className="font-mono text-white font-semibold">
+                      {p.cashier_limit ?? 3} akun
+                    </span>
                   </div>
+
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-450">Integrasi Midtrans:</span>
-                    <span className="text-white font-semibold">Aktif</span>
+                    <span className="text-slate-450 flex items-center gap-1.5">
+                      <ShoppingBag className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Limit Pesanan/Bln:</span>
+                    </span>
+                    <span className="font-mono text-white font-semibold">
+                      {p.order_limit_monthly === -1 || !p.order_limit_monthly || p.order_limit_monthly > 10000 ? 'Unlimited' : `${p.order_limit_monthly} pesanan`}
+                    </span>
                   </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-850/60 pt-2 mt-2">
+                    <span className="text-slate-450 flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Midtrans Online:</span>
+                    </span>
+                    <span className={p.midtrans_enabled ? 'text-emerald-400 font-bold' : 'text-slate-500 font-semibold'}>
+                      {p.midtrans_enabled ? 'Aktif ✅' : 'Nonaktif ❌'}
+                    </span>
+                  </div>
+
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-450">Layanan AI Insights:</span>
-                    <span className="text-white font-semibold">Aktif</span>
+                    <span className="text-slate-450 flex items-center gap-1.5">
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Ekspor Laporan:</span>
+                    </span>
+                    <span className={p.report_export_enabled ? 'text-emerald-400 font-bold' : 'text-slate-500 font-semibold'}>
+                      {p.report_export_enabled ? 'Aktif ✅' : 'Nonaktif ❌'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-450 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                      <span>AI Insights:</span>
+                    </span>
+                    <span className={p.ai_enabled ? 'text-emerald-400 font-bold' : 'text-slate-500 font-semibold'}>
+                      {p.ai_enabled ? 'Aktif ✅' : 'Nonaktif ❌'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -338,8 +412,8 @@ export default function PlatformPlansPage() {
       {/* Plan Form Modal */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl animate-scale-in">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-850 mb-5">
+          <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl animate-scale-in">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-850 mb-5 sticky top-0 bg-slate-900 z-10">
               <div className="flex items-center gap-2">
                 <PlusCircle className="w-5 h-5 text-violet-400" />
                 <h3 className="text-sm font-bold text-white">
@@ -354,76 +428,172 @@ export default function PlatformPlansPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Nama Paket</label>
-                <input
-                  required
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Contoh: Growth, Enterprise"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-650 focus:outline-none focus:border-violet-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSave} className="space-y-5">
+              {/* Basic Info */}
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Harga (Rupiah)</label>
+                  <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Nama Paket</label>
                   <input
                     required
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(Number(e.target.value))}
-                    placeholder="Contoh: 199000"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-violet-500"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Contoh: Growth, Enterprise"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-650 focus:outline-none focus:border-violet-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Siklus Penagihan</label>
-                  <select
-                    value={billingCycle}
-                    onChange={(e) => setBillingCycle(e.target.value as 'monthly' | 'annual')}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-violet-500"
-                  >
-                    <option value="monthly">Bulanan (Monthly)</option>
-                    <option value="annual">Tahunan (Annual)</option>
-                  </select>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Harga (Rupiah)</label>
+                    <input
+                      required
+                      type="number"
+                      value={price}
+                      onChange={(e) => setPrice(Number(e.target.value))}
+                      placeholder="Contoh: 199000"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Siklus Penagihan</label>
+                    <select
+                      value={billingCycle}
+                      onChange={(e) => setBillingCycle(e.target.value as 'monthly' | 'annual')}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-violet-500"
+                    >
+                      <option value="monthly">Bulanan (Monthly)</option>
+                      <option value="annual">Tahunan (Annual)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Uji Coba (Hari)</label>
+                    <input
+                      type="number"
+                      value={trialDays}
+                      onChange={(e) => setTrialDays(Number(e.target.value))}
+                      placeholder="Contoh: 7"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Deskripsi Singkat</label>
+                    <input
+                      type="text"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Ringkasan paket..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-655 focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Uji Coba (Hari)</label>
-                  <input
-                    type="number"
-                    value={trialDays}
-                    onChange={(e) => setTrialDays(Number(e.target.value))}
-                    placeholder="Contoh: 7"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-violet-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Limit Menu Produk</label>
-                  <input
-                    type="number"
-                    value={productLimit}
-                    onChange={(e) => setProductLimit(Number(e.target.value))}
-                    placeholder="Contoh: 100"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-violet-500"
-                  />
+              {/* Limits Configuration */}
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+                <h4 className="text-[11px] font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
+                  <Sliders className="w-3.5 h-3.5 text-violet-400" />
+                  <span>Limit &amp; Batasan Merchant</span>
+                </h4>
+                
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Limit Produk</label>
+                    <input
+                      type="number"
+                      value={productLimit}
+                      onChange={(e) => setProductLimit(Number(e.target.value))}
+                      placeholder="100"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Limit Kasir</label>
+                    <input
+                      type="number"
+                      value={cashierLimit}
+                      onChange={(e) => setCashierLimit(Number(e.target.value))}
+                      placeholder="3"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Limit Order/Bln (-1=Unlimited)</label>
+                    <input
+                      type="number"
+                      value={orderLimitMonthly}
+                      onChange={(e) => setOrderLimitMonthly(Number(e.target.value))}
+                      placeholder="-1"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-mono text-slate-500 uppercase mb-1">Deskripsi Singkat</label>
-                <textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Jelaskan kelebihan paket ini..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-655 focus:outline-none focus:border-violet-500 resize-none"
-                />
+              {/* Customizable Feature Toggles */}
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+                <h4 className="text-[11px] font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
+                  <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Custom Fitur Paket</span>
+                </h4>
+
+                <div className="space-y-3 pt-1">
+                  {/* Midtrans Toggle */}
+                  <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/60 cursor-pointer hover:bg-slate-850/80 transition-all">
+                    <div className="flex items-center gap-2.5">
+                      <CreditCard className="w-4 h-4 text-indigo-400" />
+                      <div>
+                        <span className="text-xs font-bold text-white block">Pembayaran Midtrans Online</span>
+                        <span className="text-[10px] text-slate-400">Izinkan QRIS dan Payment Gateway online</span>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={midtransEnabled}
+                      onChange={(e) => setMidtransEnabled(e.target.checked)}
+                      className="w-4 h-4 accent-violet-500 cursor-pointer rounded"
+                    />
+                  </label>
+
+                  {/* Report Export Toggle */}
+                  <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/60 cursor-pointer hover:bg-slate-850/80 transition-all">
+                    <div className="flex items-center gap-2.5">
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                      <div>
+                        <span className="text-xs font-bold text-white block">Ekspor Laporan (Excel/CSV)</span>
+                        <span className="text-[10px] text-slate-400">Izinkan pengunduhan spreadsheet transaksi</span>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={reportExportEnabled}
+                      onChange={(e) => setReportExportEnabled(e.target.checked)}
+                      className="w-4 h-4 accent-violet-500 cursor-pointer rounded"
+                    />
+                  </label>
+
+                  {/* AI Insights Toggle */}
+                  <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/60 cursor-pointer hover:bg-slate-850/80 transition-all">
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles className="w-4 h-4 text-teal-400" />
+                      <div>
+                        <span className="text-xs font-bold text-white block">Analisis AI Insights</span>
+                        <span className="text-[10px] text-slate-400">Rekomendasi stok dan prediksi AI cerdas</span>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={aiEnabled}
+                      onChange={(e) => setAiEnabled(e.target.checked)}
+                      className="w-4 h-4 accent-violet-500 cursor-pointer rounded"
+                    />
+                  </label>
+                </div>
               </div>
 
               {editingPlan && (
@@ -452,7 +622,7 @@ export default function PlatformPlansPage() {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-5 py-2.5 bg-violet-650 hover:bg-violet-550 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-1.5"
+                  className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-1.5"
                 >
                   {actionLoading ? (
                     <>

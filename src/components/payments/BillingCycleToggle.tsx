@@ -29,7 +29,7 @@ export const BillingCycleToggle: FC<BillingCycleToggleProps> = ({ value, onChang
         >
           Tahunan
           <span className="ml-1 bg-emerald-500 text-slate-950 text-xs font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-            Hemat 17%
+            Gratis 1 Bulan
           </span>
         </button>
       </div>

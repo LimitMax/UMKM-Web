@@ -86,7 +86,12 @@ export async function POST(request: Request) {
       trial_days,
       description,
       status,
-      product_limit
+      product_limit,
+      cashier_limit,
+      order_limit_monthly,
+      ai_enabled,
+      midtrans_enabled,
+      report_export_enabled,
     } = body;
 
     if (!name || typeof price !== 'number') {
@@ -116,8 +121,8 @@ export async function POST(request: Request) {
         code,
         name,
         description: description || null,
-        price_monthly: isMonthly ? priceNum : Math.round(priceNum / 12),
-        price_annual: isMonthly ? priceNum * 12 : priceNum,
+        price_monthly: isMonthly ? priceNum : Math.round(priceNum / 11),
+        price_annual: isMonthly ? priceNum * 11 : priceNum,
         price: priceNum,
         billing_cycle: billing_cycle || 'monthly',
         trial_days: trialDaysNum,
@@ -125,11 +130,11 @@ export async function POST(request: Request) {
         is_active: status === 'archived' ? false : true,
         sort_order: nextSortOrder,
         product_limit: Number(product_limit || 100),
-        order_limit_monthly: 5000,
-        cashier_limit: 10,
-        ai_enabled: true,
-        midtrans_enabled: true,
-        report_export_enabled: true
+        order_limit_monthly: Number(order_limit_monthly ?? -1),
+        cashier_limit: Number(cashier_limit ?? 3),
+        ai_enabled: typeof ai_enabled === 'boolean' ? ai_enabled : false,
+        midtrans_enabled: typeof midtrans_enabled === 'boolean' ? midtrans_enabled : true,
+        report_export_enabled: typeof report_export_enabled === 'boolean' ? report_export_enabled : false,
       }]);
 
     if (insertError) {

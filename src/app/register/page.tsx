@@ -122,9 +122,9 @@ export default function RegisterPage() {
 
   const getPlanBasePrice = (code: 'starter' | 'pro') => {
     if (code === 'starter') {
-      return billingCycle === 'annual' ? 990000 : 99000;
+      return billingCycle === 'annual' ? 1089000 : 99000;
     }
-    return billingCycle === 'annual' ? 1990000 : 199000;
+    return billingCycle === 'annual' ? 2189000 : 199000;
   };
 
   const calculateDiscount = (basePrice: number) => {
@@ -320,11 +320,11 @@ export default function RegisterPage() {
       desc: 'Untuk UMKM kecil yang mulai aktif berjualan online',
       features: [
         'Hingga 100 Produk',
-        'Hingga 1.000 Pesanan / bulan',
+        'Pesanan Unlimited ✅',
         'Maksimal 3 Akun Staf/Kasir',
         'Analisis AI Insights ❌',
         'Pembayaran Online (Midtrans) ✅',
-        'Ekspor Laporan (Excel/PDF) ✅',
+        'Ekspor Laporan (Excel/PDF) ❌',
       ],
       borderClass: 'border-slate-800 hover:border-indigo-700',
       activeClass: 'border-indigo-500 bg-indigo-950/10 shadow-lg shadow-indigo-500/5',
@@ -338,7 +338,7 @@ export default function RegisterPage() {
       desc: 'Untuk UMKM yang butuh insight AI, laporan dan optimasi lengkap',
       features: [
         'Hingga 500 Produk',
-        'Hingga 5.000 Pesanan / bulan',
+        'Pesanan Unlimited ✅',
         'Maksimal 10 Akun Staf/Kasir',
         'Analisis AI Insights ✅',
         'Pembayaran Online (Midtrans) ✅',

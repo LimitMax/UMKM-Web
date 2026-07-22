@@ -6,9 +6,9 @@
 -- ==========================================
 INSERT INTO plans (id, code, name, description, price_monthly, price_annual, product_limit, order_limit_monthly, cashier_limit, ai_enabled, midtrans_enabled, report_export_enabled, is_active, sort_order, billing_cycle, price, trial_days, status)
 VALUES 
-  ('plan-free', 'free', 'Free / Trial', 'Cocok untuk mencoba UMKM Pilot', 0, 0, 20, 100, 1, false, false, false, true, 1, 'monthly', 0.00, 0, 'active'),
-  ('plan-starter', 'starter', 'Starter', 'Untuk UMKM kecil yang mulai aktif berjualan', 99000, 990000, 100, 1000, 3, false, true, true, true, 2, 'monthly', 99000.00, 0, 'active'),
-  ('plan-pro', 'pro', 'Pro', 'Untuk UMKM yang butuh insight, laporan, dan otomasi lebih lengkap', 199000, 1990000, 500, 5000, 10, true, true, true, true, 3, 'monthly', 199000.00, 0, 'active')
+  ('plan-free', 'free', 'Free / Trial', 'Cocok untuk mencoba UMKM Pilot', 0, 0, 20, -1, 1, false, false, false, true, 1, 'monthly', 0.00, 0, 'active'),
+  ('plan-starter', 'starter', 'Starter', 'Untuk UMKM kecil yang mulai aktif berjualan', 99000, 1089000, 100, -1, 3, false, true, false, true, 2, 'monthly', 99000.00, 0, 'active'),
+  ('plan-pro', 'pro', 'Pro', 'Untuk UMKM yang butuh insight, laporan, dan otomasi lebih lengkap', 199000, 2189000, 500, -1, 10, true, true, true, true, 3, 'monthly', 199000.00, 0, 'active')
 ON CONFLICT (code) DO UPDATE 
 SET 
   name = EXCLUDED.name,

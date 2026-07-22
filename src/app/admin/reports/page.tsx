@@ -15,7 +15,8 @@ import {
   AlertCircle,
   CheckCircle2,
   XCircle,
-  HelpCircle
+  HelpCircle,
+  Lock
 } from 'lucide-react';
 import { orderService } from '../../../services/orderService';
 import { businessService } from '../../../services/businessService';
@@ -44,6 +45,10 @@ export default function ReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<Toast | null>(null);
   const { profile: authProfile } = useAuth();
+
+  const planCode = businessProfile?.planCode || 'free';
+  const isDeveloperAccount = authProfile?.role === 'platform_owner' || authProfile?.business_id === 'biz-platform-owner';
+  const canExportReport = planCode === 'pro' || isDeveloperAccount;
 
   // Helper date generators
   const getTodayString = () => {
@@ -150,6 +155,11 @@ export default function ReportsPage() {
   };
 
   const handleExportCSV = () => {
+    if (!canExportReport) {
+      showToast('error', 'Fitur ekspor laporan (Excel/CSV) hanya tersedia untuk paket Pro. Silakan upgrade paket Anda.');
+      return;
+    }
+
     if (filteredOrders.length === 0 || !businessProfile) {
       showToast('error', 'Tidak ada data untuk diekspor.');
       return;
@@ -221,14 +231,14 @@ export default function ReportsPage() {
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
-            <span>Laporan & Ekspor Data</span>
+            <span>Laporan &amp; Ekspor Data</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
             Analisis penjualan, ringkasan pembayaran, dan ekspor spreadsheet transaksi.
           </p>
-          {businessProfile?.planCode === 'free' && (
+          {!canExportReport && (
             <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/5 py-1 px-2.5 rounded-full border border-amber-500/10 mt-2">
-              ⚠️ Ekspor laporan tersedia di paket Starter dan Pro (Mode Demo Aktif)
+              ⚠️ Fitur ekspor laporan (Excel/CSV) hanya tersedia pada paket Pro. Akun Anda saat ini berada di paket {planCode === 'starter' ? 'Starter' : 'Free'}.
             </span>
           )}
         </div>
@@ -247,9 +257,14 @@ export default function ReportsPage() {
             onClick={handleExportCSV}
             type="button"
             disabled={filteredOrders.length === 0}
-            className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-950/50 disabled:border-slate-900 disabled:text-slate-650 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-emerald-500/5 hover:shadow-emerald-500/10 transition-all flex items-center gap-1.5"
+            className={`px-5 py-2.5 font-black text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5 ${
+              canExportReport
+                ? 'bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-950/50 disabled:border-slate-900 disabled:text-slate-650 text-slate-950 shadow-emerald-500/5 hover:shadow-emerald-500/10 cursor-pointer'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white cursor-pointer border border-slate-700'
+            }`}
+            title={canExportReport ? 'Ekspor Laporan CSV' : 'Fitur ini khusus paket Pro'}
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
+            {canExportReport ? <FileSpreadsheet className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5 text-amber-400" />}
             <span>Ekspor CSV</span>
           </button>
         </div>

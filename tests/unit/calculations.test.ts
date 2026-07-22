@@ -23,6 +23,7 @@ describe('calculations utilities', () => {
     deliveryAdminFeeEnabled: true,
     deliveryAdminFeeType: 'fixed',
     deliveryAdminFeeValue: 2000,
+    deliveryInstruction: 'Pesanan delivery akan dikonfirmasi oleh kasir sebelum dikirim.',
   };
 
   describe('calculateDeliveryDistance', () => {

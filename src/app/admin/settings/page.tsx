@@ -1867,7 +1867,11 @@ export default function AdminSettingsPage() {
                 </div>
                 <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2">
                   <span className="text-slate-400">Limit Pesanan:</span>
-                  <span className="text-white font-bold">{activePlan ? activePlan.orderLimitMonthly : 100} / bln</span>
+                  <span className="text-white font-bold">
+                    {activePlan
+                      ? (activePlan.orderLimitMonthly === -1 || activePlan.orderLimitMonthly > 10000 ? 'Unlimited' : `${activePlan.orderLimitMonthly} / bln`)
+                      : 'Unlimited'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center text-xs border-t border-slate-900 pt-2">
                   <span className="text-slate-400">Limit Staf/Kasir:</span>
