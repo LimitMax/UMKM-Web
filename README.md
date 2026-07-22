@@ -1,6 +1,7 @@
 # 🚀 UMKM Pilot
 
-### A Production-Grade Multi-Tenant SaaS Platform with Split-Payment Gateways, Instant Auto-Sync, and LLM-Powered Business Analytics
+### A Production-Grade Multi-Tenant SaaS Platform for Micro, Small, and Medium Enterprises (UMKM)
+#### Split-Payment Gateways, Instant Auto-Sync, Real-Time Cashier Console, and LLM-Powered Business Analytics
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
@@ -14,93 +15,150 @@
 
 ## 📋 Table of Contents
 
-- [📖 Introduction & Overview](#-introduction--overview)
-- [✨ Core Application Modules](#-core-application-modules)
-- [🛠️ Technology Stack](#️-technology-stack)
-- [🏗️ Multi-Tenant Architecture & Payment Flow](#️-multi-tenant-architecture--payment-flow)
-- [⚡ Local Development & Setup](#-local-development--setup)
-- [🧪 Automated Testing Guide (Vitest + Playwright)](#-automated-testing-guide-vitest--playwright)
-- [🗂️ Project Directory Structure](#️-project-directory-structure)
-- [🚀 Deployment & Production Checklist](#-deployment--production-checklist)
-- [📄 License](#-license)
+1. [📖 Product Overview & Architecture](#-product-overview--architecture)
+2. [🗺️ End-to-End User Journeys & Feature Modules](#️-end-to-end-user-journeys--feature-modules)
+   - [🛒 1. Public Customer Self-Ordering Portal](#-1-public-customer-self-ordering-portal)
+   - [🔔 2. Real-Time Order Tracking & Payment Auto-Sync](#-2-real-time-order-tracking--payment-auto-sync)
+   - [👨‍🍳 3. Real-Time Cashier Operations Console](#-3-real-time-cashier-operations-console)
+   - [📊 4. Merchant Admin Management Dashboard](#-4-merchant-admin-management-dashboard)
+   - [👑 5. Platform Owner SaaS Management Portal](#-5-platform-owner-saas-management-portal)
+3. [💳 Subscription Plans & Feature Matrix](#-subscription-plans--feature-matrix)
+4. [📐 Database Schema & Multi-Tenant Security (RLS)](#-database-schema--multi-tenant-security-rls)
+5. [🔄 Sequence Diagrams & Data Flows](#-sequence-diagrams--data-flows)
+   - [Payment Auto-Synchronization Flow](#payment-auto-synchronization-flow)
+   - [Multi-Tenant Data Access Architecture](#multi-tenant-data-access-architecture)
+6. [🛠️ Technology Stack & Library Ecosystem](#️-technology-stack--library-ecosystem)
+7. [⚡ Local Development & Setup Guide](#-local-development--setup-guide)
+8. [🧪 Testing & Quality Assurance (Vitest + Playwright)](#-testing--quality-assurance-vitest--playwright)
+9. [📁 Comprehensive Directory Structure](#-comprehensive-directory-structure)
+10. [🚀 Production Deployment Checklist](#-production-deployment-checklist)
+11. [📄 License](#-license)
 
 ---
 
-## 📖 Introduction & Overview
+## 📖 Product Overview & Architecture
 
-**UMKM Pilot** is an end-to-end, multi-tenant SaaS application designed specifically for Micro, Small, and Medium Enterprises (UMKM / MSMEs). The platform streamlines the entire retail and culinary sales pipeline:
-1. **Self-Ordering Digital Catalog**: Mobile-first store page accessed via business slug (`/order/[businessSlug]`).
-2. **Direct Tenant Payment Gateway**: Payments process directly into the merchant's Midtrans account (QRIS, GoPay, ShopeePay, Virtual Accounts, Credit Cards).
-3. **Automated Real-Time Payment Auto-Sync**: Customer order status automatically updates to **Sudah Dibayar** as soon as payment settles—eliminating cashier validation bottlenecks and webhook dependencies.
-4. **Real-Time Cashier Console**: Orders stream instantly to cashiers via Supabase Realtime WebSocket channels (`/cashier`).
-5. **LLM-Powered Business Analytics**: **Nara AI Pilot** provides merchants with data-driven sales advice, inventory warnings, and automatic promo campaign recommendations.
+**UMKM Pilot** is a modern, full-stack, multi-tenant SaaS web application built to empower Indonesian Micro, Small, and Medium Enterprises (UMKM / MSMEs). The application eliminates traditional point-of-sale hardware dependencies, manual bank transfer confirmations, and fragmented management tools by providing an all-in-one digital ecosystem.
 
----
-
-## ✨ Core Application Modules
-
-### 🛒 1. Customer Ordering & Self-Tracking
-- **Dynamic Digital Menu**: Instant loading via store slug with category navigation and live product search.
-- **Midtrans Payment Integration**: Native Snap payment popup supporting QRIS, Virtual Accounts (BCA, BNI, BRI, Permata, Mandiri, CIMB), E-Wallets, and Credit Cards.
-- **3-Second Auto-Polling Status Tracker**: Real-time status tracker (`/order/[businessSlug]/track`) that polls status every 3 seconds for pending payments and automatically stops when settled.
-- **Printable Digital Receipts**: Accessible digital receipt view (`/receipt/[orderId]`).
-
-### 🏪 2. Cashier Operations Console
-- **Sub-Second Real-Time Queue**: Instant order arrival via Supabase Realtime broadcast channels (`/cashier`).
-- **Atomic Order Lifecycle**: Transition order status (`pending` → `paid` → `processing` → `ready` → `completed` / `cancelled`).
-- **Automatic Inventory Reconciliation**: Stock is deducted upon checkout and restored automatically if an order is cancelled.
-
-### 📊 3. Merchant Administration Dashboard
-- **Business Insights**: Live performance charts, daily revenue metrics, top-selling items, and fulfillment breakdowns (`/admin/insights`).
-- **Inventory Control**: Low-stock alerts, stock adjustments, and product catalog management (`/admin/products`, `/admin/stock`).
-- **Promo Vouchers**: Merchant-configurable discount codes with redemption limits (`/admin/vouchers`).
-- **Nara AI Pilot Assistant**: Contextual AI assistant analyzing real-time store metrics.
-
-### 🏢 4. Platform Owner Portal
-- **Tenant Management**: Multi-tenant business metrics, plan statuses, and business toggles (`/platform/businesses`).
-- **SaaS Plan Billing**: Automated billing for Starter/Pro tiers (`/platform/subscriptions`).
-- **Platform Campaign Coupons**: Global promotional coupons across stores (`/platform/coupons`).
-- **System Monitoring**: Live health check monitoring Supabase, Auth, Midtrans, and AI engines (`/platform/monitoring`).
+### Core Value Propositions:
+- **Instant Digital Storefront**: Each merchant receives a dedicated public ordering page accessible via unique slug (`/order/[businessSlug]`).
+- **Direct Merchant Payment Integration**: Payments process directly into the merchant's Midtrans Payment Gateway account via QRIS, E-Wallets (GoPay, ShopeePay), Virtual Accounts, or Cash.
+- **Non-Blocking Payment Auto-Sync**: Orders automatically update to **Paid (Lunas)** within 3 seconds of payment settlement—bypassing webhook bottlenecks.
+- **Sub-Second Cashier WebSockets**: Orders stream directly to the cashier kitchen console (`/cashier`) via Supabase Realtime channels with audio-visual notifications.
+- **Nara AI Pilot Assistant**: Embedded AI analytics engine providing data-driven sales insights, inventory warnings, and automatic promo recommendations.
+- **Granular SaaS Plan Tiering**: Flexible Free, Starter, and Pro tiers with custom feature flags managed dynamically by the Platform Owner.
 
 ---
 
-## 🛠️ Technology Stack
+## 🗺️ End-to-End User Journeys & Feature Modules
 
-| Layer | Technology | Purpose |
-| :--- | :--- | :--- |
-| **Framework** | **Next.js 16.2 (App Router + Turbopack)** | SSR, API routes, and optimized routing |
-| **Language** | **TypeScript 5** | End-to-end static typing and compile-time safety |
-| **Database** | **PostgreSQL (Supabase)** | Multi-tenant database with Row Level Security (RLS) |
-| **Auth & Security** | **Supabase Auth & RLS** | Tenant isolation and session authentication |
-| **Realtime** | **Supabase Realtime** | Sub-second order queue WebSockets |
-| **Payments** | **Midtrans Snap & Core API** | Tenant-split payments & non-blocking status auto-sync |
-| **Unit Testing** | **Vitest + JSDOM** | Fast unit and helper function testing |
-| **E2E Testing** | **Playwright** | End-to-end browser user journey testing |
-| **AI Engine** | **OpenAI API Standard** | Nara AI Pilot analytical engine |
-
----
-
-## 🏗️ Multi-Tenant Architecture & Payment Flow
-
-### PostgreSQL Row Level Security (RLS)
-Data isolation across tenants is strictly enforced at the database level using `business_id` filters.
-
-```mermaid
-graph TD
-    Client[Customer / Cashier / Owner] -->|HTTP / REST| Gateway[Next.js App Router]
-    Gateway -->|JWT Session / Auth| DB[(Supabase PostgreSQL)]
-
-    subgraph Database RLS Policies
-        DB --> RLS_Biz[Businesses Table: tenant_id check]
-        DB --> RLS_Prod[Products Table: tenant_id check]
-        DB --> RLS_Ord[Orders Table: tenant_id check]
-    end
-
-    RLS_Biz -->|Allow Access| MerchantA[Merchant A Workspace]
-    RLS_Biz -->|Block Access| MerchantB[Merchant B Workspace]
+```
+                    ┌─────────────────────────────────────────────────────────┐
+                    │                    UMKM PILOT ECOSYSTEM                 │
+                    └─────────────────────────────────────────────────────────┘
+                                                 │
+      ┌────────────────────────┬─────────────────┴───────────────┬────────────────────────┐
+      ▼                        ▼                                 ▼                        ▼
+┌───────────┐            ┌───────────┐                     ┌───────────┐            ┌───────────┐
+│ Customer  │            │  Cashier  │                     │ Merchant  │            │ Platform  │
+│ Portal    │            │  Console  │                     │ Admin     │            │ Owner     │
+└───────────┘            └───────────┘                     └───────────┘            └───────────┘
 ```
 
-### Automatic Payment Synchronization Sequence
+### 🛒 1. Public Customer Self-Ordering Portal
+- **Location**: `/order/[businessSlug]`
+- **Key Features**:
+  - **Dynamic Product Catalog**: Real-time menu list grouped by categories (Food, Drinks, Snacks, Packages) with instant search filtering.
+  - **Fulfillment Types**: Choice between **Takeaway (Bungkus)**, **Dine-In (Makan di Tempat)**, and **Delivery (Pengiriman)**.
+  - **Dynamic Delivery Calculation**: Supports fixed-rate and distance-based shipping fees (`/km`) with configurable base distance thresholds and rounding modes.
+  - **Promo Voucher Validation**: Real-time coupon code redemption supporting fixed Rupiah discounts or percentage markdowns.
+  - **Midtrans Payment Gateway**: Native Snap modal integration supporting QRIS, Mandiri/BCA/BNI/BRI/Permata/CIMB Virtual Accounts, GoPay, ShopeePay, Credit Cards, and Cash.
+  - **Receipt & Invoice**: Instant digital receipt generation (`/receipt/[orderId]`) printable for physical documentation.
+
+### 🔔 2. Real-Time Order Tracking & Payment Auto-Sync
+- **Location**: `/order/[businessSlug]/track`
+- **Key Features**:
+  - **Order Tracking Code**: Accessible using unique 6-character short tracking codes (e.g. `K8P2Q9`).
+  - **3-Second Auto-Sync Poller**: Background polling algorithm querying Midtrans Core API status. As soon as payment completes, the status instantly flips to `Paid` in the database and triggers the cashier screen.
+  - **Visual Order Progression**: Timeline steps displaying `Waiting Payment` ➔ `Paid / Queue` ➔ `Processing` ➔ `Ready` ➔ `Completed`.
+  - **Store Delivery Note**: Displays custom delivery instructions configured by the merchant.
+
+### 👨‍🍳 3. Real-Time Cashier Operations Console
+- **Location**: `/cashier`
+- **Key Features**:
+  - **Sub-Second Realtime Queue**: Supabase WebSocket channel (`realtimeService`) broadcasting incoming paid and cash orders instantly.
+  - **Audio-Visual Order Alerts**: Sound notification chime when new orders arrive.
+  - **Atomic Lifecycle Transitions**: Cashiers advance orders through statuses (`Waiting Payment` ➔ `Paid` ➔ `Processing` ➔ `Ready` ➔ `Completed` or `Cancelled`).
+  - **Automatic Inventory Reconciliation**: Product stock is automatically deducted upon successful checkout and restored back to inventory if an order is cancelled.
+  - **Staff Role Isolation**: Secured cashier logins restricted strictly to store operational management.
+
+### 📊 4. Merchant Admin Management Dashboard
+- **Location**: `/admin`
+- **Key Features**:
+  - **Performance Analytics (`/admin/insights`)**: Live sales charts, revenue metrics, top-performing items, order volume graphs, and **Nara AI Pilot** advisor.
+  - **Product & Category Control (`/admin/products`)**: Add, edit, archive products, set pricing, upload images, and assign categories.
+  - **Stock Management (`/admin/stock`)**: Low-stock warning badges, stock history, and quick inventory adjustments.
+  - **Transactions List (`/admin/transactions`)**: Search, filter, and review historical orders with manual status override.
+  - **Reports & Data Export (`/admin/reports`)**: Filter sales by date ranges, order statuses, and payment methods. Export complete spreadsheet data as UTF-8 CSV/Excel (Gated to Pro plan).
+  - **Promo Voucher Manager (`/admin/vouchers`)**: Create store-specific vouchers with usage caps and minimum transaction thresholds.
+  - **Store & Delivery Configuration (`/admin/settings`)**: Configure business profile, tax rates, service charges, delivery parameters, cashier staff accounts, and Midtrans API keys.
+
+### 👑 5. Platform Owner SaaS Management Portal
+- **Location**: `/platform`
+- **Key Features**:
+  - **Business Directory (`/platform/businesses`)**: Complete overview of all registered tenant stores, status management (Active, Trial, Suspended), and direct store profile inspection (`/platform/businesses/[id]`).
+  - **Customizable SaaS Plans (`/platform/plans`)**: Create and edit subscription plans (Free, Starter, Pro, Enterprise). Platform Owners can customize:
+    - **Feature Toggles**: Enable/Disable AI Insights (`ai_enabled`), Midtrans Payments (`midtrans_enabled`), and Report Export (`report_export_enabled`).
+    - **Limits**: Set Product Limit (`product_limit`), Staff/Cashier Limit (`cashier_limit`), and Monthly Order Limit (`order_limit_monthly`, -1 = Unlimited).
+    - **Pricing**: Configure monthly & annual pricing (Annual billing automatically provides 1 month free / 11x monthly price).
+  - **Subscription Monitoring (`/platform/subscriptions`)**: Track tenant plan assignments, trial expiry dates, and Midtrans subscription status.
+  - **Global Coupons (`/platform/coupons`)**: Create platform-wide promotional discount coupons for SaaS plan subscriptions.
+  - **System Health Monitor (`/platform/monitoring`)**: Live status check monitoring Database latency, Auth engine, Midtrans gateway endpoints, and AI models.
+  - **SaaS Business Analytics (`/platform/analytics`)**: Monthly Recurring Revenue (MRR), Annual Recurring Revenue (ARR), active tenant count, and plan distribution metrics.
+
+---
+
+## 💳 Subscription Plans & Feature Matrix
+
+UMKM Pilot offers flexible subscription plans tailored to merchant growth stages:
+
+| Feature / Limit | Free / Trial | Starter | Pro |
+| :--- | :---: | :---: | :---: |
+| **Monthly Price** | **Rp 0** | **Rp 99.000 / bulan** | **Rp 199.000 / bulan** |
+| **Annual Price** *(Gratis 1 Bulan)* | **Rp 0** | **Rp 1.089.000 / tahun** | **Rp 2.189.000 / tahun** |
+| **Product Menu Limit** | 20 Products | 100 Products | 500 Products |
+| **Monthly Order Limit** | **Unlimited** | **Unlimited** | **Unlimited** |
+| **Cashier Account Limit** | 1 Account | 3 Accounts | 10 Accounts |
+| **Online Payment (Midtrans / QRIS)** | ❌ Disabled | ✅ Enabled | ✅ Enabled |
+| **Report Export (Excel / CSV)** | ❌ Disabled | ❌ Disabled | ✅ Enabled |
+| **Nara AI Pilot Advisor** | ❌ Disabled | ❌ Disabled | ✅ Enabled |
+
+> *Note: Platform Owners can customize feature toggles and limits for any custom plan tier via the `/platform/plans` dashboard.*
+
+---
+
+## 📐 Database Schema & Multi-Tenant Security (RLS)
+
+Data security and tenant isolation are enforced directly in PostgreSQL via **Supabase Row Level Security (RLS)** using `business_id` scoping.
+
+### Core Database Tables:
+- `businesses`: Store profile, slug, settings, payment keys, and active plan reference.
+- `profiles`: User profiles linked to `auth.users` with roles (`platform_owner`, `business_owner`, `cashier`) and `business_id`.
+- `plans`: SaaS tier specifications (`price_monthly`, `price_annual`, `ai_enabled`, `midtrans_enabled`, `report_export_enabled`, `cashier_limit`, `product_limit`, `order_limit_monthly`).
+- `business_subscriptions`: Active store subscriptions, trial dates, and billing status.
+- `products`: Product catalog items with prices, stock counts, categories, and image URLs.
+- `orders`: Transaction headers storing fulfillment type, customer details, subtotal, shipping fees, tax, service charge, and status.
+- `order_items`: Order line item details snapshotting product name and price at checkout time.
+- `payments`: Midtrans payment transactions, transaction IDs, payment methods, and settlement timestamps.
+- `vouchers`: Store promotional discount codes.
+- `coupons`: Global SaaS plan subscription promotional codes.
+- `midtrans_transactions_log`: Audit logs for all Midtrans status synchronization events.
+
+---
+
+## 🔄 Sequence Diagrams & Data Flows
+
+### Payment Auto-Synchronization Flow
 
 ```mermaid
 sequenceDiagram
@@ -110,52 +168,88 @@ sequenceDiagram
     participant API as Track API (/api/public/orders/track)
     participant CoreAPI as Midtrans Core API
     participant DB as Supabase PostgreSQL
+    participant Realtime as Cashier WebSocket
 
-    Customer->>Tracker: Opens tracking page (/track?code=K8P2Q9)
-    loop Every 3 seconds (if pending)
-        Tracker->>API: POST /api/public/orders/track
-        API->>CoreAPI: GET /v2/{order_id}/status
-        CoreAPI-->>API: 200 OK (transaction_status: settlement)
-        API->>DB: UPDATE payments SET status='paid' & orders SET payment_status='paid'
-        API-->>Tracker: Returns order (paymentStatus: 'paid')
-        Tracker->>Tracker: Clear 3s interval, show Green Success Alert Banner
+    Customer->>Tracker: Customer opens tracker page (/order/warung-kopi/track?code=K8P2Q9)
+    loop Every 3 seconds (while payment is pending)
+        Tracker->>API: POST /api/public/orders/track { orderId, trackingCode }
+        API->>CoreAPI: GET /v2/{order_id}/status (Midtrans Core API)
+        CoreAPI-->>API: 200 OK (transaction_status: "settlement")
+        API->>DB: Update payment status='paid' & order status='Paid'
+        DB-->>Realtime: Fire postgres_changes broadcast event
+        Realtime-->>Cashier: Instant order notification sound & queue update
+        API-->>Tracker: Returns order object { paymentStatus: 'paid' }
+        Tracker->>Tracker: Stop 3s poller & render Green Success Banner
     end
+```
+
+### Multi-Tenant Data Access Architecture
+
+```mermaid
+graph TD
+    User[Client Request: JWT Token] --> Gateway[Next.js App Router API / RLS Engine]
+    
+    subgraph PostgreSQL Row Level Security (RLS)
+        Gateway --> AuthCheck{Check auth.uid()}
+        AuthCheck -->|Extract business_id| RLSFilter[Apply RLS Policy: WHERE business_id = user_business_id]
+    end
+
+    RLSFilter -->|Tenant A| DataA[(Merchant A Data Isolated)]
+    RLSFilter -->|Tenant B| DataB[(Merchant B Data Isolated)]
 ```
 
 ---
 
-## ⚡ Local Development & Setup
+## 🛠️ Technology Stack & Library Ecosystem
+
+| Component | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Framework** | **Next.js 16.2 (App Router)** | Full-stack React framework with SSR, Turbopack, and API routes |
+| **Language** | **TypeScript 5** | Strict type safety across database models, API handlers, and UI components |
+| **Styling** | **Tailwind CSS 3.4** | Utility-first CSS styling with glassmorphism, dark mode, and responsive layouts |
+| **Icons** | **Lucide React** | Clean, modern icon library |
+| **Database** | **PostgreSQL (Supabase)** | Cloud database with native Row Level Security (RLS) |
+| **Auth & Realtime**| **Supabase Auth & Realtime** | JWT authentication, RBAC, and WebSocket broadcast channels |
+| **Payment Gateway** | **Midtrans Snap & Core API** | Integrated online payment modal and server-side payment verification |
+| **AI Analytics** | **OpenAI API Standard** | Nara AI Pilot smart store analysis and promo recommendations |
+| **Unit Testing** | **Vitest + JSDOM** | High-performance unit test runner for business calculations and formatting |
+| **E2E Testing** | **Playwright** | Cross-browser automated user journey testing |
+
+---
+
+## ⚡ Local Development & Setup Guide
 
 ### Prerequisites
-- **Node.js**: v18.x or newer
+- **Node.js**: `v18.18.0` or newer (Recommended: Node 20 LTS)
+- **npm**: `v9.x` or newer
 - **Supabase**: Active Supabase project
-- **Midtrans Account**: Sandbox account keys
+- **Midtrans**: Midtrans Sandbox Developer Account
 
-### 1. Clone & Install Dependencies
+### 1. Clone & Install Project
 ```bash
 git clone https://github.com/your-username/umkm-pilot.git
 cd umkm-pilot
 npm install
 ```
 
-### 2. Configure Environment Variables
-Create `.env.local` in the project root:
+### 2. Environment Variables Configuration
+Create a `.env.local` file in the root directory:
 
 ```env
-# Supabase Configuration
+# Supabase Database Configuration
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-client-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-secure-server-service-key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 
-# Developer & Owner Accounts
+# Developer & Platform Owner Privileges
 NEXT_PUBLIC_DEVELOPER_EMAILS=owner@platform.com,developer@platform.com
 
-# LLM Config (OpenAI API Standard compatible)
-LLM_API_KEY=your-api-key
+# LLM AI Engine (OpenAI Compatible)
+LLM_API_KEY=your-llm-api-key
 LLM_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=gpt-4o-mini
 
-# Midtrans Gateway Configuration
+# Midtrans Payment Gateway Configuration
 NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=SB-Mid-client-your-client-key
 MIDTRANS_SERVER_KEY=SB-Mid-server-your-server-key
 NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION=false
@@ -163,7 +257,13 @@ MIDTRANS_SNAP_BASE_URL=https://app.sandbox.midtrans.com
 MIDTRANS_CORE_API_BASE_URL=https://api.sandbox.midtrans.com
 ```
 
-### 3. Run Development Server
+### 3. Database Initialization (Supabase Migrations)
+Run SQL scripts located in `supabase/migrations/` sequentially inside your Supabase SQL Editor:
+1. `20260716000001_initial_schema.sql` (Tables, Foreign Keys, Indexes, RLS Policies)
+2. `20260716000002_functions_triggers.sql` (Triggers, Auto-Timestamp functions)
+3. `20260716000003_seed_data.sql` (Default Plans, Features, Coupons, Demo Store)
+
+### 4. Run Development Server
 ```bash
 npm run dev
 ```
@@ -171,89 +271,123 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🧪 Automated Testing Guide (Vitest + Playwright)
+## 🧪 Testing & Quality Assurance (Vitest + Playwright)
 
-The project includes unit, integration, and end-to-end test suites.
-
-### 1. Unit & Integration Testing (Vitest)
-Vitest executes tests for currency formatting, status mapping, and payment type conversions.
-
+### 1. Type Check Verification
+Ensure static types pass cleanly without compilation errors:
 ```bash
-# Run unit tests once
-npm run test
-
-# Run unit tests in watch mode
-npm run test:watch
+npx tsc --noEmit
 ```
 
-### 2. End-to-End Testing (Playwright)
-Playwright tests complete customer user journeys (catalog navigation, invalid code validation, cashier views).
-
+### 2. Unit Testing (Vitest)
+Executes unit tests for calculations, distance delivery fees, currency formatting, and ETA logic:
 ```bash
-# Install Playwright browser binaries (first-time setup)
+# Run unit tests
+npm run test
+
+# Run unit tests with UI interface
+npm run test:ui
+```
+
+### 3. End-to-End Testing (Playwright)
+Executes automated browser tests covering catalog checkout, order tracking, and cashier queues:
+```bash
+# Install Playwright browser binaries
 npx playwright install
 
-# Run E2E tests in headless mode
+# Run E2E tests
 npm run test:e2e
 ```
 
 ---
 
-## 🗂️ Project Directory Structure
+## 📁 Comprehensive Directory Structure
 
 ```text
 UMKM-Web/
-├── docs/                       # Architecture guides & checklists
-├── public/                     # Brand logos and static icons
+├── docs/                       # Architecture documentation and checklists
+├── public/                     # Static assets, branding, and icons
 ├── supabase/
-│   ├── migrations/             # SQL migrations in chronological order
-│   └── reset_database.sql      # Test workspace reset script
+│   ├── migrations/             # Chronological SQL migration files
+│   │   ├── 20260716000001_initial_schema.sql
+│   │   ├── 20260716000002_functions_triggers.sql
+│   │   └── 20260716000003_seed_data.sql
+│   └── reset_database.sql      # Local development database reset helper
 ├── tests/
 │   ├── e2e/                    # Playwright E2E browser tests
+│   │   ├── checkout-and-track.spec.ts
 │   │   └── order-flow.spec.ts
 │   └── unit/                   # Vitest unit test suites
+│       ├── calculations.test.ts
+│       ├── etaHelpers.test.ts
 │       ├── format.test.ts
 │       └── paymentHelpers.test.ts
 ├── src/
-│   ├── app/                    # Next.js App Router
-│   │   ├── admin/              # Merchant management dashboard
-│   │   ├── api/                # Secure API endpoints
-│   │   ├── cashier/            # Real-time cashier queue console
-│   │   ├── login/              # Authentication portal
-│   │   ├── order/              # Customer ordering & tracking
-│   │   ├── platform/           # Platform Owner SaaS portal
-│   │   ├── receipt/            # Digital printable receipt page
-│   │   ├── register/           # Multi-step store onboarding
-│   │   └── suspended/          # Account suspension screen
-│   ├── components/             # Reusable UI components
+│   ├── app/                    # Next.js App Router Routes & APIs
+│   │   ├── admin/              # Merchant Admin Management Console
+│   │   │   ├── insights/       # Sales analytics & Nara AI Pilot
+│   │   │   ├── products/       # Catalog & pricing management
+│   │   │   ├── reports/        # Sales summary & CSV/Excel export
+│   │   │   ├── settings/       # Store settings & Midtrans keys
+│   │   │   ├── stock/          # Inventory levels & stock adjustments
+│   │   │   ├── transactions/   # Order history & status management
+│   │   │   └── vouchers/       # Store promo codes
+│   │   ├── api/                # Backend API Endpoints
+│   │   │   ├── admin/          # Merchant admin protected APIs
+│   │   │   ├── payments/       # Midtrans client & server processors
+│   │   │   ├── platform/       # Platform Owner SaaS management APIs
+│   │   │   ├── public/         # Public store ordering & tracking APIs
+│   │   │   └── webhooks/       # Midtrans payment notification webhooks
+│   │   ├── cashier/            # Realtime Cashier Kitchen Queue Console
+│   │   ├── login/              # User Authentication Portal
+│   │   ├── order/              # Public Digital Catalog & Order Tracker
+│   │   │   └── [businessSlug]/ # Dynamic store ordering page & tracker
+│   │   ├── platform/           # Platform Owner SaaS Portal
+│   │   │   ├── analytics/      # SaaS MRR/ARR analytics
+│   │   │   ├── businesses/     # Multi-tenant directory
+│   │   │   ├── coupons/        # Global platform promotional coupons
+│   │   │   ├── monitoring/     # System health monitoring
+│   │   │   ├── plans/          # SaaS Plan tier customization
+│   │   │   └── subscriptions/  # SaaS Subscription tracking
+│   │   ├── receipt/            # Digital printable order receipt
+│   │   └── register/           # Multi-step merchant registration
+│   ├── components/             # Reusable UI & Layout Components
+│   │   ├── ai/                 # Floating Nara AI Assistant modal
+│   │   └── payments/           # Subscription modal & billing cycle toggles
 │   ├── lib/
-│   │   ├── data/               # Supabase data access layer
-│   │   ├── payments/           # Midtrans client, processors, audit logging
-│   │   ├── services/           # Services & broadcast channels
-│   │   └── supabase/           # Supabase client configurations
-│   ├── services/               # Front-end API wrappers
-│   ├── types/                  # Shared TypeScript types
-│   └── utils/                  # Currency, status mappers, ETA helpers
-├── playwright.config.ts        # Playwright test configuration
-├── vitest.config.ts            # Vitest test configuration
-└── README.md
+│   │   ├── ai/                 # Server AI prompt builder & models
+│   │   ├── data/               # Supabase data mappers & repositories
+│   │   ├── payments/           # Midtrans client & payment status processor
+│   │   ├── services/           # Realtime WebSockets & plan services
+│   │   ├── subscription/       # Subscription status helpers
+│   │   └── supabase/           # Supabase client & admin client factories
+│   ├── services/               # Frontend service abstraction layer
+│   ├── types/                  # TypeScript interface definitions
+│   └── utils/                  # Calculations, delivery fee, formatting helpers
+├── playwright.config.ts        # Playwright E2E configuration
+├── vitest.config.ts            # Vitest unit test configuration
+└── README.md                   # Project documentation
 ```
 
 ---
 
-## 🚀 Deployment & Production Checklist
+## 🚀 Production Deployment Checklist
 
-1. **Lint & Build Verification**:
+1. **Verify Lint & Type Checking**:
    ```bash
    npm run lint
+   npx tsc --noEmit
+   ```
+2. **Build Verification**:
+   ```bash
    npm run build
    ```
-2. **Database Realtime Enablement**:
+3. **Supabase Realtime Enablement**:
    Ensure PostgreSQL Realtime is enabled in Supabase for tables `orders` and `products`.
-3. **Midtrans Webhook URLs**:
-   Configure Midtrans Payment Notification URLs:
-   - Merchant Webhook: `https://your-domain.com/api/webhooks/midtrans`
-   - Subscription Webhook: `https://your-domain.com/api/subscriptions/midtrans/sync`
+4. **Configure Midtrans Production Webhooks**:
+   Set notification webhooks in Midtrans Production Dashboard:
+   - Payment Webhook: `https://your-domain.com/api/webhooks/midtrans`
+   - SaaS Subscription Webhook: `https://your-domain.com/api/subscriptions/midtrans/sync`
 
 ---
 
