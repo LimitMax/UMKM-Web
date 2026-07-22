@@ -22,17 +22,16 @@
    - [👨‍🍳 3. Real-Time Cashier Operations Console](#-3-real-time-cashier-operations-console)
    - [📊 4. Merchant Admin Management Dashboard](#-4-merchant-admin-management-dashboard)
    - [👑 5. Platform Owner SaaS Management Portal](#-5-platform-owner-saas-management-portal)
-3. [💳 Subscription Plans & Feature Matrix](#-subscription-plans--feature-matrix)
-4. [📐 Database Schema & Multi-Tenant Security (RLS)](#-database-schema--multi-tenant-security-rls)
-5. [🔄 Sequence Diagrams & Data Flows](#-sequence-diagrams--data-flows)
+3. [📐 Database Schema & Multi-Tenant Security (RLS)](#-database-schema--multi-tenant-security-rls)
+4. [🔄 Sequence Diagrams & Data Flows](#-sequence-diagrams--data-flows)
    - [Payment Auto-Synchronization Flow](#payment-auto-synchronization-flow)
    - [Multi-Tenant Data Access Architecture](#multi-tenant-data-access-architecture)
-6. [🛠️ Technology Stack & Library Ecosystem](#️-technology-stack--library-ecosystem)
-7. [⚡ Local Development & Setup Guide](#-local-development--setup-guide)
-8. [🧪 Testing & Quality Assurance (Vitest + Playwright)](#-testing--quality-assurance-vitest--playwright)
-9. [📁 Comprehensive Directory Structure](#-comprehensive-directory-structure)
-10. [🚀 Production Deployment Checklist](#-production-deployment-checklist)
-11. [📄 License](#-license)
+5. [🛠️ Technology Stack & Library Ecosystem](#️-technology-stack--library-ecosystem)
+6. [⚡ Local Development & Setup Guide](#-local-development--setup-guide)
+7. [🧪 Testing & Quality Assurance (Vitest + Playwright)](#-testing--quality-assurance-vitest--playwright)
+8. [📁 Comprehensive Directory Structure](#-comprehensive-directory-structure)
+9. [🚀 Production Deployment Checklist](#-production-deployment-checklist)
+10. [📄 License](#-license)
 
 ---
 
@@ -46,7 +45,7 @@
 - **Non-Blocking Payment Auto-Sync**: Orders automatically update to **Paid (Lunas)** within 3 seconds of payment settlement—bypassing webhook bottlenecks.
 - **Sub-Second Cashier WebSockets**: Orders stream directly to the cashier kitchen console (`/cashier`) via Supabase Realtime channels with audio-visual notifications.
 - **Nara AI Pilot Assistant**: Embedded AI analytics engine providing data-driven sales insights, inventory warnings, and automatic promo recommendations.
-- **Granular SaaS Plan Tiering**: Flexible Free, Starter, and Pro tiers with custom feature flags managed dynamically by the Platform Owner.
+- **Dynamic Plan Management**: Fully customizable subscription plans with dynamic feature toggles and limit configurations managed directly by the Platform Owner.
 
 ---
 
@@ -99,7 +98,7 @@
   - **Product & Category Control (`/admin/products`)**: Add, edit, archive products, set pricing, upload images, and assign categories.
   - **Stock Management (`/admin/stock`)**: Low-stock warning badges, stock history, and quick inventory adjustments.
   - **Transactions List (`/admin/transactions`)**: Search, filter, and review historical orders with manual status override.
-  - **Reports & Data Export (`/admin/reports`)**: Filter sales by date ranges, order statuses, and payment methods. Export complete spreadsheet data as UTF-8 CSV/Excel (Gated to Pro plan).
+  - **Reports & Data Export (`/admin/reports`)**: Filter sales by date ranges, order statuses, and payment methods. Export complete spreadsheet data as UTF-8 CSV/Excel.
   - **Promo Voucher Manager (`/admin/vouchers`)**: Create store-specific vouchers with usage caps and minimum transaction thresholds.
   - **Store & Delivery Configuration (`/admin/settings`)**: Configure business profile, tax rates, service charges, delivery parameters, cashier staff accounts, and Midtrans API keys.
 
@@ -107,7 +106,7 @@
 - **Location**: `/platform`
 - **Key Features**:
   - **Business Directory (`/platform/businesses`)**: Complete overview of all registered tenant stores, status management (Active, Trial, Suspended), and direct store profile inspection (`/platform/businesses/[id]`).
-  - **Customizable SaaS Plans (`/platform/plans`)**: Create and edit subscription plans (Free, Starter, Pro, Enterprise). Platform Owners can customize:
+  - **Customizable SaaS Plans (`/platform/plans`)**: Create and edit subscription plans. Platform Owners can customize:
     - **Feature Toggles**: Enable/Disable AI Insights (`ai_enabled`), Midtrans Payments (`midtrans_enabled`), and Report Export (`report_export_enabled`).
     - **Limits**: Set Product Limit (`product_limit`), Staff/Cashier Limit (`cashier_limit`), and Monthly Order Limit (`order_limit_monthly`, -1 = Unlimited).
     - **Pricing**: Configure monthly & annual pricing (Annual billing automatically provides 1 month free / 11x monthly price).
@@ -115,25 +114,6 @@
   - **Global Coupons (`/platform/coupons`)**: Create platform-wide promotional discount coupons for SaaS plan subscriptions.
   - **System Health Monitor (`/platform/monitoring`)**: Live status check monitoring Database latency, Auth engine, Midtrans gateway endpoints, and AI models.
   - **SaaS Business Analytics (`/platform/analytics`)**: Monthly Recurring Revenue (MRR), Annual Recurring Revenue (ARR), active tenant count, and plan distribution metrics.
-
----
-
-## 💳 Subscription Plans & Feature Matrix
-
-UMKM Pilot offers flexible subscription plans tailored to merchant growth stages:
-
-| Feature / Limit | Free / Trial | Starter | Pro |
-| :--- | :---: | :---: | :---: |
-| **Monthly Price** | **Rp 0** | **Rp 99.000 / bulan** | **Rp 199.000 / bulan** |
-| **Annual Price** *(Gratis 1 Bulan)* | **Rp 0** | **Rp 1.089.000 / tahun** | **Rp 2.189.000 / tahun** |
-| **Product Menu Limit** | 20 Products | 100 Products | 500 Products |
-| **Monthly Order Limit** | **Unlimited** | **Unlimited** | **Unlimited** |
-| **Cashier Account Limit** | 1 Account | 3 Accounts | 10 Accounts |
-| **Online Payment (Midtrans / QRIS)** | ❌ Disabled | ✅ Enabled | ✅ Enabled |
-| **Report Export (Excel / CSV)** | ❌ Disabled | ❌ Disabled | ✅ Enabled |
-| **Nara AI Pilot Advisor** | ❌ Disabled | ❌ Disabled | ✅ Enabled |
-
-> *Note: Platform Owners can customize feature toggles and limits for any custom plan tier via the `/platform/plans` dashboard.*
 
 ---
 
