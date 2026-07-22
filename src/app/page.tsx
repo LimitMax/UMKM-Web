@@ -65,14 +65,14 @@ export default function LandingPage() {
 
         {/* Headline */}
         <h1 className="text-4xl md:text-6xl font-extrabold text-center max-w-4xl tracking-tight leading-[1.15] mb-6">
-          Kembangkan Bisnismu Lebih Cepat dengan{' '}
+          Kelola Bisnis Lebih Cerdas dengan AI,{' '}
           <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
-            UMKM Pilot
+            Bukan Lebih Rumit
           </span>
         </h1>
 
         <p className="text-slate-400 text-center max-w-2xl text-base md:text-lg mb-12 leading-relaxed">
-          Ikuti ribuan pemilik usaha yang sukses bareng UMKM Pilot. Atur kasir pintar, stok otomatis, dan e-menu mandiri tanpa ribet. Biarkan AI kami yang analisis keuntungan, sementara Anda fokus buka cabang baru!
+          Dari kasir pintar hingga analisis bisnis berbasis AI, UMKM Pilot membantu UMKM bekerja lebih efisien, meningkatkan penjualan, dan mengambil keputusan dengan lebih percaya diri.
           <span className="block text-xs text-emerald-450 font-bold mt-3 bg-emerald-500/5 py-1 px-3.5 rounded-full border border-emerald-500/10 w-fit mx-auto animate-pulse">
             ✨ Mulai dari paket Free/Trial untuk mencoba.
           </span>
@@ -149,7 +149,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="w-full border-t border-slate-900 bg-black/40 py-6 text-center text-xs text-slate-500 relative z-10">
-        <p>© 2026 LimitMax. Dibuat dengan cinta untuk pertumbuhan UMKM Indonesia.</p>
+        <p>© 2026 LimitMax. Dibuat dengan ❤︎ untuk pertumbuhan UMKM Indonesia.</p>
       </footer>
     </div>
   );
